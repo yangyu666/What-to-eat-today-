@@ -1,0 +1,7 @@
+page {
+  --color-page: #f7f3ec;
+  --color-surface: #fffaf2;
+  --color-text: #302820;
+  --color-muted: #82766a;
+  --color-accent: #d95f35;
+}

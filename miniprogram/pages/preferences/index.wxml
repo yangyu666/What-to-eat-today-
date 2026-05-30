@@ -1,0 +1,18 @@
+<view class="page preferences-page">
+  <view class="section-heading">
+    <text class="section-title">口味偏好</text>
+    <text class="muted">先保留本地状态，后续接云端用户画像。</text>
+  </view>
+
+  <view class="option-list">
+    <button
+      class="option {{item.selected ? 'is-selected' : ''}}"
+      wx:for="{{options}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      bindtap="toggleOption"
+    >
+      {{item.label}}
+    </button>
+  </view>
+</view>

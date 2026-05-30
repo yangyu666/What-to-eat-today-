@@ -1,0 +1,17 @@
+{
+  "name": "what-to-eat-today",
+  "version": "0.1.0",
+  "private": true,
+  "description": "今天吃什么微信小程序工程骨架",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"miniprogram/**/*.ts\""
+  },
+  "devDependencies": {
+    "@types/wechat-miniprogram": "^3.4.8",
+    "@typescript-eslint/eslint-plugin": "^8.33.0",
+    "@typescript-eslint/parser": "^8.33.0",
+    "eslint": "^9.28.0",
+    "typescript": "^5.8.3"
+  }
+}

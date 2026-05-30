@@ -1,0 +1,14 @@
+<view class="page mine-page">
+  <view class="profile">
+    <view class="avatar">吃</view>
+    <view>
+      <text class="nickname">{{nickname}}</text>
+      <text class="status">{{cloudStatus}}</text>
+    </view>
+  </view>
+
+  <view class="info-panel">
+    <text class="panel-title">开发状态</text>
+    <text class="panel-text">当前仅初始化工程骨架，登录、订阅提醒、云数据库会在后续迭代接入。</text>
+  </view>
+</view>

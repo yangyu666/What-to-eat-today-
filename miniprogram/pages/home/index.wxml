@@ -1,0 +1,24 @@
+<view class="page home-page">
+  <view class="hero">
+    <text class="eyebrow">TODAY</text>
+    <text class="title">今天吃什么</text>
+    <text class="subtitle">先给你一个靠谱选择，后面再接入偏好和云端推荐。</text>
+  </view>
+
+  <view class="recommend-card" wx:if="{{recommendation}}">
+    <text class="card-label">今日推荐</text>
+    <text class="meal-name">{{recommendation.name}}</text>
+    <view class="tag-row">
+      <text class="tag" wx:for="{{recommendation.tags}}" wx:key="*this">{{item}}</text>
+    </view>
+    <text class="reason">{{recommendation.reason}}</text>
+    <view class="meta-row">
+      <text>约 {{recommendation.estimatedMinutes}} 分钟</text>
+      <button class="text-button" bindtap="refreshRecommendation" loading="{{loading}}">换一个</button>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <text>正在想今天吃什么...</text>
+  </view>
+</view>
