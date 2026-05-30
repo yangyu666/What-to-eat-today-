@@ -1,0 +1,66 @@
+<view class="page result-page">
+  <view class="result-header">
+    <text class="eyebrow">RECOMMENDATION</text>
+    <text class="page-title">推荐结果</text>
+    <text class="desc">已结合 {{answerCount}} 个选择，用本地 mock 算法匹配今天最适合的一家。</text>
+  </view>
+
+  <view class="empty-state" wx:if="{{loading}}">
+    <text>正在匹配附近适合的一家...</text>
+  </view>
+
+  <view class="result-card" wx:elif="{{recommendation}}">
+    <view class="card-head">
+      <view class="restaurant-info">
+        <text class="label">就近推荐</text>
+        <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
+        <text class="meal-name">推荐菜：{{mealNameText}}</text>
+      </view>
+      <view class="match-badge">
+        <text class="match-number">{{matchPercent}}%</text>
+        <text class="match-label">匹配</text>
+      </view>
+    </view>
+
+    <view class="meta-grid">
+      <view class="meta-item">
+        <text class="meta-label">距离</text>
+        <text class="meta-value">{{distanceText}}</text>
+      </view>
+      <view class="meta-item">
+        <text class="meta-label">人均</text>
+        <text class="meta-value">{{averageCostText}}</text>
+      </view>
+    </view>
+
+    <view class="tag-row">
+      <text class="tag" wx:for="{{recommendation.tags}}" wx:key="*this">{{item}}</text>
+    </view>
+
+    <view class="reason-box">
+      <text class="reason-label">推荐原因</text>
+      <text class="reason">{{recommendation.reason}}</text>
+    </view>
+
+    <text class="prompt" wx:if="{{promptText}}">你的补充：{{promptText}}</text>
+
+    <view class="switch-limit">
+      <text wx:if="{{accepted}}">已采纳，这顿饭定了。</text>
+      <text wx:elif="{{locked}}">结果已锁定。</text>
+      <text wx:else>还可以换 {{maxSwitchCount - switchCount}} 次</text>
+    </view>
+
+    <view class="action-row">
+      <button class="secondary-button" bindtap="switchRestaurant" disabled="{{locked || accepted}}">
+        {{locked || accepted ? '已锁定' : '换一家'}}
+      </button>
+      <button class="primary-button" bindtap="acceptRestaurant" disabled="{{accepted}}">
+        {{accepted ? '已采纳' : '就吃这家'}}
+      </button>
+    </view>
+  </view>
+
+  <view class="empty-state" wx:else>
+    <text>暂时没有可推荐的店。</text>
+  </view>
+</view>

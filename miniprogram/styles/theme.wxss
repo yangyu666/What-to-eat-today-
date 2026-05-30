@@ -1,7 +1,9 @@
 page {
-  --color-page: #f7f3ec;
-  --color-surface: #fffaf2;
-  --color-text: #302820;
-  --color-muted: #82766a;
-  --color-accent: #d95f35;
+  --color-page: #f6f8f7;
+  --color-surface: #ffffff;
+  --color-text: #1f2430;
+  --color-muted: #7f8794;
+  --color-accent: #18c653;
+  --color-accent-dark: #0fa944;
+  --color-line: #edf0f2;
 }

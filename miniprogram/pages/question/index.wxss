@@ -1,0 +1,136 @@
+.question-page {
+  display: flex;
+  flex-direction: column;
+  gap: 34rpx;
+  background: var(--color-page);
+}
+
+.question-nav {
+  display: grid;
+  grid-template-columns: 80rpx 1fr 100rpx;
+  align-items: center;
+  min-height: 64rpx;
+}
+
+.icon-button,
+.skip-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text);
+  font-size: 32rpx;
+}
+
+.icon-button {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  font-size: 54rpx;
+  line-height: 1;
+}
+
+.skip-button {
+  color: var(--color-muted);
+  font-size: 26rpx;
+}
+
+.progress-text {
+  color: var(--color-text);
+  font-size: 30rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.progress-track {
+  width: 100%;
+  height: 10rpx;
+  border-radius: 999rpx;
+  background: #e8ecef;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.question-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14rpx;
+  padding-top: 34rpx;
+}
+
+.question-title {
+  color: var(--color-text);
+  font-size: 42rpx;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.question-subtitle {
+  color: var(--color-muted);
+  font-size: 28rpx;
+}
+
+.option-list {
+  display: flex;
+  flex-direction: column;
+  gap: 28rpx;
+}
+
+.option-card {
+  display: grid;
+  grid-template-columns: 150rpx 1fr;
+  align-items: center;
+  gap: 28rpx;
+  min-height: 176rpx;
+  padding: 30rpx;
+  border: 1rpx solid var(--color-line);
+  border-radius: 28rpx;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-surface);
+  box-shadow: 0 14rpx 36rpx rgba(23, 31, 44, 0.06);
+}
+
+.option-card:nth-child(odd) {
+  background: linear-gradient(90deg, #fff1f0 0%, #ffffff 72%);
+}
+
+.option-card:nth-child(even) {
+  background: linear-gradient(90deg, #eefaf2 0%, #ffffff 72%);
+}
+
+.option-visual {
+  width: 132rpx;
+  height: 112rpx;
+  border-radius: 999rpx;
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #f7b66e 34%, #e44f35 68%, #c83b25 100%);
+  box-shadow: inset 0 0 0 12rpx rgba(255, 255, 255, 0.35);
+}
+
+.option-card:nth-child(even) .option-visual {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #a9e7b7 38%, #48c970 70%, #1f9b4c 100%);
+}
+
+.option-title,
+.option-desc {
+  display: block;
+}
+
+.option-title {
+  color: var(--color-text);
+  font-size: 34rpx;
+  font-weight: 800;
+}
+
+.option-desc {
+  margin-top: 12rpx;
+  color: var(--color-muted);
+  font-size: 25rpx;
+}

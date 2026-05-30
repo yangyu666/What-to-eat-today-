@@ -1,24 +1,55 @@
 <view class="page home-page">
+  <view class="top-row">
+    <view class="location-pill">
+      <text class="location-dot">●</text>
+      <text>{{locationStatus}}</text>
+    </view>
+    <view class="weather-card">
+      <text class="weather-icon">☀</text>
+      <text>26°C</text>
+    </view>
+  </view>
+
   <view class="hero">
-    <text class="eyebrow">TODAY</text>
-    <text class="title">今天吃什么</text>
-    <text class="subtitle">先给你一个靠谱选择，后面再接入偏好和云端推荐。</text>
+    <text class="greeting">Hi，小明 👋</text>
+    <text class="subtitle">中午好，今天想吃点什么呢？</text>
+    <text class="title">今天吃<text class="accent">什么</text>？</text>
+    <text class="hero-note"><text class="accent">30秒</text>结束选择困难</text>
   </view>
 
-  <view class="recommend-card" wx:if="{{recommendation}}">
-    <text class="card-label">今日推荐</text>
-    <text class="meal-name">{{recommendation.name}}</text>
-    <view class="tag-row">
-      <text class="tag" wx:for="{{recommendation.tags}}" wx:key="*this">{{item}}</text>
-    </view>
-    <text class="reason">{{recommendation.reason}}</text>
-    <view class="meta-row">
-      <text>约 {{recommendation.estimatedMinutes}} 分钟</text>
-      <button class="text-button" bindtap="refreshRecommendation" loading="{{loading}}">换一个</button>
-    </view>
+  <view class="input-panel">
+    <input
+      class="wish-input"
+      placeholder="一句话告诉我：想吃辣、清淡、快一点..."
+      placeholder-class="input-placeholder"
+      value="{{promptText}}"
+      bindinput="onPromptInput"
+    />
+    <button class="primary-button" bindtap="startQuestionnaire">帮我决定</button>
+    <button class="secondary-button" bindtap="startQuestionnaire">我有要求</button>
   </view>
 
-  <view class="empty-state" wx:else>
-    <text>正在想今天吃什么...</text>
+  <view class="history-entry" bindtap="openHistory">
+    <view>
+      <text class="entry-title">历史记录</text>
+      <text class="entry-desc">查看之前吃过和推荐过的选择</text>
+    </view>
+    <text class="entry-arrow">›</text>
+  </view>
+
+  <view class="recent-section">
+    <view class="section-header">
+      <text class="section-title">最近推荐</text>
+      <text class="section-link" bindtap="openHistory">查看全部 ›</text>
+    </view>
+    <view class="recent-list">
+      <view class="recent-card" wx:for="{{recentMeals}}" wx:key="id">
+        <view class="meal-cover {{item.coverClass}}">
+          <text>{{item.matchText}}</text>
+        </view>
+        <text class="meal-name">{{item.name}}</text>
+        <text class="meal-time">{{item.timeText}}</text>
+      </view>
+    </view>
   </view>
 </view>

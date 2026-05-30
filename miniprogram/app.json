@@ -1,6 +1,8 @@
 {
   "pages": [
     "pages/home/index",
+    "pages/question/index",
+    "pages/result/index",
     "pages/preferences/index",
     "pages/history/index",
     "pages/mine/index"
@@ -9,26 +11,22 @@
     "navigationBarTitleText": "今天吃什么",
     "navigationBarBackgroundColor": "#ffffff",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f7f3ec",
+    "backgroundColor": "#f6f8f7",
     "backgroundTextStyle": "dark"
   },
   "tabBar": {
-    "color": "#7b746c",
-    "selectedColor": "#d95f35",
+    "color": "#8a929f",
+    "selectedColor": "#18c653",
     "backgroundColor": "#ffffff",
     "borderStyle": "black",
     "list": [
       {
         "pagePath": "pages/home/index",
-        "text": "推荐"
-      },
-      {
-        "pagePath": "pages/preferences/index",
-        "text": "偏好"
+        "text": "首页"
       },
       {
         "pagePath": "pages/history/index",
-        "text": "记录"
+        "text": "历史"
       },
       {
         "pagePath": "pages/mine/index",

@@ -5,7 +5,8 @@
   "description": "今天吃什么微信小程序工程骨架",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"miniprogram/**/*.ts\""
+    "lint": "eslint \"miniprogram/**/*.ts\"",
+    "test:recommendation": "tsc scripts/recommendationEngine.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/recommendation-test --skipLibCheck --strict && node .tmp/recommendation-test/scripts/recommendationEngine.test.js"
   },
   "devDependencies": {
     "@types/wechat-miniprogram": "^3.4.8",

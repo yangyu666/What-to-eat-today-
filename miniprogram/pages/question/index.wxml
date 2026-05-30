@@ -1,0 +1,32 @@
+<view class="page question-page">
+  <view class="question-nav">
+    <button class="icon-button" bindtap="goBack">‹</button>
+    <text class="progress-text">{{progressText}}</text>
+    <button class="skip-button" bindtap="skipQuestion">跳过</button>
+  </view>
+
+  <view class="progress-track">
+    <view class="progress-bar" style="width: {{progressPercent}}%;"></view>
+  </view>
+
+  <view class="question-header">
+    <text class="question-title">{{currentQuestion.title}}</text>
+    <text class="question-subtitle">选择你的当前偏好</text>
+  </view>
+
+  <view class="option-list">
+    <button
+      class="option-card"
+      wx:for="{{currentQuestion.options}}"
+      wx:key="id"
+      data-option-id="{{item.id}}"
+      bindtap="selectOption"
+    >
+      <view class="option-visual"></view>
+      <view>
+        <text class="option-title">{{item.label}}</text>
+        <text class="option-desc">点一下，继续下一题</text>
+      </view>
+    </button>
+  </view>
+</view>
