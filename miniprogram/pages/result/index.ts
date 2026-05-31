@@ -10,7 +10,6 @@ Page({
     currentIndex: 0,
     recommendation: null as MealCandidate | null,
     answerCount: 0,
-    promptText: '',
     loading: false,
     switchCount: 0,
     maxSwitchCount: MAX_SWITCH_COUNT,
@@ -24,12 +23,11 @@ Page({
 
   onLoad() {
     const result = wx.getStorageSync('meal_questionnaire_result') as
-      | (UserQuestionnaireResult & { promptText?: string })
+      | UserQuestionnaireResult
       | undefined;
 
     this.setData({
-      answerCount: result?.answers?.length || 0,
-      promptText: result?.promptText || ''
+      answerCount: result?.answers?.length || 0
     });
 
     this.loadRecommendation(result);
@@ -47,7 +45,7 @@ Page({
         accepted: false
       });
     } catch (error) {
-      console.error('Failed to load recommendation from cloud function.', error);
+      console.error('Failed to load recommendation.', error);
       this.setData({ loading: false });
       wx.showToast({
         title: '推荐加载失败',

@@ -1,6 +1,5 @@
 Page({
   data: {
-    promptText: '',
     locationStatus: '北京市 · 海淀区',
     recentMeals: [
       {
@@ -27,15 +26,8 @@ Page({
     ]
   },
 
-  onPromptInput(event: WechatMiniprogram.Input) {
-    this.setData({
-      promptText: event.detail.value
-    });
-  },
-
   startQuestionnaire() {
     wx.setStorageSync('meal_questionnaire_draft', {
-      promptText: this.data.promptText,
       startedAt: new Date().toISOString()
     });
 

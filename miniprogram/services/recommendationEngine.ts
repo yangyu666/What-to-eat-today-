@@ -2,6 +2,7 @@ import type { Restaurant, RestaurantId, TagId } from '../types/restaurant';
 import type {
   RecommendationCandidate,
   RecommendationConfidenceLabel,
+  RecommendationSource,
   RecommendationResult,
   RecommendationScoreBreakdown
 } from '../types/recommendation';
@@ -18,6 +19,7 @@ export interface RecommendationEngineOptions {
   limit?: number;
   now?: Date;
   random?: () => number;
+  source?: RecommendationSource;
 }
 
 interface HardFilterResult {
@@ -59,7 +61,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   return {
     id: `rec-${now.getTime()}`,
     generatedAt: now.toISOString(),
-    source: 'mock',
+    source: options.source ?? 'mock',
     candidates,
     selectedCandidateId: candidates[0]?.id,
     reasonSummary: buildReasonSummary(candidates[0])

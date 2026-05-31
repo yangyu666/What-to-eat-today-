@@ -17,14 +17,7 @@
     <text class="hero-note"><text class="accent">30秒</text>结束选择困难</text>
   </view>
 
-  <view class="input-panel">
-    <input
-      class="wish-input"
-      placeholder="一句话告诉我：想吃辣、清淡、快一点..."
-      placeholder-class="input-placeholder"
-      value="{{promptText}}"
-      bindinput="onPromptInput"
-    />
+  <view class="action-panel">
     <button class="primary-button" bindtap="startQuestionnaire">帮我决定</button>
     <button class="secondary-button" bindtap="startQuestionnaire">我有要求</button>
   </view>

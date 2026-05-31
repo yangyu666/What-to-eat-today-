@@ -35,6 +35,11 @@
     ]
   },
   "style": "v2",
+  "permission": {
+    "scope.userLocation": {
+      "desc": "Find nearby restaurants."
+    }
+  },
   "componentFramework": "glass-easel",
   "sitemapLocation": "sitemap.json",
   "lazyCodeLoading": "requiredComponents"

@@ -63,7 +63,7 @@ export interface Restaurant {
   signatureDishes?: string[];
   coverImageUrl?: string;
   rating?: number;
-  source?: 'manual' | 'imported' | 'user_created';
+  source?: 'manual' | 'imported' | 'user_created' | 'amap';
   status: RestaurantStatus;
 }
 

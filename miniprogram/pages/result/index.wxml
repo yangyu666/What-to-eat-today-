@@ -2,7 +2,7 @@
   <view class="result-header">
     <text class="eyebrow">RECOMMENDATION</text>
     <text class="page-title">推荐结果</text>
-    <text class="desc">已结合 {{answerCount}} 个选择，用本地 mock 算法匹配今天最适合的一家。</text>
+    <text class="desc">已结合 {{answerCount}} 个固定问答选择，为你匹配今天适合的一家。</text>
   </view>
 
   <view class="empty-state" wx:if="{{loading}}">
@@ -41,8 +41,6 @@
       <text class="reason-label">推荐原因</text>
       <text class="reason">{{recommendation.reason}}</text>
     </view>
-
-    <text class="prompt" wx:if="{{promptText}}">你的补充：{{promptText}}</text>
 
     <view class="switch-limit">
       <text wx:if="{{accepted}}">已采纳，这顿饭定了。</text>

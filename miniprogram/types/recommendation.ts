@@ -9,7 +9,7 @@ import type { UserPreferenceAnswer, UserPreferenceProfile } from './userPreferen
 
 export type RecommendationId = string;
 export type RecommendationCandidateId = string;
-export type RecommendationSource = 'mock' | 'cloud' | 'rule' | 'manual';
+export type RecommendationSource = 'mock' | 'cloud' | 'rule' | 'manual' | 'amap';
 export type RecommendationAction = 'shown' | 'accepted' | 'skipped' | 'dismissed';
 export type RecommendationConfidenceLabel = 'low' | 'medium' | 'high';
 
@@ -129,6 +129,11 @@ export type ApiResponse<T> =
       requestId: string;
     };
 
-export type CloudFunctionName = 'recommendMeal' | 'savePreference' | 'listHistory';
+export type CloudFunctionName =
+  | 'recommendRestaurant'
+  | 'recommendMeal'
+  | 'amapPoi'
+  | 'savePreference'
+  | 'listHistory';
 
 export const RECOMMENDATION_HISTORY_COLLECTION = 'recommendation_history' as const;

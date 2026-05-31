@@ -1,6 +1,6 @@
 import type {
-  PreferenceQuestion,
   PreferenceOption,
+  PreferenceQuestion,
   UserPreferenceAnswer,
   UserQuestionnaireResult
 } from '../../types/userPreference';
@@ -11,68 +11,65 @@ interface QuestionViewModel extends PreferenceQuestion {
 
 const questions: QuestionViewModel[] = [
   {
-    id: 'flavor',
-    title: '今天想吃重口还是清淡？',
+    id: 'dining_mode',
+    title: '堂食还是外卖？',
     type: 'single',
     required: true,
     options: [
-      { id: 'flavor_spicy', label: '重口味', selected: false, value: 'spicy' },
-      { id: 'flavor_light', label: '清淡', selected: false, value: 'light' }
-    ]
-  },
-  {
-    id: 'staple',
-    title: '主食更想来哪一种？',
-    type: 'single',
-    required: true,
-    options: [
-      { id: 'staple_rice', label: '米饭', selected: false, value: 'rice' },
-      { id: 'staple_noodle', label: '面食', selected: false, value: 'noodle' },
-      { id: 'staple_snack', label: '小吃', selected: false, value: 'snack' }
-    ]
-  },
-  {
-    id: 'speed',
-    title: '你希望多久吃上？',
-    type: 'single',
-    required: true,
-    options: [
-      { id: 'speed_15', label: '15 分钟内', selected: false, value: 15 },
-      { id: 'speed_30', label: '30 分钟内', selected: false, value: 30 },
-      { id: 'speed_45', label: '慢慢选', selected: false, value: 45 }
+      { id: 'dining_mode_dine_in', label: '堂食', selected: false, value: 'dine_in' },
+      { id: 'dining_mode_delivery', label: '外卖', selected: false, value: 'delivery' }
     ]
   },
   {
     id: 'budget',
-    title: '这顿预算大概多少？',
+    title: '预算区间？',
     type: 'single',
     required: true,
     options: [
-      { id: 'budget_low', label: '25 元内', selected: false, value: 'low' },
-      { id: 'budget_mid', label: '25-45 元', selected: false, value: 'mid' },
-      { id: 'budget_high', label: '想吃好点', selected: false, value: 'high' }
+      { id: 'budget_under_30', label: '30以下', selected: false, value: 'under_30' },
+      { id: 'budget_30_60', label: '30~60', selected: false, value: '30_60' },
+      { id: 'budget_over_60', label: '60以上', selected: false, value: 'over_60' }
     ]
   },
   {
-    id: 'people',
-    title: '这顿几个人吃？',
+    id: 'distance',
+    title: '能接受多远？',
     type: 'single',
     required: true,
     options: [
-      { id: 'people_one', label: '一个人', selected: false, value: 1 },
-      { id: 'people_two', label: '两个人', selected: false, value: 2 },
-      { id: 'people_group', label: '多人一起', selected: false, value: 3 }
+      { id: 'distance_500m', label: '500米', selected: false, value: 500 },
+      { id: 'distance_1km', label: '1公里', selected: false, value: 1000 },
+      { id: 'distance_any', label: '无所谓', selected: false, value: 'any' }
     ]
   },
   {
-    id: 'scene',
-    title: '现在更想要什么感觉？',
+    id: 'flavor',
+    title: '重口还是清淡？',
     type: 'single',
     required: true,
     options: [
-      { id: 'scene_fast', label: '省事快吃', selected: false, value: 'fast' },
-      { id: 'scene_comfort', label: '舒服坐会儿', selected: false, value: 'comfort' },
-      { id: 'scene_healthy', label: '健康少负担', selected: false, value: 'healthy' }
+      { id: 'flavor_strong', label: '重口', selected: false, value: 'strong' },
+      { id: 'flavor_light', label: '清淡', selected: false, value: 'light' }
+    ]
+  },
+  {
+    id: 'temperature',
+    title: '热食还是凉食？',
+    type: 'single',
+    required: true,
+    options: [
+      { id: 'temperature_hot', label: '热食', selected: false, value: 'hot' },
+      { id: 'temperature_cold', label: '凉食', selected: false, value: 'cold' }
+    ]
+  },
+  {
+    id: 'meal_type',
+    title: '正餐还是小吃？',
+    type: 'single',
+    required: true,
+    options: [
+      { id: 'meal_type_meal', label: '正餐', selected: false, value: 'meal' },
+      { id: 'meal_type_snack', label: '小吃', selected: false, value: 'snack' }
     ]
   }
 ];
@@ -82,8 +79,8 @@ Page({
     questions,
     currentIndex: 0,
     currentQuestion: questions[0],
-    progressText: '1 / 6',
-    progressPercent: 16.67,
+    progressText: `1 / ${questions.length}`,
+    progressPercent: 100 / questions.length,
     answers: [] as UserPreferenceAnswer[]
   },
 
@@ -150,20 +147,15 @@ Page({
       answeredAt: new Date().toISOString()
     };
 
-    return [
-      ...this.data.answers.filter((item) => item.questionId !== question.id),
-      answer
-    ];
+    return [...this.data.answers.filter((item) => item.questionId !== question.id), answer];
   },
 
   finishQuestionnaire(answers: UserPreferenceAnswer[]) {
-    const draft = wx.getStorageSync('meal_questionnaire_draft') || {};
-    const result: UserQuestionnaireResult & { promptText?: string } = {
+    const result: UserQuestionnaireResult = {
       version: 'v1.0-local',
       source: 'onboarding',
       answers,
-      submittedAt: new Date().toISOString(),
-      promptText: draft.promptText || ''
+      submittedAt: new Date().toISOString()
     };
 
     wx.setStorageSync('meal_questionnaire_result', result);
