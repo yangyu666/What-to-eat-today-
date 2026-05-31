@@ -38,13 +38,22 @@ Page({
   async loadRecommendation(result?: UserQuestionnaireResult) {
     this.setData({ loading: true });
 
-    const candidates = await getLocalRecommendations(result);
-    this.setCurrentRecommendation(candidates, 0, {
-      loading: false,
-      switchCount: 0,
-      locked: false,
-      accepted: false
-    });
+    try {
+      const candidates = await getLocalRecommendations(result);
+      this.setCurrentRecommendation(candidates, 0, {
+        loading: false,
+        switchCount: 0,
+        locked: false,
+        accepted: false
+      });
+    } catch (error) {
+      console.error('Failed to load recommendation from cloud function.', error);
+      this.setData({ loading: false });
+      wx.showToast({
+        title: '推荐加载失败',
+        icon: 'none'
+      });
+    }
   },
 
   switchRestaurant() {

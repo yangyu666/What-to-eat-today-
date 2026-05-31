@@ -1,27 +1,10 @@
-import { mockRestaurants } from '../data/mockRestaurants';
+import { cloudConfig } from '../config/cloud';
 import type { MealCandidate } from '../models/meal';
-import type { UserPreferenceAnswer, UserPreferenceProfile, UserQuestionnaireResult } from '../types/userPreference';
-import { recommendRestaurants } from './recommendationEngine';
-
-const DEFAULT_PREFERENCE: UserPreferenceProfile = {
-  selectedOptionIds: ['quick', 'light'],
-  preferredTagIds: ['quick', 'hot', 'light', 'comfort'],
-  avoidedTagIds: ['strong_flavor'],
-  budgetLevel: 3,
-  maxDistanceMeters: 1500,
-  maxEstimatedMinutes: 40
-};
+import type { ApiResponse, RecommendMealResponse } from '../types/recommendation';
+import type { UserQuestionnaireResult } from '../types/userPreference';
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
-  const result = recommendRestaurants({
-    restaurants: mockRestaurants,
-    context: {
-      preferenceSnapshot: DEFAULT_PREFERENCE
-    },
-    limit: 1
-  });
-
-  const [candidate] = result.candidates;
+  const [candidate] = await getCloudRecommendations(undefined, 1);
 
   if (!candidate) {
     throw new Error('No recommendation candidates available.');
@@ -33,83 +16,30 @@ export async function getTodayRecommendation(): Promise<MealCandidate> {
 export async function getLocalRecommendations(
   questionnaire?: UserQuestionnaireResult
 ): Promise<MealCandidate[]> {
-  const result = recommendRestaurants({
-    restaurants: mockRestaurants,
-    context: {
-      preferenceSnapshot: questionnaire
-        ? buildPreferenceProfile(questionnaire.answers)
-        : DEFAULT_PREFERENCE
-    },
-    limit: 4,
-    random: () => 0
-  });
-
-  return result.candidates;
+  return getCloudRecommendations(questionnaire, 4);
 }
 
-function buildPreferenceProfile(answers: UserPreferenceAnswer[]): UserPreferenceProfile {
-  const selectedOptionIds = answers.flatMap((answer) => answer.optionIds ?? []);
-  const preferredTagIds = new Set(DEFAULT_PREFERENCE.preferredTagIds);
-  const avoidedTagIds = new Set(DEFAULT_PREFERENCE.avoidedTagIds);
-  let budgetLevel = DEFAULT_PREFERENCE.budgetLevel;
-  let maxEstimatedMinutes = DEFAULT_PREFERENCE.maxEstimatedMinutes;
-  let peopleCount = DEFAULT_PREFERENCE.peopleCount;
+async function getCloudRecommendations(
+  questionnaire: UserQuestionnaireResult | undefined,
+  limit: number
+): Promise<MealCandidate[]> {
+  if (!wx.cloud) {
+    throw new Error('Current base library does not support cloud development.');
+  }
 
-  answers.forEach((answer) => {
-    if (answer.questionId === 'flavor') {
-      if (answer.value === 'spicy') {
-        preferredTagIds.add('spicy');
-        preferredTagIds.add('strong_flavor');
-        avoidedTagIds.delete('strong_flavor');
-      }
-
-      if (answer.value === 'light') {
-        preferredTagIds.add('light');
-        preferredTagIds.add('healthy');
-        avoidedTagIds.add('strong_flavor');
-      }
-    }
-
-    if (answer.questionId === 'staple' && typeof answer.value === 'string') {
-      preferredTagIds.add(answer.value);
-    }
-
-    if (answer.questionId === 'speed' && typeof answer.value === 'number') {
-      maxEstimatedMinutes = answer.value;
-      preferredTagIds.add('quick');
-    }
-
-    if (answer.questionId === 'budget') {
-      budgetLevel = answer.value === 'low' ? 2 : answer.value === 'high' ? 4 : 3;
-    }
-
-    if (answer.questionId === 'people' && typeof answer.value === 'number') {
-      peopleCount = answer.value;
-      if (answer.value >= 3) {
-        preferredTagIds.add('group');
-      } else {
-        preferredTagIds.add('solo');
-      }
-    }
-
-    if (answer.questionId === 'scene' && typeof answer.value === 'string') {
-      const sceneTagMap: Record<string, string[]> = {
-        fast: ['quick'],
-        comfort: ['comfort', 'relaxed'],
-        healthy: ['healthy', 'light', 'low_burden']
-      };
-
-      sceneTagMap[answer.value]?.forEach((tagId) => preferredTagIds.add(tagId));
+  const response = await wx.cloud.callFunction({
+    name: cloudConfig.recommendRestaurantFunctionName,
+    data: {
+      questionnaire,
+      limit
     }
   });
+  const payload = response.result as ApiResponse<RecommendMealResponse> | undefined;
 
-  return {
-    selectedOptionIds,
-    preferredTagIds: [...preferredTagIds],
-    avoidedTagIds: [...avoidedTagIds],
-    budgetLevel,
-    maxDistanceMeters: DEFAULT_PREFERENCE.maxDistanceMeters,
-    maxEstimatedMinutes,
-    peopleCount
-  };
+  if (!payload?.ok) {
+    const message = payload?.ok === false ? payload.error.message : 'Cloud recommendation failed.';
+    throw new Error(message);
+  }
+
+  return payload.data.recommendation.candidates;
 }
