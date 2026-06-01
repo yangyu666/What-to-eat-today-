@@ -234,12 +234,37 @@ function buildPreferenceProfile(answers) {
   const preferredTagIds = new Set(DEFAULT_PREFERENCE.preferredTagIds);
   const avoidedTagIds = new Set(DEFAULT_PREFERENCE.avoidedTagIds);
   let budgetLevel = DEFAULT_PREFERENCE.budgetLevel;
+  let maxDistanceMeters = DEFAULT_PREFERENCE.maxDistanceMeters;
   let maxEstimatedMinutes = DEFAULT_PREFERENCE.maxEstimatedMinutes;
   let peopleCount = DEFAULT_PREFERENCE.peopleCount;
 
   answers.forEach((answer) => {
+    if (answer.questionId === 'dining_mode') {
+      if (answer.value === 'delivery') {
+        preferredTagIds.add('quick');
+      }
+
+      if (answer.value === 'dine_in') {
+        preferredTagIds.add('comfort');
+        preferredTagIds.add('relaxed');
+      }
+    }
+
+    if (answer.questionId === 'budget') {
+      budgetLevel =
+        answer.value === 'under_30' ? 2 : answer.value === 'over_60' ? 4 : 3;
+    }
+
+    if (answer.questionId === 'distance') {
+      if (answer.value === 500 || answer.value === 1000) {
+        maxDistanceMeters = answer.value;
+      } else {
+        maxDistanceMeters = undefined;
+      }
+    }
+
     if (answer.questionId === 'flavor') {
-      if (answer.value === 'spicy') {
+      if (answer.value === 'strong') {
         preferredTagIds.add('spicy');
         preferredTagIds.add('strong_flavor');
         avoidedTagIds.delete('strong_flavor');
@@ -252,37 +277,27 @@ function buildPreferenceProfile(answers) {
       }
     }
 
-    if (answer.questionId === 'staple' && typeof answer.value === 'string') {
-      preferredTagIds.add(answer.value);
-    }
+    if (answer.questionId === 'temperature') {
+      if (answer.value === 'hot') {
+        preferredTagIds.add('hot');
+      }
 
-    if (answer.questionId === 'speed' && typeof answer.value === 'number') {
-      maxEstimatedMinutes = answer.value;
-      preferredTagIds.add('quick');
-    }
-
-    if (answer.questionId === 'budget') {
-      budgetLevel = answer.value === 'low' ? 2 : answer.value === 'high' ? 4 : 3;
-    }
-
-    if (answer.questionId === 'people' && typeof answer.value === 'number') {
-      peopleCount = answer.value;
-
-      if (answer.value >= 3) {
-        preferredTagIds.add('group');
-      } else {
-        preferredTagIds.add('solo');
+      if (answer.value === 'cold') {
+        preferredTagIds.add('salad');
+        preferredTagIds.add('low_burden');
       }
     }
 
-    if (answer.questionId === 'scene' && typeof answer.value === 'string') {
-      const sceneTagMap = {
-        fast: ['quick'],
-        comfort: ['comfort', 'relaxed'],
-        healthy: ['healthy', 'light', 'low_burden']
-      };
+    if (answer.questionId === 'meal_type') {
+      if (answer.value === 'meal') {
+        preferredTagIds.add('staple');
+        preferredTagIds.add('rice');
+      }
 
-      (sceneTagMap[answer.value] || []).forEach((tagId) => preferredTagIds.add(tagId));
+      if (answer.value === 'snack') {
+        preferredTagIds.add('snack');
+        preferredTagIds.add('quick');
+      }
     }
   });
 
@@ -291,7 +306,7 @@ function buildPreferenceProfile(answers) {
     preferredTagIds: [...preferredTagIds],
     avoidedTagIds: [...avoidedTagIds],
     budgetLevel,
-    maxDistanceMeters: DEFAULT_PREFERENCE.maxDistanceMeters,
+    maxDistanceMeters,
     maxEstimatedMinutes,
     peopleCount
   };

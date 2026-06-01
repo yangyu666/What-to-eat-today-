@@ -18,6 +18,7 @@ const DEFAULT_PREFERENCE: UserPreferenceProfile = {
   maxDistanceMeters: 1500,
   maxEstimatedMinutes: 45
 };
+let cloudInitialized = false;
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
   const [candidate] = await getRecommendations(undefined, 1);
@@ -94,9 +95,7 @@ async function getCloudRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
   limit: number
 ): Promise<MealCandidate[]> {
-  if (!wx.cloud) {
-    throw new Error('Current base library does not support cloud development.');
-  }
+  ensureCloudInitialized();
 
   const response = await wx.cloud.callFunction({
     name: cloudConfig.recommendRestaurantFunctionName,
@@ -113,6 +112,22 @@ async function getCloudRecommendations(
   }
 
   return payload.data.recommendation.candidates;
+}
+
+function ensureCloudInitialized() {
+  if (!wx.cloud) {
+    throw new Error('Current base library does not support cloud development.');
+  }
+
+  if (cloudInitialized) {
+    return;
+  }
+
+  wx.cloud.init({
+    env: cloudConfig.envId || undefined,
+    traceUser: true
+  });
+  cloudInitialized = true;
 }
 
 function getMockRecommendations(

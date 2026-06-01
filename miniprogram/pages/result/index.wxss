@@ -148,15 +148,6 @@
   line-height: 1.6;
 }
 
-.prompt {
-  color: var(--color-muted);
-  font-size: 26rpx;
-  line-height: 1.55;
-  padding: 20rpx;
-  border-radius: 18rpx;
-  background: #f5f8f6;
-}
-
 .switch-limit {
   text-align: center;
 }

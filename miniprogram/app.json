@@ -37,7 +37,7 @@
   "style": "v2",
   "permission": {
     "scope.userLocation": {
-      "desc": "Find nearby restaurants."
+      "desc": "用于获取附近餐厅推荐"
     }
   },
   "componentFramework": "glass-easel",
