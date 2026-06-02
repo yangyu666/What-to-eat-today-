@@ -2,22 +2,12 @@ import { cloudConfig } from '../config/cloud';
 import { mockRestaurants } from '../data/mockRestaurants';
 import type { MealCandidate } from '../models/meal';
 import type { ApiResponse, RecommendMealResponse } from '../types/recommendation';
-import type {
-  UserPreferenceAnswer,
-  UserPreferenceProfile,
-  UserQuestionnaireResult
-} from '../types/userPreference';
+import type { UserQuestionnaireResult } from '../types/userPreference';
+import { buildAmapRestaurantQuery } from './amapQueryBuilder';
 import { getNearbyRestaurants } from './amapPoiService';
+import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
 
-const DEFAULT_PREFERENCE: UserPreferenceProfile = {
-  selectedOptionIds: [],
-  preferredTagIds: ['quick', 'staple'],
-  avoidedTagIds: [],
-  budgetLevel: 3,
-  maxDistanceMeters: 1500,
-  maxEstimatedMinutes: 45
-};
 let cloudInitialized = false;
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
@@ -63,11 +53,14 @@ async function getAmapRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
   limit: number
 ): Promise<MealCandidate[]> {
-  const preferenceSnapshot = buildPreferenceProfile(questionnaire?.answers ?? []);
+  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
+  const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
 
   try {
     const restaurants = await getNearbyRestaurants({
-      radiusMeters: preferenceSnapshot.maxDistanceMeters,
+      radiusMeters: amapQuery.radiusMeters,
+      keyword: amapQuery.keywords,
+      types: amapQuery.types,
       pageSize: 25
     });
 
@@ -101,6 +94,9 @@ async function getCloudRecommendations(
     name: cloudConfig.recommendRestaurantFunctionName,
     data: {
       questionnaire,
+      context: {
+        preferenceSnapshot: mapAnswersToPreferenceProfile(questionnaire?.answers ?? [])
+      },
       limit
     }
   });
@@ -137,7 +133,7 @@ function getMockRecommendations(
   const result = recommendRestaurants({
     restaurants: mockRestaurants,
     context: {
-      preferenceSnapshot: buildPreferenceProfile(questionnaire?.answers ?? [])
+      preferenceSnapshot: mapAnswersToPreferenceProfile(questionnaire?.answers ?? [])
     },
     limit,
     random: () => 0,
@@ -145,96 +141,4 @@ function getMockRecommendations(
   });
 
   return result.candidates;
-}
-
-function buildPreferenceProfile(answers: UserPreferenceAnswer[]): UserPreferenceProfile {
-  const selectedOptionIds = answers.flatMap((answer) => answer.optionIds ?? []);
-  const preferredTagIds = new Set(DEFAULT_PREFERENCE.preferredTagIds);
-  const avoidedTagIds = new Set(DEFAULT_PREFERENCE.avoidedTagIds);
-  let budgetLevel = DEFAULT_PREFERENCE.budgetLevel;
-  let maxDistanceMeters = DEFAULT_PREFERENCE.maxDistanceMeters;
-  let maxEstimatedMinutes = DEFAULT_PREFERENCE.maxEstimatedMinutes;
-
-  answers.forEach((answer) => {
-    if (answer.questionId === 'dining_mode') {
-      if (answer.value === 'dine_in') {
-        maxEstimatedMinutes = 45;
-      }
-
-      if (answer.value === 'delivery') {
-        maxEstimatedMinutes = 60;
-        preferredTagIds.add('quick');
-      }
-    }
-
-    if (answer.questionId === 'budget') {
-      if (answer.value === 'under_30') {
-        budgetLevel = 2;
-      } else if (answer.value === 'over_60') {
-        budgetLevel = 4;
-      } else {
-        budgetLevel = 3;
-      }
-    }
-
-    if (answer.questionId === 'distance') {
-      if (answer.value === 500 || answer.value === 1000) {
-        maxDistanceMeters = answer.value;
-      }
-
-      if (answer.value === 'any') {
-        maxDistanceMeters = 3000;
-      }
-    }
-
-    if (answer.questionId === 'flavor') {
-      if (answer.value === 'strong') {
-        preferredTagIds.add('spicy');
-        preferredTagIds.add('strong_flavor');
-        preferredTagIds.add('stir_fry');
-        avoidedTagIds.delete('strong_flavor');
-      }
-
-      if (answer.value === 'light') {
-        preferredTagIds.add('light');
-        preferredTagIds.add('healthy');
-        avoidedTagIds.add('strong_flavor');
-      }
-    }
-
-    if (answer.questionId === 'temperature') {
-      if (answer.value === 'hot') {
-        preferredTagIds.add('hot');
-        preferredTagIds.add('comfort');
-      }
-
-      if (answer.value === 'cold') {
-        preferredTagIds.add('light');
-        preferredTagIds.add('salad');
-      }
-    }
-
-    if (answer.questionId === 'meal_type') {
-      if (answer.value === 'meal') {
-        preferredTagIds.add('staple');
-        preferredTagIds.add('rice');
-        preferredTagIds.add('noodle');
-      }
-
-      if (answer.value === 'snack') {
-        preferredTagIds.add('snack');
-        preferredTagIds.add('quick');
-        preferredTagIds.add('solo');
-      }
-    }
-  });
-
-  return {
-    selectedOptionIds,
-    preferredTagIds: [...preferredTagIds],
-    avoidedTagIds: [...avoidedTagIds],
-    budgetLevel,
-    maxDistanceMeters,
-    maxEstimatedMinutes
-  };
 }

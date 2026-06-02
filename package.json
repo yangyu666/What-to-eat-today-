@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"miniprogram/**/*.ts\"",
-    "test:recommendation": "tsc scripts/recommendationEngine.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/recommendation-test --skipLibCheck --strict && node .tmp/recommendation-test/scripts/recommendationEngine.test.js"
+    "test:recommendation": "tsc scripts/recommendationEngine.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/recommendation-test --skipLibCheck --strict && node .tmp/recommendation-test/scripts/recommendationEngine.test.js",
+    "test:preference": "tsc scripts/preferenceFlow.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/preference-test --skipLibCheck --strict && node .tmp/preference-test/scripts/preferenceFlow.test.js"
   },
   "devDependencies": {
     "@types/wechat-miniprogram": "^3.4.8",

@@ -78,6 +78,7 @@ exports.main = async (event = {}, context = {}) => {
     const radius = clampInteger(event.radiusMeters, 300, 5000, DEFAULT_RADIUS_METERS);
     const pageSize = clampInteger(event.pageSize, 1, 25, DEFAULT_PAGE_SIZE);
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
+    const types = typeof event.types === 'string' && event.types.trim() ? event.types.trim() : AMAP_FOOD_TYPE;
 
     const amapResponse = await requestAmap({
       key,
@@ -85,7 +86,8 @@ exports.main = async (event = {}, context = {}) => {
       longitude,
       radius,
       pageSize,
-      keyword
+      keyword,
+      types
     });
 
     if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
@@ -115,11 +117,11 @@ exports.main = async (event = {}, context = {}) => {
   }
 };
 
-function requestAmap({ key, latitude, longitude, radius, pageSize, keyword }) {
+function requestAmap({ key, latitude, longitude, radius, pageSize, keyword, types }) {
   const params = new URLSearchParams({
     key,
     location: `${longitude},${latitude}`,
-    types: AMAP_FOOD_TYPE,
+    types,
     radius: String(radius),
     sortrule: 'distance',
     offset: String(pageSize),

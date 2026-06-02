@@ -15,6 +15,7 @@ interface NearbyRestaurantOptions {
   radiusMeters?: number;
   pageSize?: number;
   keyword?: string;
+  types?: string;
 }
 
 interface CachedNearbyRestaurants {
@@ -22,6 +23,7 @@ interface CachedNearbyRestaurants {
   createdAt: number;
   location: GeoPoint;
   radiusMeters: number;
+  queryKey: string;
 }
 
 const CLOUD_FUNCTION_NAME = 'amapPoi';
@@ -29,13 +31,15 @@ const DEFAULT_RADIUS_METERS = 1500;
 const DEFAULT_PAGE_SIZE = 20;
 const CACHE_KEY = 'nearby_restaurants_amap_cache';
 const CACHE_TTL_MS = 10 * 60 * 1000;
+const CACHE_LOCATION_TOLERANCE_METERS = 100;
 
 export async function getNearbyRestaurants(
   options: NearbyRestaurantOptions = {}
 ): Promise<Restaurant[]> {
   const location = await getUserLocation();
   const radiusMeters = options.radiusMeters ?? DEFAULT_RADIUS_METERS;
-  const cached = readNearbyRestaurantsCache(location, radiusMeters);
+  const queryKey = buildQueryKey(options);
+  const cached = readNearbyRestaurantsCache(location, radiusMeters, queryKey);
 
   if (cached.length > 0) {
     return cached;
@@ -44,7 +48,8 @@ export async function getNearbyRestaurants(
   const restaurants = await fetchNearbyRestaurantsFromCloud(location, {
     radiusMeters,
     pageSize: options.pageSize ?? DEFAULT_PAGE_SIZE,
-    keyword: options.keyword
+    keyword: options.keyword,
+    types: options.types
   });
 
   if (restaurants.length > 0) {
@@ -52,7 +57,8 @@ export async function getNearbyRestaurants(
       restaurants,
       createdAt: Date.now(),
       location,
-      radiusMeters
+      radiusMeters,
+      queryKey
     });
   }
 
@@ -78,7 +84,7 @@ async function getUserLocation(): Promise<GeoPoint> {
 async function fetchNearbyRestaurantsFromCloud(
   location: GeoPoint,
   options: Required<Pick<NearbyRestaurantOptions, 'radiusMeters' | 'pageSize'>> &
-    Pick<NearbyRestaurantOptions, 'keyword'>
+    Pick<NearbyRestaurantOptions, 'keyword' | 'types'>
 ): Promise<Restaurant[]> {
   const app = getApp<IAppOption>();
 
@@ -93,7 +99,8 @@ async function fetchNearbyRestaurantsFromCloud(
       longitude: location.longitude,
       radiusMeters: options.radiusMeters,
       pageSize: options.pageSize,
-      keyword: options.keyword
+      keyword: options.keyword,
+      types: options.types
     }
   });
   const result = response.result as AmapPoiCloudResponse | undefined;
@@ -105,7 +112,11 @@ async function fetchNearbyRestaurantsFromCloud(
   return result.data.restaurants;
 }
 
-function readNearbyRestaurantsCache(location: GeoPoint, radiusMeters: number): Restaurant[] {
+function readNearbyRestaurantsCache(
+  location: GeoPoint,
+  radiusMeters: number,
+  queryKey: string
+): Restaurant[] {
   const cached = wx.getStorageSync(CACHE_KEY) as CachedNearbyRestaurants | undefined;
 
   if (!cached || !Array.isArray(cached.restaurants)) {
@@ -113,9 +124,12 @@ function readNearbyRestaurantsCache(location: GeoPoint, radiusMeters: number): R
   }
 
   const isFresh = Date.now() - cached.createdAt < CACHE_TTL_MS;
-  const isNearby = getDistanceMeters(location, cached.location) <= Math.min(500, radiusMeters / 2);
+  const isNearby =
+    getDistanceMeters(location, cached.location) <=
+    Math.min(CACHE_LOCATION_TOLERANCE_METERS, radiusMeters / 2);
+  const isSameQuery = cached.queryKey === queryKey;
 
-  return isFresh && isNearby ? cached.restaurants : [];
+  return isFresh && isNearby && isSameQuery ? cached.restaurants : [];
 }
 
 function writeNearbyRestaurantsCache(cache: CachedNearbyRestaurants) {
@@ -140,4 +154,8 @@ function getDistanceMeters(left: GeoPoint, right: GeoPoint): number {
 
 function toRadians(value: number): number {
   return (value * Math.PI) / 180;
+}
+
+function buildQueryKey(options: NearbyRestaurantOptions): string {
+  return [options.keyword?.trim() ?? '', options.types?.trim() ?? ''].join('|');
 }

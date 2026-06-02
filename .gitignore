@@ -5,6 +5,9 @@ coverage/
 .DS_Store
 *.log
 
+# Mini Program TypeScript compiler output
+miniprogram/**/*.js
+
 # WeChat DevTools
 .idea/
 .vscode/

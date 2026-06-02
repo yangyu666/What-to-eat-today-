@@ -6,6 +6,19 @@ export type PreferenceOptionId = string;
 export type PreferenceQuestionType = 'single' | 'multiple' | 'range' | 'boolean' | 'text';
 export type PreferenceAnswerValue = string | string[] | number | boolean | null;
 export type PreferenceSource = 'onboarding' | 'settings' | 'recommendation_filter';
+export type PreferenceDimension =
+  | 'distance'
+  | 'budget'
+  | 'dining_mode'
+  | 'flavor'
+  | 'temperature'
+  | 'meal_type'
+  | 'speed'
+  | 'health'
+  | 'satiety'
+  | 'avoidance'
+  | 'mood'
+  | 'scene';
 
 export interface PreferenceOption {
   id: PreferenceOptionId;
@@ -21,6 +34,7 @@ export interface PreferenceQuestion {
   type: PreferenceQuestionType;
   options?: PreferenceOption[];
   required?: boolean;
+  dimension?: PreferenceDimension;
   min?: number;
   max?: number;
   step?: number;
@@ -48,6 +62,10 @@ export interface UserPreferenceProfile {
   selectedOptionIds: PreferenceOptionId[];
   preferredTagIds: TagId[];
   avoidedTagIds: TagId[];
+  positiveTags?: TagId[];
+  negativeTags?: TagId[];
+  constraints?: Record<string, string | number | boolean | undefined>;
+  softPreferences?: Record<string, string | number | boolean | string[] | number[] | undefined>;
   budgetLevel?: PriceLevel;
   maxDistanceMeters?: number;
   maxEstimatedMinutes?: number;
