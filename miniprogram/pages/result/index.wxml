@@ -1,64 +1,91 @@
-<view class="page result-page">
-  <view class="result-header">
-    <text class="eyebrow">RECOMMENDATION</text>
-    <text class="page-title">推荐结果</text>
-    <text class="desc">已结合 {{answerCount}} 个动态问答选择，为你匹配今天适合的一家。</text>
-  </view>
-
+﻿<view class="page result-page">
   <view class="empty-state" wx:if="{{loading}}">
-    <text>正在匹配附近适合的一家...</text>
+    <text>姝ｅ湪鍖归厤闄勮繎閫傚悎鐨勪竴瀹?..</text>
   </view>
 
   <view class="result-card" wx:elif="{{recommendation}}">
-    <view class="card-head">
-      <view class="restaurant-info">
-        <text class="label">就近推荐</text>
-        <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
-        <text class="meal-name">推荐菜：{{mealNameText}}</text>
+    <view class="cover-wrap">
+      <image
+        wx:if="{{coverImageUrl}}"
+        class="restaurant-cover"
+        mode="aspectFill"
+        src="{{coverImageUrl}}"
+        binderror="handleCoverImageError"
+      />
+      <view class="cover-placeholder" wx:else>
+        <text class="placeholder-title">楂樺痉鏆傛棤闂ㄥ簵鍥?/text>
+        <text class="placeholder-desc">鍥剧墖灏嗕紭鍏堜娇鐢ㄩ珮寰?POI 杩斿洖鐨勫簵閾虹収鐗?/text>
       </view>
       <view class="match-badge">
-        <text class="match-number">{{matchPercent}}%</text>
-        <text class="match-label">匹配</text>
+        <text class="match-number">{{matchPercent}}<text class="percent">%</text></text>
+        <text class="match-label">鍖归厤搴?/text>
       </view>
     </view>
 
-    <view class="meta-grid">
-      <view class="meta-item">
-        <text class="meta-label">距离</text>
-        <text class="meta-value">{{distanceText}}</text>
+    <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
+    <text class="meal-name">鎺ㄨ崘鑿滐細{{mealNameText}}</text>
+
+    <text class="source-text">{{sourceText}}</text>
+
+    <view class="info-row">
+      <view class="info-item">
+        <text class="info-icon">鈱?/text>
+        <text>{{walkText}}</text>
       </view>
-      <view class="meta-item">
-        <text class="meta-label">人均</text>
-        <text class="meta-value">{{averageCostText}}</text>
+      <view class="divider"></view>
+      <view class="info-item">
+        <text class="info-icon">鈾?/text>
+        <text>{{averageCostText}}</text>
+      </view>
+      <view class="divider"></view>
+      <view class="info-item">
+        <text class="star">鈽?/text>
+        <text>{{ratingText}}</text>
       </view>
     </view>
 
-    <view class="tag-row">
-      <text class="tag" wx:for="{{recommendation.tags}}" wx:key="*this">{{item}}</text>
+    <view class="reason-card">
+      <text class="reason-title">鎺ㄨ崘鐞嗙敱</text>
+      <view
+        class="reason-item"
+        wx:for="{{reasonItems}}"
+        wx:key="title"
+      >
+        <text class="check-icon">鉁?/text>
+        <view class="reason-copy">
+          <text class="reason-name">{{item.title}}</text>
+          <text class="reason-desc">{{item.desc}}</text>
+        </view>
+      </view>
     </view>
 
-    <view class="reason-box">
-      <text class="reason-label">推荐原因</text>
-      <text class="reason">{{recommendation.reason}}</text>
+    <view class="lock-card" wx:if="{{locked && !accepted}}">
+      <view class="lock-icon">鈻?/view>
+      <view>
+        <text class="lock-title">宸蹭负浣犻攣瀹氭渶浣虫帹鑽?/text>
+        <text class="lock-desc">澶氭鍒锋柊鍚庯紝涓轰綘淇濈暀褰撳墠鏈€鍖归厤鏂规</text>
+      </view>
     </view>
 
-    <view class="switch-limit">
-      <text wx:if="{{accepted}}">已采纳，这顿饭定了。</text>
-      <text wx:elif="{{locked}}">结果已锁定。</text>
-      <text wx:else>还可以换 {{maxSwitchCount - switchCount}} 次</text>
+    <view class="switch-limit" wx:else>
+      <text wx:if="{{accepted}}">宸查噰绾筹紝杩欓】楗畾浜嗐€?/text>
+      <text wx:elif="{{switchCount >= maxSwitchCount}}">宸叉崲 3 娆★紝鍐嶇偣涓€娆￠攣瀹氱粨鏋溿€?/text>
+      <text wx:else>杩樺彲浠ユ崲 {{maxSwitchCount - switchCount}} 娆?/text>
     </view>
 
     <view class="action-row">
       <button class="secondary-button" bindtap="switchRestaurant" disabled="{{locked || accepted}}">
-        {{locked || accepted ? '已锁定' : '换一家'}}
+        <text class="button-icon">鈫?/text>
+        {{locked || accepted ? '宸查攣瀹? : switchButtonText}}
       </button>
       <button class="primary-button" bindtap="acceptRestaurant" disabled="{{accepted}}">
-        {{accepted ? '已采纳' : '就吃这家'}}
+        <text class="button-icon">鉁?/text>
+        {{accepted ? '宸查噰绾? : '灏卞悆杩欏'}}
       </button>
     </view>
   </view>
 
   <view class="empty-state" wx:else>
-    <text>暂时没有可推荐的店。</text>
+    <text>{{errorText || '推荐加载失败，请稍后重试'}}</text>
   </view>
 </view>

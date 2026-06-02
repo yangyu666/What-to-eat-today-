@@ -1,9 +1,11 @@
+const { trackRecommendationAction } = require('../../services/historyService');
+
 const MAX_SWITCH_COUNT = 3;
+const DEFAULT_RESULT_IMAGE_URL = '';
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
 const CACHE_KEY = 'nearby_restaurants_amap_cache';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const CACHE_LOCATION_TOLERANCE_METERS = 100;
-const { trackRecommendationAction } = require('../../services/historyService');
 
 const MOCK_RESTAURANTS = [
   {
@@ -39,7 +41,7 @@ const MOCK_RESTAURANTS = [
   {
     id: 'mock-light-salad',
     name: '轻食沙拉研究所',
-    tags: ['清淡', '健康', '凉食', '低负担'],
+    tags: ['清淡', '健康', '冷食', '低负担'],
     tagIds: ['light', 'healthy', 'salad', 'low_burden'],
     distanceMeters: 650,
     averageCostYuan: 38,
@@ -67,7 +69,8 @@ Page({
     walkText: '',
     ratingText: '',
     mealNameText: '',
-    coverImageUrl: '',
+    coverImageUrl: DEFAULT_RESULT_IMAGE_URL,
+    errorText: '',
     sourceText: '',
     reasonItems: [],
     switchButtonText: '换一家'
@@ -84,20 +87,38 @@ Page({
   },
 
   async loadRecommendation(result) {
-    this.setData({ loading: true });
+    this.setData({ loading: true, errorText: '' });
 
     try {
       const candidates = await getRecommendations(result);
+
+      if (candidates.length === 0) {
+        this.setCurrentRecommendation([], 0, {
+          loading: false,
+          switchCount: 0,
+          locked: false,
+          accepted: false,
+          errorText: '暂无可推荐候选'
+        });
+        return;
+      }
+
       this.setCurrentRecommendation(candidates, 0, {
         loading: false,
         switchCount: 0,
         locked: false,
-        accepted: false
+        accepted: false,
+        switchButtonText: '换一家'
       });
       this.trackCurrentRecommendation('shown', candidates[0], 0, result);
     } catch (error) {
       console.error('Failed to load recommendation.', error);
-      this.setData({ loading: false });
+      this.setData({
+        loading: false,
+        candidates: [],
+        recommendation: null,
+        errorText: '推荐加载失败，请稍后重试'
+      });
       wx.showToast({
         title: '推荐加载失败',
         icon: 'none'
@@ -110,10 +131,11 @@ Page({
       return;
     }
 
-    const nextSwitchCount = this.data.switchCount + 1;
-
-    if (nextSwitchCount > MAX_SWITCH_COUNT) {
-      this.setData({ locked: true });
+    if (this.data.switchCount >= MAX_SWITCH_COUNT) {
+      this.setData({
+        locked: true,
+        switchButtonText: '已锁定'
+      });
       wx.showToast({
         title: '结果已锁定',
         icon: 'none'
@@ -121,7 +143,9 @@ Page({
       return;
     }
 
+    const nextSwitchCount = this.data.switchCount + 1;
     const nextIndex = (this.data.currentIndex + 1) % this.data.candidates.length;
+
     this.trackCurrentRecommendation(
       'skipped',
       this.data.recommendation,
@@ -130,7 +154,6 @@ Page({
     );
     this.setCurrentRecommendation(this.data.candidates, nextIndex, {
       switchCount: nextSwitchCount,
-      locked: nextSwitchCount >= MAX_SWITCH_COUNT,
       switchButtonText: nextSwitchCount >= MAX_SWITCH_COUNT ? '锁定结果' : '换一家'
     });
   },
@@ -158,6 +181,27 @@ Page({
     });
   },
 
+  reloadRecommendation() {
+    this.loadRecommendation(this.getQuestionnaireResult());
+  },
+
+  handleCoverImageError() {
+    this.setData({
+      coverImageUrl: DEFAULT_RESULT_IMAGE_URL
+    });
+  },
+
+  goBack() {
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        wx.switchTab({
+          url: '/pages/home/index'
+        });
+      }
+    });
+  },
+
   setCurrentRecommendation(candidates, currentIndex, extraData = {}) {
     const recommendation = candidates[currentIndex] || null;
     const restaurant = recommendation ? recommendation.restaurant : null;
@@ -167,7 +211,6 @@ Page({
       typeof distanceMeters === 'number' ? Math.max(1, Math.ceil(distanceMeters / 120)) : null;
     const rating = restaurant && restaurant.rating;
     const source = getRecommendationSource(recommendation);
-    const isAmapRestaurant = source === 'amap';
 
     this.setData({
       candidates,
@@ -180,7 +223,7 @@ Page({
       walkText: walkingMinutes ? `步行${walkingMinutes}分钟` : '步行时间未知',
       ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分稳定',
       mealNameText: recommendation ? recommendation.mealName || recommendation.name || '' : '',
-      coverImageUrl: isAmapRestaurant && recommendation && recommendation.imageUrl ? recommendation.imageUrl : '',
+      coverImageUrl: getStableCoverImageUrl(recommendation),
       sourceText: getSourceText(source),
       reasonItems: recommendation ? buildReasonItems(recommendation, walkingMinutes, averageCostYuan) : [],
       ...extraData
@@ -247,27 +290,24 @@ function getSourceText(source) {
 
 function buildReasonItems(recommendation, walkingMinutes, averageCostYuan) {
   const tags = new Set(recommendation.tags || []);
+  const isHot = tags.has('热乎') || tags.has('麻辣烫') || tags.has('hot');
 
   return [
     {
-      title: tags.has('热乎') || tags.has('麻辣烫') ? '热食偏好匹配' : '口味偏好匹配',
-      desc: tags.has('热乎') || tags.has('麻辣烫') ? '符合你选择的“想吃热食”' : '符合你今天的口味倾向'
+      title: isHot ? '热食偏好匹配' : '口味偏好匹配',
+      desc: isHot ? '符合你选择的热食倾向' : '符合你今天的口味倾向'
     },
     {
       title: walkingMinutes ? `步行${walkingMinutes}分钟` : '距离较近',
-      desc: '距离你的位置很近'
+      desc: '距离和用餐便利性已纳入排序'
     },
     {
       title: typeof averageCostYuan === 'number' ? `人均${averageCostYuan}元` : '人均适中',
-      desc: '符合你的预算范围'
+      desc: '预算信息已参与推荐匹配'
     },
     {
-      title: '出餐速度快',
-      desc: '高峰期平均等待10分钟'
-    },
-    {
-      title: '符合预算',
-      desc: '在你的预算范围内'
+      title: `${Math.round(recommendation.confidenceScore || 0)}% 匹配`,
+      desc: recommendation.reason || '根据你的问答偏好综合排序'
     }
   ];
 }
@@ -315,7 +355,7 @@ async function getNearbyRestaurants(preference) {
   const restaurants = result.data && Array.isArray(result.data.restaurants) ? result.data.restaurants : [];
 
   if (restaurants.length > 0) {
-    wx.setStorageSync(CACHE_KEY, {
+    writeNearbyRestaurantsCache({
       restaurants,
       createdAt: Date.now(),
       location,
@@ -334,13 +374,6 @@ function getUserLocation() {
       isHighAccuracy: true,
       highAccuracyExpireTime: 4000,
       success(result) {
-        console.warn('Location resolved for nearby restaurants.', {
-          latitude: result.latitude,
-          longitude: result.longitude,
-          accuracy: result.accuracy,
-          horizontalAccuracy: result.horizontalAccuracy
-        });
-
         resolve({
           latitude: result.latitude,
           longitude: result.longitude
@@ -368,7 +401,14 @@ function ensureCloudInitialized() {
 }
 
 function readNearbyRestaurantsCache(location, radiusMeters, queryKey) {
-  const cached = wx.getStorageSync(CACHE_KEY);
+  let cached;
+
+  try {
+    cached = wx.getStorageSync(CACHE_KEY);
+  } catch (error) {
+    console.warn('Failed to read nearby restaurants cache.', error);
+    return [];
+  }
 
   if (!cached || !Array.isArray(cached.restaurants)) {
     return [];
@@ -381,6 +421,14 @@ function readNearbyRestaurantsCache(location, radiusMeters, queryKey) {
   const isSameQuery = cached.queryKey === queryKey;
 
   return isFresh && isNearby && isSameQuery ? cached.restaurants : [];
+}
+
+function writeNearbyRestaurantsCache(cache) {
+  try {
+    wx.setStorageSync(CACHE_KEY, cache);
+  } catch (error) {
+    console.warn('Failed to write nearby restaurants cache.', error);
+  }
 }
 
 function mapAnswersToPreference(answers = []) {
@@ -405,7 +453,7 @@ function buildKeyword(values) {
   }
 
   if (values.includes('light')) {
-    return '粥|粉面|轻食|沙拉';
+    return '粥粉面|轻食|沙拉';
   }
 
   if (values.includes('cold')) {
@@ -430,7 +478,7 @@ function rankRestaurants(restaurants, preference) {
         score += 8;
       }
 
-      if (preference.flavor === 'strong' && /辣|麻|火锅|川|湘|烧烤/.test(labelText)) {
+      if (preference.flavor === 'strong' && /辣|麻辣|火锅|川菜|湘菜|重口/.test(labelText)) {
         score += 10;
       }
 
@@ -442,15 +490,15 @@ function rankRestaurants(restaurants, preference) {
         score += 6;
       }
 
-      if (preference.temperature === 'cold' && /凉|沙拉|轻食/.test(labelText)) {
+      if (preference.temperature === 'cold' && /冷|沙拉|轻食/.test(labelText)) {
         score += 6;
       }
 
-      if (preference.mealType === 'snack' && /小吃|包子|饺子|炸|饼/.test(labelText)) {
+      if (preference.mealType === 'snack' && /小吃|包子|饺子|点心/.test(labelText)) {
         score += 6;
       }
 
-      if (preference.mealType === 'meal' && /饭|面|粉|粥|正餐|主食/.test(labelText)) {
+      if (preference.mealType === 'meal' && /饭|面|粉|正餐|主食/.test(labelText)) {
         score += 6;
       }
 
@@ -480,17 +528,17 @@ function rankRestaurants(restaurants, preference) {
 }
 
 function getMealName(restaurant) {
-  const tags = Array.isArray(restaurant.tags) ? restaurant.tags.join(' ') : '';
+  const text = `${restaurant.name || ''} ${(restaurant.tags || []).join(' ')}`;
 
-  if (/粥|粉|面/.test(`${restaurant.name}${tags}`)) {
+  if (/粥|粉|面/.test(text)) {
     return '招牌粥粉面';
   }
 
-  if (/牛肉/.test(`${restaurant.name}${tags}`)) {
+  if (/牛肉/.test(text)) {
     return '招牌牛肉面';
   }
 
-  if (/沙拉|轻食/.test(`${restaurant.name}${tags}`)) {
+  if (/沙拉|轻食/.test(text)) {
     return '轻食套餐';
   }
 
@@ -499,11 +547,26 @@ function getMealName(restaurant) {
 
 function buildReason(restaurant, confidenceScore) {
   const distance = typeof restaurant.distanceMeters === 'number' ? Math.round(restaurant.distanceMeters) : null;
-  const price = typeof restaurant.averageCostYuan === 'number' ? `，人均 ¥${restaurant.averageCostYuan}` : '';
-  const rating = typeof restaurant.rating === 'number' ? `，评分 ${restaurant.rating}` : '';
-  const distanceText = distance === null ? '距离合适' : `距离约 ${distance} 米`;
+  const price = typeof restaurant.averageCostYuan === 'number' ? `，人均¥${restaurant.averageCostYuan}` : '';
+  const rating = typeof restaurant.rating === 'number' ? `，评分${restaurant.rating}` : '';
+  const distanceText = distance === null ? '距离合适' : `距离约${distance}米`;
 
-  return `匹配度 ${confidenceScore}%，${distanceText}${price}${rating}`;
+  return `匹配度${confidenceScore}%，${distanceText}${price}${rating}`;
+}
+
+function getStableCoverImageUrl(recommendation) {
+  if (!recommendation) {
+    return DEFAULT_RESULT_IMAGE_URL;
+  }
+
+  const restaurant = recommendation.restaurant || {};
+  const imageUrl = recommendation.imageUrl || restaurant.coverImageUrl;
+
+  if (imageUrl) {
+    return imageUrl;
+  }
+
+  return DEFAULT_RESULT_IMAGE_URL;
 }
 
 function getDistanceMeters(left, right) {

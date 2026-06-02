@@ -7,23 +7,38 @@ export interface SelectQuestionsOptions {
 }
 
 const DEFAULT_QUESTION_COUNT = 6;
-const BASE_DIMENSIONS: PreferenceDimension[] = ['distance', 'budget', 'dining_mode'];
+const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
+const QUESTION_FLOWS = [
+  ['avoidance', 'distance', 'flavor', 'budget', 'satiety', 'mood'],
+  ['spice_tolerance', 'budget', 'health', 'distance', 'meal_type', 'speed'],
+  ['avoidance', 'health', 'distance', 'budget', 'temperature', 'scene'],
+  ['spice_tolerance', 'distance', 'budget', 'flavor', 'meal_type', 'mood'],
+  ['avoidance', 'budget', 'satiety', 'distance', 'temperature', 'speed']
+];
 
 export function selectQuestionSet(options: SelectQuestionsOptions = {}): QuestionBankItem[] {
   const count = options.count ?? DEFAULT_QUESTION_COUNT;
   const random = options.random ?? Math.random;
-  const baseQuestions = BASE_DIMENSIONS.map((dimension) => {
-    return questionBank.find((question) => question.dimension === dimension);
-  }).filter((question): question is QuestionBankItem => question !== undefined);
+  const selectableQuestions = questionBank.filter((question) => {
+    return !EXCLUDED_DIMENSIONS.includes(question.dimension);
+  });
+  const flow = QUESTION_FLOWS[Math.floor(random() * QUESTION_FLOWS.length)] ?? QUESTION_FLOWS[0];
+  const selected = flow
+    .map((id) => selectableQuestions.find((question) => question.id === id))
+    .filter(isQuestion)
+    .slice(0, count);
 
-  const requiredBaseCount = Math.min(2, baseQuestions.length, count);
-  const selected = shuffle(baseQuestions, random).slice(0, requiredBaseCount);
-  const selectedIds = new Set(selected.map((question) => question.id));
-  const flexiblePool = questionBank.filter((question) => !selectedIds.has(question.id));
+  if (selected.length < count) {
+    const selectedIds = new Set(selected.map((question) => question.id));
+    const fallbackPool = selectableQuestions.filter((question) => !selectedIds.has(question.id));
+    selected.push(...shuffle(fallbackPool, random).slice(0, count - selected.length));
+  }
 
-  selected.push(...shuffle(flexiblePool, random).slice(0, Math.max(0, count - selected.length)));
+  return selected;
+}
 
-  return shuffle(selected, random).slice(0, count);
+function isQuestion(question: QuestionBankItem | undefined): question is QuestionBankItem {
+  return question !== undefined;
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {

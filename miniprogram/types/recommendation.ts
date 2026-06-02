@@ -12,6 +12,15 @@ export type RecommendationCandidateId = string;
 export type RecommendationSource = 'mock' | 'cloud' | 'rule' | 'manual' | 'amap';
 export type RecommendationAction = 'shown' | 'accepted' | 'skipped' | 'dismissed';
 export type RecommendationConfidenceLabel = 'low' | 'medium' | 'high';
+export type RecommendationAlgorithmVersion = 'recommendation-v2';
+
+export interface CandidatePoolStats {
+  totalFetched: number;
+  afterHardFilter: number;
+  afterNegativeFilter: number;
+  finalCandidateCount: number;
+  fallbackUsed: boolean;
+}
 
 export interface RecommendationScoreBreakdown {
   baseScore: number;
@@ -22,6 +31,12 @@ export interface RecommendationScoreBreakdown {
   timeScore: number;
   ratingScore: number;
   openStatusScore: number;
+  dataCompletenessScore?: number;
+  hardConstraintScore?: number;
+  positivePreferenceScore?: number;
+  negativeAvoidanceScore?: number;
+  relativeLeadScore?: number;
+  confidenceScore?: number;
   finalScore: number;
   matchedPreferredTagIds: TagId[];
   matchedAvoidedTagIds: TagId[];
@@ -41,6 +56,14 @@ export interface RecommendationCandidate {
   confidenceLabel?: RecommendationConfidenceLabel;
   scoreBreakdown?: RecommendationScoreBreakdown;
   matchedTagIds?: TagId[];
+  matchedPreferredTagIds?: TagId[];
+  matchedAvoidedTagIds?: TagId[];
+  hardFilterReasons?: string[];
+  penaltyReasons?: string[];
+  fallbackReason?: string;
+  algorithmVersion?: RecommendationAlgorithmVersion;
+  weightProfileId?: string;
+  experimentId?: string;
   imageUrl?: string;
   source?: RecommendationSource;
 }
@@ -65,9 +88,14 @@ export interface RecommendationResult {
   id: RecommendationId;
   generatedAt: IsoDateString;
   source: RecommendationSource;
+  algorithmVersion?: RecommendationAlgorithmVersion;
+  weightProfileId?: string;
+  experimentId?: string;
   candidates: RecommendationCandidate[];
   selectedCandidateId?: RecommendationCandidateId;
   reasonSummary?: string;
+  fallbackReason?: string;
+  candidatePoolStats?: CandidatePoolStats;
 }
 
 export interface RecommendMealResponse {
@@ -92,8 +120,18 @@ export interface RecommendationHistoryRecord {
   createdAt?: IsoDateString;
   updatedAt?: IsoDateString;
   source?: RecommendationSource;
+  algorithmVersion?: RecommendationAlgorithmVersion;
+  weightProfileId?: string;
+  experimentId?: string;
   matchPercent?: number;
   switchCount?: number;
+  scoreBreakdown?: RecommendationScoreBreakdown;
+  matchedPreferredTagIds?: TagId[];
+  matchedAvoidedTagIds?: TagId[];
+  hardFilterReasons?: string[];
+  penaltyReasons?: string[];
+  fallbackReason?: string;
+  candidatePoolStats?: CandidatePoolStats;
   questionnaire?: {
     version?: string;
     answerCount: number;

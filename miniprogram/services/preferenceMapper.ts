@@ -8,9 +8,7 @@ export const DEFAULT_PREFERENCE_PROFILE: UserPreferenceProfile = {
   avoidedTagIds: [],
   positiveTags: ['quick', 'staple'],
   negativeTags: [],
-  constraints: {
-    diningMode: 'either'
-  },
+  constraints: {},
   softPreferences: {},
   budgetLevel: 3,
   maxDistanceMeters: 1500,
@@ -54,7 +52,7 @@ export function mapAnswersToPreferenceProfile(
   });
 
   const preferredTagIds = [...draft.preferredTagIds];
-  const avoidedTagIds = [...draft.avoidedTagIds].filter((tagId) => !draft.preferredTagIds.has(tagId));
+  const avoidedTagIds = [...draft.avoidedTagIds];
 
   return {
     selectedOptionIds: [...draft.selectedOptionIds],
@@ -126,11 +124,6 @@ function applyLegacyAnswer(draft: MutablePreferenceProfile, answer: UserPreferen
     }
   }
 
-  if (answer.questionId === 'dining_mode') {
-    draft.constraints.diningMode =
-      answer.value === 'dine_in' || answer.value === 'delivery' ? answer.value : 'either';
-  }
-
   if (answer.questionId === 'flavor') {
     if (answer.value === 'strong') {
       ['spicy', 'strong_flavor', 'stir_fry'].forEach((tagId) =>
@@ -140,6 +133,28 @@ function applyLegacyAnswer(draft: MutablePreferenceProfile, answer: UserPreferen
     } else if (answer.value === 'light') {
       ['light', 'healthy'].forEach((tagId) => draft.preferredTagIds.add(tagId));
       draft.avoidedTagIds.add('strong_flavor');
+    }
+  }
+
+  if (answer.questionId === 'spice_tolerance') {
+    if (answer.value === 'no_spicy') {
+      [
+        'spicy',
+        'strong_flavor',
+        'hotpot',
+        'malatang',
+        'sichuan',
+        'hunan',
+        'chongqing_noodle',
+        'maocai',
+        'dry_pot'
+      ].forEach((tagId) => draft.avoidedTagIds.add(tagId));
+      ['not_spicy', 'light', 'congee'].forEach((tagId) => draft.preferredTagIds.add(tagId));
+    } else if (answer.value === 'mild') {
+      ['strong_flavor', 'hotpot', 'malatang'].forEach((tagId) => draft.avoidedTagIds.add(tagId));
+    } else if (answer.value === 'spicy_ok') {
+      ['spicy', 'strong_flavor'].forEach((tagId) => draft.preferredTagIds.add(tagId));
+      ['spicy', 'strong_flavor'].forEach((tagId) => draft.avoidedTagIds.delete(tagId));
     }
   }
 
@@ -156,6 +171,49 @@ function applyLegacyAnswer(draft: MutablePreferenceProfile, answer: UserPreferen
       ['staple', 'rice', 'noodle'].forEach((tagId) => draft.preferredTagIds.add(tagId));
     } else if (answer.value === 'snack') {
       ['snack', 'quick', 'solo'].forEach((tagId) => draft.preferredTagIds.add(tagId));
+    }
+  }
+
+  if (answer.questionId === 'avoidance') {
+    if (answer.value === 'avoid_spicy') {
+      [
+        'spicy',
+        'strong_flavor',
+        'hotpot',
+        'malatang',
+        'sichuan',
+        'hunan',
+        'chongqing_noodle',
+        'maocai',
+        'dry_pot'
+      ].forEach((tagId) => draft.avoidedTagIds.add(tagId));
+      ['not_spicy', 'light'].forEach((tagId) => draft.preferredTagIds.add(tagId));
+    } else if (answer.value === 'avoid_greasy') {
+      ['bbq', 'fried', 'heavy', 'strong_flavor', 'burger'].forEach((tagId) =>
+        draft.avoidedTagIds.add(tagId)
+      );
+      ['healthy', 'light', 'low_burden', 'fresh'].forEach((tagId) =>
+        draft.preferredTagIds.add(tagId)
+      );
+    }
+  }
+
+  if (answer.questionId === 'health' && answer.value === 'light_burden') {
+    ['healthy', 'low_burden', 'light', 'fresh', 'salad'].forEach((tagId) =>
+      draft.preferredTagIds.add(tagId)
+    );
+    ['strong_flavor', 'spicy', 'bbq', 'fried', 'heavy'].forEach((tagId) =>
+      draft.avoidedTagIds.add(tagId)
+    );
+  }
+
+  if (answer.questionId === 'satiety') {
+    if (answer.value === 'filling') {
+      ['staple', 'rice', 'noodle', 'meal', 'set_meal'].forEach((tagId) =>
+        draft.preferredTagIds.add(tagId)
+      );
+    } else if (answer.value === 'light') {
+      ['snack', 'light', 'solo'].forEach((tagId) => draft.preferredTagIds.add(tagId));
     }
   }
 }

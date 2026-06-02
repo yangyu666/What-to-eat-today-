@@ -46,7 +46,13 @@ async function getRecommendations(
     console.warn('Fallback to local mock recommendation after cloud recommendation failed.', error);
   }
 
-  return getMockRecommendations(questionnaire, limit);
+  const mockCandidates = getMockRecommendations(questionnaire, limit);
+
+  if (mockCandidates.length === 0) {
+    throw new Error('No recommendation candidates available after all fallbacks.');
+  }
+
+  return mockCandidates;
 }
 
 async function getAmapRecommendations(

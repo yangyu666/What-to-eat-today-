@@ -74,6 +74,7 @@ export interface RestaurantSummary {
   distanceMeters?: number;
   averageCostYuan?: number;
   openStatus?: RestaurantOpenStatus;
+  rating?: number;
 }
 
 export interface CloudDocumentMeta {

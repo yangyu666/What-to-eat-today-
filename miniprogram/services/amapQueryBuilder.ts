@@ -4,29 +4,58 @@ export interface AmapRestaurantQuery {
   radiusMeters: number;
   keywords?: string;
   types: string;
+  removedKeywords?: string[];
+  fallbackKeywordsUsed?: boolean;
 }
 
 const DEFAULT_RADIUS_METERS = 1500;
 const AMAP_FOOD_TYPE = '050000';
+const SAFE_FALLBACK_KEYWORDS = ['简餐', '盖饭', '粥', '轻食', '日式'];
 const TAG_KEYWORDS: Record<string, string[]> = {
   quick: ['快餐', '简餐'],
-  staple: ['盖饭', '面'],
-  noodle: ['面', '粉'],
-  rice: ['盖饭'],
-  spicy: ['川菜', '湘菜', '麻辣烫'],
-  strong_flavor: ['川菜', '湘菜', '烧烤'],
+  staple: ['盖饭', '面', '套餐'],
+  meal: ['盖饭', '套餐'],
+  set_meal: ['套餐', '简餐'],
+  noodle: ['面', '粉面'],
+  rice: ['盖饭', '米饭'],
+  spicy: ['川菜', '湘菜', '麻辣烫', '重庆小面'],
+  strong_flavor: ['川菜', '湘菜', '麻辣香锅', '冒菜'],
+  hotpot: ['火锅', '串串'],
+  malatang: ['麻辣烫'],
+  sichuan: ['川菜', '冒菜'],
+  hunan: ['湘菜', '小炒'],
+  chongqing_noodle: ['重庆小面', '小面'],
   stir_fry: ['小炒'],
-  hot: ['面', '粉', '粥'],
+  hot: ['粥', '汤', '面'],
+  cold: ['轻食', '沙拉'],
   comfort: ['粥', '汤'],
   light: ['轻食', '粥', '粤菜'],
   healthy: ['轻食', '沙拉'],
   salad: ['沙拉'],
-  low_burden: ['轻食'],
-  not_spicy: ['粤菜', '日式'],
-  snack: ['小吃'],
+  low_burden: ['轻食', '粥'],
+  fresh: ['轻食', '日式'],
+  not_spicy: ['粥', '粤菜', '日式', '简餐'],
+  snack: ['小吃', '包子', '煎饼'],
   solo: ['快餐', '简餐'],
   relaxed: ['茶餐厅', '西餐'],
-  group: ['火锅', '烤肉']
+  group: ['火锅', '烤肉'],
+  bbq: ['烧烤', '烤肉'],
+  fried: ['炸鸡', '汉堡']
+};
+const CONFLICT_KEYWORDS_BY_NEGATIVE_TAG: Record<string, string[]> = {
+  spicy: ['川菜', '湘菜', '麻辣烫', '重庆小面', '小面', '冒菜', '麻辣香锅', '火锅', '串串'],
+  strong_flavor: ['川菜', '湘菜', '麻辣烫', '重庆小面', '小面', '冒菜', '麻辣香锅', '烧烤'],
+  hotpot: ['火锅', '串串'],
+  malatang: ['麻辣烫'],
+  sichuan: ['川菜', '冒菜'],
+  hunan: ['湘菜'],
+  chongqing_noodle: ['重庆小面', '小面'],
+  maocai: ['冒菜'],
+  dry_pot: ['麻辣香锅', '香锅'],
+  bbq: ['烧烤', '烤肉'],
+  fried: ['炸鸡', '油炸'],
+  heavy: ['烧烤', '烤肉', '炸鸡', '汉堡'],
+  burger: ['汉堡']
 };
 
 export function buildAmapRestaurantQuery(
@@ -36,10 +65,14 @@ export function buildAmapRestaurantQuery(
     avoidedTagIds: []
   }
 ): AmapRestaurantQuery {
+  const keywordResult = buildKeywords(preference);
+
   return {
     radiusMeters: normalizeRadius(preference.maxDistanceMeters),
-    keywords: buildKeywords(preference),
-    types: AMAP_FOOD_TYPE
+    keywords: keywordResult.keywords,
+    types: AMAP_FOOD_TYPE,
+    removedKeywords: keywordResult.removedKeywords,
+    fallbackKeywordsUsed: keywordResult.fallbackKeywordsUsed
   };
 }
 
@@ -48,7 +81,7 @@ function normalizeRadius(maxDistanceMeters: number | undefined): number {
   return Math.max(300, Math.min(5000, Math.round(radius)));
 }
 
-function buildKeywords(preference: UserPreferenceProfile): string | undefined {
+function buildKeywords(preference: UserPreferenceProfile) {
   const keywords = new Set<string>();
   const softKeywords = preference.softPreferences?.amapKeywords;
 
@@ -64,10 +97,35 @@ function buildKeywords(preference: UserPreferenceProfile): string | undefined {
     TAG_KEYWORDS[tagId]?.forEach((keyword) => keywords.add(keyword));
   });
 
-  preference.avoidedTagIds.forEach((tagId) => {
-    TAG_KEYWORDS[tagId]?.forEach((keyword) => keywords.delete(keyword));
+  const beforeRemovalCount = keywords.size;
+  const removedKeywords = removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
+  let fallbackKeywordsUsed = false;
+
+  if (keywords.size === 0 || removedKeywords.length >= Math.max(2, beforeRemovalCount / 2)) {
+    SAFE_FALLBACK_KEYWORDS.forEach((keyword) => keywords.add(keyword));
+    removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
+    fallbackKeywordsUsed = true;
+  }
+
+  const rankedKeywords = [...keywords].slice(0, 5);
+
+  return {
+    keywords: rankedKeywords.length > 0 ? rankedKeywords.join('|') : undefined,
+    removedKeywords,
+    fallbackKeywordsUsed
+  };
+}
+
+function removeNegativeConflictKeywords(keywords: Set<string>, avoidedTagIds: string[]): string[] {
+  const removed: string[] = [];
+
+  avoidedTagIds.forEach((tagId) => {
+    CONFLICT_KEYWORDS_BY_NEGATIVE_TAG[tagId]?.forEach((keyword) => {
+      if (keywords.delete(keyword)) {
+        removed.push(keyword);
+      }
+    });
   });
 
-  const rankedKeywords = [...keywords].slice(0, 4);
-  return rankedKeywords.length > 0 ? rankedKeywords.join('|') : undefined;
+  return removed;
 }

@@ -117,7 +117,14 @@ function readNearbyRestaurantsCache(
   radiusMeters: number,
   queryKey: string
 ): Restaurant[] {
-  const cached = wx.getStorageSync(CACHE_KEY) as CachedNearbyRestaurants | undefined;
+  let cached: CachedNearbyRestaurants | undefined;
+
+  try {
+    cached = wx.getStorageSync(CACHE_KEY) as CachedNearbyRestaurants | undefined;
+  } catch (error) {
+    console.warn('Failed to read nearby restaurants cache.', error);
+    return [];
+  }
 
   if (!cached || !Array.isArray(cached.restaurants)) {
     return [];
@@ -133,7 +140,11 @@ function readNearbyRestaurantsCache(
 }
 
 function writeNearbyRestaurantsCache(cache: CachedNearbyRestaurants) {
-  wx.setStorageSync(CACHE_KEY, cache);
+  try {
+    wx.setStorageSync(CACHE_KEY, cache);
+  } catch (error) {
+    console.warn('Failed to write nearby restaurants cache.', error);
+  }
 }
 
 function getDistanceMeters(left: GeoPoint, right: GeoPoint): number {

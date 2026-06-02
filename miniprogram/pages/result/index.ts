@@ -5,6 +5,7 @@ import type { RecommendationAction, RecommendationSource } from '../../types/rec
 import type { UserQuestionnaireResult } from '../../types/userPreference';
 
 const MAX_SWITCH_COUNT = 3;
+const DEFAULT_RESULT_IMAGE_URL = '';
 
 interface ReasonItem {
   title: string;
@@ -28,7 +29,8 @@ Page({
     walkText: '',
     ratingText: '',
     mealNameText: '',
-    coverImageUrl: '',
+    coverImageUrl: DEFAULT_RESULT_IMAGE_URL,
+    errorText: '',
     sourceText: '',
     reasonItems: [] as ReasonItem[],
     switchButtonText: '换一家'
@@ -47,20 +49,38 @@ Page({
   },
 
   async loadRecommendation(result?: UserQuestionnaireResult) {
-    this.setData({ loading: true });
+    this.setData({ loading: true, errorText: '' });
 
     try {
       const candidates = await getLocalRecommendations(result);
+
+      if (candidates.length === 0) {
+        this.setCurrentRecommendation([], 0, {
+          loading: false,
+          switchCount: 0,
+          locked: false,
+          accepted: false,
+          errorText: '暂无可推荐候选'
+        });
+        return;
+      }
+
       this.setCurrentRecommendation(candidates, 0, {
         loading: false,
         switchCount: 0,
         locked: false,
-        accepted: false
+        accepted: false,
+        switchButtonText: '换一家'
       });
       this.trackCurrentRecommendation('shown', candidates[0], 0, result);
     } catch (error) {
       console.error('Failed to load recommendation.', error);
-      this.setData({ loading: false });
+      this.setData({
+        loading: false,
+        candidates: [],
+        recommendation: null,
+        errorText: '推荐加载失败，请稍后重试'
+      });
       wx.showToast({
         title: '推荐加载失败',
         icon: 'none'
@@ -87,6 +107,7 @@ Page({
 
     const nextSwitchCount = this.data.switchCount + 1;
     const nextIndex = (this.data.currentIndex + 1) % this.data.candidates.length;
+
     this.trackCurrentRecommendation(
       'skipped',
       this.data.recommendation,
@@ -123,9 +144,13 @@ Page({
   },
 
   reloadRecommendation() {
-    const result = this.getQuestionnaireResult();
+    this.loadRecommendation(this.getQuestionnaireResult());
+  },
 
-    this.loadRecommendation(result);
+  handleCoverImageError() {
+    this.setData({
+      coverImageUrl: DEFAULT_RESULT_IMAGE_URL
+    });
   },
 
   goBack() {
@@ -151,7 +176,6 @@ Page({
       typeof distanceMeters === 'number' ? Math.max(1, Math.ceil(distanceMeters / 120)) : null;
     const rating = recommendation?.restaurant?.rating;
     const source = this.getRecommendationSource(recommendation);
-    const isAmapRestaurant = source === 'amap';
 
     this.setData({
       candidates,
@@ -164,7 +188,7 @@ Page({
       walkText: walkingMinutes ? `步行${walkingMinutes}分钟` : '步行时间未知',
       ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分稳定',
       mealNameText: recommendation?.mealName || recommendation?.name || '',
-      coverImageUrl: isAmapRestaurant && recommendation?.imageUrl ? recommendation.imageUrl : '',
+      coverImageUrl: getStableCoverImageUrl(recommendation),
       sourceText: this.getSourceText(source),
       reasonItems: recommendation
         ? this.buildReasonItems(recommendation, walkingMinutes, averageCostYuan)
@@ -179,27 +203,24 @@ Page({
     averageCostYuan: number | undefined
   ): ReasonItem[] {
     const tags = new Set(recommendation.tags);
+    const isHot = tags.has('热乎') || tags.has('麻辣烫') || tags.has('hot');
 
     return [
       {
-        title: tags.has('热乎') || tags.has('麻辣烫') ? '热食偏好匹配' : '口味偏好匹配',
-        desc: tags.has('热乎') || tags.has('麻辣烫') ? '符合你选择的“想吃热食”' : '符合你今天的口味倾向'
+        title: isHot ? '热食偏好匹配' : '口味偏好匹配',
+        desc: isHot ? '符合你选择的热食倾向' : '符合你今天的口味倾向'
       },
       {
         title: walkingMinutes ? `步行${walkingMinutes}分钟` : '距离较近',
-        desc: '距离你的位置很近'
+        desc: '距离和用餐便利性已纳入排序'
       },
       {
         title: typeof averageCostYuan === 'number' ? `人均${averageCostYuan}元` : '人均适中',
-        desc: '符合你的预算范围'
+        desc: '预算信息已参与推荐匹配'
       },
       {
-        title: '出餐速度快',
-        desc: '高峰期平均等待10分钟'
-      },
-      {
-        title: '符合预算',
-        desc: '在你的预算范围内'
+        title: `${Math.round(recommendation.confidenceScore ?? 0)}% 匹配`,
+        desc: recommendation.reason || '根据你的问答偏好综合排序'
       }
     ];
   },
@@ -258,3 +279,17 @@ Page({
     return sourceTextMap[source];
   }
 });
+
+function getStableCoverImageUrl(recommendation: MealCandidate | null): string {
+  if (!recommendation) {
+    return DEFAULT_RESULT_IMAGE_URL;
+  }
+
+  const imageUrl = recommendation.imageUrl;
+
+  if (imageUrl) {
+    return imageUrl;
+  }
+
+  return DEFAULT_RESULT_IMAGE_URL;
+}

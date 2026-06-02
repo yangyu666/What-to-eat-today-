@@ -27,9 +27,12 @@
       data-option-id="{{item.id}}"
       bindtap="selectOption"
     >
-      <view class="option-visual">
-        <text>{{item.visual}}</text>
-      </view>
+      <image
+        class="option-image"
+        src="{{item.imageUrl}}"
+        mode="aspectFill"
+        lazy-load="true"
+      />
       <view class="option-copy">
         <text class="option-title">{{item.label}}</text>
         <text class="option-desc">{{item.desc}}</text>
