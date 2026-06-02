@@ -4,6 +4,18 @@
     <text class="muted">记录最近展示、跳过和采纳的推荐。</text>
   </view>
 
+  <view class="filter-tabs">
+    <button
+      class="filter-tab {{activeFilter === item.value ? 'is-active' : ''}}"
+      wx:for="{{filterTabs}}"
+      wx:key="value"
+      data-filter="{{item.value}}"
+      bindtap="changeFilter"
+    >
+      {{item.label}}
+    </button>
+  </view>
+
   <view class="empty-state" wx:if="{{loading}}">
     <text>正在读取历史记录...</text>
   </view>

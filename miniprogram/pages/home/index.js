@@ -23,9 +23,10 @@ Page({
   async loadRecentMeals() {
     try {
       const history = await getHistory();
+      const recentHistory = selectRecentHistory(history);
 
       this.setData({
-        recentMeals: history.slice(0, MAX_RECENT_MEALS).map(toRecentMealItem)
+        recentMeals: recentHistory.map(toRecentMealItem)
       });
     } catch (error) {
       console.warn('Failed to load recent recommendations.', error);
@@ -61,6 +62,16 @@ function toRecentMealItem(item) {
       typeof item.matchPercent === 'number' ? `${Math.round(item.matchPercent)}% 匹配` : '已推荐',
     imageUrl: item.imageUrl || getFallbackImageUrl(item.tags, name)
   };
+}
+
+function selectRecentHistory(history) {
+  const accepted = history.filter((item) => item.action === 'accepted');
+
+  if (accepted.length > 0) {
+    return accepted.slice(0, MAX_RECENT_MEALS);
+  }
+
+  return history.filter((item) => item.action === 'shown').slice(0, MAX_RECENT_MEALS);
 }
 
 function getFallbackImageUrl(tags, name) {

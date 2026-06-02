@@ -2,6 +2,8 @@ import type { MealHistoryItem } from '../../models/meal';
 import { getHistory } from '../../services/historyService';
 import type { RecommendationAction, RecommendationSource } from '../../types/recommendation';
 
+type HistoryFilter = 'all' | 'accepted' | 'skipped';
+
 interface HistoryViewItem extends MealHistoryItem {
   titleText: string;
   subtitleText: string;
@@ -13,9 +15,16 @@ interface HistoryViewItem extends MealHistoryItem {
 
 Page({
   data: {
+    allHistory: [] as MealHistoryItem[],
     history: [] as HistoryViewItem[],
     loading: false,
-    emptyText: '还没有推荐历史'
+    activeFilter: 'accepted' as HistoryFilter,
+    emptyText: '还没有采纳记录',
+    filterTabs: [
+      { value: 'all', label: '全部' },
+      { value: 'accepted', label: '已采纳' },
+      { value: 'skipped', label: '已跳过' }
+    ] as Array<{ value: HistoryFilter; label: string }>
   },
 
   onLoad() {
@@ -31,9 +40,12 @@ Page({
 
     try {
       const history = await getHistory();
+      const activeFilter = this.data.activeFilter as HistoryFilter;
 
       this.setData({
-        history: history.map(this.toHistoryViewItem),
+        allHistory: history,
+        history: filterHistory(history, activeFilter).map(this.toHistoryViewItem),
+        emptyText: getEmptyText(activeFilter),
         loading: false
       });
     } catch (error) {
@@ -47,6 +59,20 @@ Page({
         icon: 'none'
       });
     }
+  },
+
+  changeFilter(event: WechatMiniprogram.TouchEvent) {
+    const activeFilter = event.currentTarget.dataset.filter as HistoryFilter | undefined;
+
+    if (!activeFilter || activeFilter === this.data.activeFilter) {
+      return;
+    }
+
+    this.setData({
+      activeFilter,
+      history: filterHistory(this.data.allHistory, activeFilter).map(this.toHistoryViewItem),
+      emptyText: getEmptyText(activeFilter)
+    });
   },
 
   toHistoryViewItem(item: MealHistoryItem): HistoryViewItem {
@@ -75,6 +101,44 @@ function getActionText(action?: RecommendationAction): string {
   };
 
   return action ? actionTextMap[action] : '已记录';
+}
+
+function filterHistory(history: MealHistoryItem[], filter: HistoryFilter): MealHistoryItem[] {
+  if (filter === 'accepted') {
+    return history.filter((item) => item.action === 'accepted');
+  }
+
+  if (filter === 'skipped') {
+    return history.filter((item) => item.action === 'skipped');
+  }
+
+  return [...history].sort((left, right) => getActionPriority(left.action) - getActionPriority(right.action));
+}
+
+function getActionPriority(action?: RecommendationAction): number {
+  if (action === 'accepted') {
+    return 0;
+  }
+
+  if (action === 'skipped') {
+    return 1;
+  }
+
+  if (action === 'shown') {
+    return 2;
+  }
+
+  return 3;
+}
+
+function getEmptyText(filter: HistoryFilter): string {
+  const emptyTextMap: Record<HistoryFilter, string> = {
+    all: '还没有推荐历史',
+    accepted: '还没有采纳记录',
+    skipped: '还没有跳过记录'
+  };
+
+  return emptyTextMap[filter];
 }
 
 function getSourceText(source?: RecommendationSource): string {

@@ -15,7 +15,8 @@
 - 出参：`ApiResponse<SaveRecommendationHistoryResponse>`
 - 数据表：写入云数据库 `recommendation_history` 集合。
 - 行为：保存推荐展示 `shown`、换一家 `skipped`、就吃这家 `accepted` 等用户行为，同时记录 `switchCount`、问答快照、推荐来源、餐厅、菜名、匹配度、标签、图片和时间。
-- 部署：在微信开发者工具中右键 `saveRecommendationHistory`，选择“上传并部署：云端安装依赖”。
+- 部署：在微信开发者工具中右键 `saveRecommendationHistory`，选择“上传并部署：云端安装依赖”。部署后在云开发控制台确认 `recommendation_history` 集合已创建，并将权限设置为允许当前用户读取和写入自己的记录（例如“仅创建者可读写”）；否则历史页会回退展示本地 storage 记录。
+- 非阻塞：前端会先写入本地 storage，再异步调用 `saveRecommendationHistory`。云函数上传失败、返回失败或集合权限未配置时，只记录 warning，不阻塞推荐展示、换一家或“就吃这家”操作。
 
 小程序启动时会在 `miniprogram/app.ts` 初始化云开发；环境 ID 可在
 `miniprogram/config/cloud.ts` 中填写。结果页调用 `recommendRestaurant` 后使用后端返回的

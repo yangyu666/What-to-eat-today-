@@ -2,9 +2,16 @@ const { getHistory } = require('../../services/historyService');
 
 Page({
   data: {
+    allHistory: [],
     history: [],
     loading: false,
-    emptyText: '还没有推荐历史'
+    activeFilter: 'accepted',
+    emptyText: '还没有采纳记录',
+    filterTabs: [
+      { value: 'all', label: '全部' },
+      { value: 'accepted', label: '已采纳' },
+      { value: 'skipped', label: '已跳过' }
+    ]
   },
 
   onLoad() {
@@ -20,9 +27,12 @@ Page({
 
     try {
       const history = await getHistory();
+      const activeFilter = this.data.activeFilter;
 
       this.setData({
-        history: history.map(toHistoryViewItem),
+        allHistory: history,
+        history: filterHistory(history, activeFilter).map(toHistoryViewItem),
+        emptyText: getEmptyText(activeFilter),
         loading: false
       });
     } catch (error) {
@@ -36,6 +46,20 @@ Page({
         icon: 'none'
       });
     }
+  },
+
+  changeFilter(event) {
+    const activeFilter = event.currentTarget.dataset.filter;
+
+    if (!activeFilter || activeFilter === this.data.activeFilter) {
+      return;
+    }
+
+    this.setData({
+      activeFilter,
+      history: filterHistory(this.data.allHistory, activeFilter).map(toHistoryViewItem),
+      emptyText: getEmptyText(activeFilter)
+    });
   }
 });
 
@@ -64,6 +88,44 @@ function getActionText(action) {
   };
 
   return action ? actionTextMap[action] : '已记录';
+}
+
+function filterHistory(history, filter) {
+  if (filter === 'accepted') {
+    return history.filter((item) => item.action === 'accepted');
+  }
+
+  if (filter === 'skipped') {
+    return history.filter((item) => item.action === 'skipped');
+  }
+
+  return [...history].sort((left, right) => getActionPriority(left.action) - getActionPriority(right.action));
+}
+
+function getActionPriority(action) {
+  if (action === 'accepted') {
+    return 0;
+  }
+
+  if (action === 'skipped') {
+    return 1;
+  }
+
+  if (action === 'shown') {
+    return 2;
+  }
+
+  return 3;
+}
+
+function getEmptyText(filter) {
+  const emptyTextMap = {
+    all: '还没有推荐历史',
+    accepted: '还没有采纳记录',
+    skipped: '还没有跳过记录'
+  };
+
+  return emptyTextMap[filter] || emptyTextMap.all;
 }
 
 function getSourceText(source) {
