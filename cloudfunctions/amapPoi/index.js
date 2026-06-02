@@ -46,6 +46,32 @@ const TAG_LABELS = {
   group: '多人'
 };
 
+Object.assign(TAG_LABELS, {
+  dessert: '甜品',
+  milk_tea: '奶茶',
+  coffee: '咖啡',
+  drink: '饮品',
+  afternoon_tea: '下午茶',
+  breakfast: '早餐',
+  lunch: '午餐',
+  dinner: '晚餐',
+  late_night: '夜宵',
+  vegetarian: '素食',
+  halal: '清真',
+  allergy_sensitive: '忌口友好',
+  low_sugar: '低糖',
+  low_carb: '低碳',
+  high_protein: '高蛋白',
+  non_meal: '非正餐',
+  pork: '猪肉',
+  meat_heavy: '重肉',
+  seafood: '海鲜',
+  peanut: '花生坚果',
+  unclear_ingredients: '配料风险',
+  sweet: '偏甜',
+  sugary_drink: '含糖饮品'
+});
+
 const TAG_RULES = [
   { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
   { pattern: /麻辣烫|麻辣拌/, ids: ['spicy', 'strong_flavor', 'heavy', 'malatang', 'hot', 'quick'] },
@@ -64,6 +90,23 @@ const TAG_RULES = [
   { pattern: /日式|日本|寿司|咖喱|拉面/, ids: ['rice', 'not_spicy', 'stable', 'solo'] },
   { pattern: /西餐|披萨|意式|brunch|牛排|咖啡/, ids: ['western', 'relaxed', 'slow', 'not_spicy'] }
 ];
+
+TAG_RULES.push(
+  { pattern: /咖啡|cafe|coffee/i, ids: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
+  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|霸王茶姬/, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /饮品|果茶|糖水/, ids: ['drink', 'non_meal', 'sweet', 'sugary_drink'] },
+  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点/, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { pattern: /早餐|包子|豆浆|油条|早茶/, ids: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
+  { pattern: /粥|粥粉面/, ids: ['breakfast', 'congee', 'quick', 'hot', 'not_spicy'] },
+  { pattern: /夜宵|宵夜/, ids: ['late_night', 'quick', 'hot', 'snack'] },
+  { pattern: /清真|兰州拉面|牛肉面/, ids: ['halal', 'noodle', 'hot', 'high_protein'] },
+  { pattern: /素食|素菜|素面/, ids: ['vegetarian', 'healthy', 'light', 'not_spicy'] },
+  { pattern: /健身餐|鸡胸肉|高蛋白|牛肉饭/, ids: ['high_protein', 'healthy', 'low_carb'] },
+  { pattern: /猪肉|卤肉|叉烧|五花肉/, ids: ['pork', 'meat_heavy'] },
+  { pattern: /海鲜|虾|蟹/, ids: ['seafood', 'unclear_ingredients'] },
+  { pattern: /花生|坚果/, ids: ['peanut', 'unclear_ingredients'] },
+  { pattern: /轻食|沙拉|健康餐|低卡|减脂/, ids: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'low_carb'] }
+);
 
 exports.main = async (event = {}, context = {}) => {
   const requestId = context.requestId || `amap-poi-${Date.now()}`;
@@ -87,7 +130,7 @@ exports.main = async (event = {}, context = {}) => {
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
     const types = typeof event.types === 'string' && event.types.trim() ? event.types.trim() : AMAP_FOOD_TYPE;
 
-    const amapResponse = await requestAmap({
+    let amapResponse = await requestAmap({
       key,
       latitude,
       longitude,
@@ -96,12 +139,30 @@ exports.main = async (event = {}, context = {}) => {
       keyword,
       types
     });
+    let keywordFallbackUsed = false;
 
     if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
       return fail(requestId, 'AMAP_REQUEST_FAILED', amapResponse.info || 'AMap request failed.', {
         infocode: amapResponse.infocode,
         status: amapResponse.status
       });
+    }
+
+    if (keyword && (!Array.isArray(amapResponse.pois) || amapResponse.pois.length === 0)) {
+      const fallbackResponse = await requestAmap({
+        key,
+        latitude,
+        longitude,
+        radius,
+        pageSize,
+        keyword: '',
+        types
+      });
+
+      if (fallbackResponse.status === '1' && fallbackResponse.infocode === '10000') {
+        amapResponse = fallbackResponse;
+        keywordFallbackUsed = true;
+      }
     }
 
     const restaurants = (Array.isArray(amapResponse.pois) ? amapResponse.pois : [])
@@ -115,7 +176,8 @@ exports.main = async (event = {}, context = {}) => {
         source: 'amap',
         fetchedAt: new Date().toISOString(),
         location: { latitude, longitude },
-        radiusMeters: radius
+        radiusMeters: radius,
+        keywordFallbackUsed
       },
       requestId
     };

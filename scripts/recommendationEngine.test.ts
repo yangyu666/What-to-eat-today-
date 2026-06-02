@@ -526,7 +526,7 @@ assert(selectedQuestions.some((question) => ['avoidance', 'spice_tolerance'].inc
 assert(selectedQuestions.some((question) => question.id === 'distance'), '6 题应覆盖距离');
 assert(selectedQuestions.some((question) => question.id === 'budget'), '6 题应覆盖预算');
 assert(
-  selectedQuestions.filter((question) => ['flavor', 'health', 'satiety', 'meal_type'].includes(question.id)).length >= 2,
+  selectedQuestions.filter((question) => ['meal_intent', 'dietary_restriction', 'time_slot', 'category_avoidance', 'category_preference'].includes(question.id)).length >= 2,
   '6 题应覆盖至少两个口味/健康/饱腹相关维度'
 );
 
@@ -549,3 +549,252 @@ const answers: UserPreferenceAnswer[] = [
 ];
 const mapped = mapAnswersToPreferenceProfile(answers);
 assert(mapped.avoidedTagIds.includes('chongqing_noodle'), '问答映射应扩展避辣负向标签');
+
+const breadthRestaurants: Restaurant[] = [
+  {
+    id: 'breadth-milk-tea',
+    name: '喜茶奶茶',
+    tags: ['奶茶'],
+    category: '茶饮',
+    distanceMeters: 160,
+    averageCostYuan: 24,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  {
+    id: 'breadth-coffee',
+    name: '街角咖啡',
+    tags: ['咖啡'],
+    category: '咖啡店',
+    distanceMeters: 180,
+    averageCostYuan: 28,
+    openStatus: 'open',
+    rating: 4.7,
+    status: 'active'
+  },
+  {
+    id: 'breadth-dessert',
+    name: '甜品面包房',
+    tags: ['甜品', '面包'],
+    category: '甜品/面包',
+    distanceMeters: 220,
+    averageCostYuan: 32,
+    openStatus: 'open',
+    rating: 4.6,
+    status: 'active'
+  },
+  {
+    id: 'breadth-rice-meal',
+    name: '家常盖饭套餐',
+    tags: ['盖饭'],
+    tagIds: ['meal', 'rice', 'set_meal', 'quick', 'staple'],
+    category: '简餐',
+    distanceMeters: 120,
+    averageCostYuan: 30,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  },
+  {
+    id: 'breadth-breakfast-congee',
+    name: '早餐粥包子铺',
+    tags: ['早餐', '粥', '包子'],
+    category: '早餐',
+    distanceMeters: 140,
+    averageCostYuan: 16,
+    openStatus: 'open',
+    rating: 4.5,
+    status: 'active'
+  },
+  {
+    id: 'breadth-late-snack',
+    name: '夜宵热小吃',
+    tags: ['夜宵', '小吃'],
+    category: '小吃',
+    distanceMeters: 150,
+    averageCostYuan: 22,
+    openStatus: 'open',
+    rating: 4.5,
+    status: 'active'
+  },
+  {
+    id: 'breadth-bbq',
+    name: '烤肉烧烤店',
+    tags: ['烤肉', '烧烤'],
+    category: '烧烤',
+    distanceMeters: 150,
+    averageCostYuan: 58,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  {
+    id: 'breadth-halal-noodle',
+    name: '清真兰州牛肉面',
+    tags: ['清真', '牛肉面'],
+    category: '清真面馆',
+    distanceMeters: 170,
+    averageCostYuan: 26,
+    openStatus: 'open',
+    rating: 4.4,
+    status: 'active'
+  },
+  {
+    id: 'breadth-pork-rice',
+    name: '卤肉饭叉烧店',
+    tags: ['卤肉', '叉烧'],
+    category: '快餐',
+    distanceMeters: 130,
+    averageCostYuan: 28,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  {
+    id: 'breadth-fitness',
+    name: '高蛋白健身餐鸡胸肉',
+    tags: ['健身餐', '鸡胸肉'],
+    category: '轻食健康餐',
+    distanceMeters: 190,
+    averageCostYuan: 42,
+    openStatus: 'open',
+    rating: 4.7,
+    status: 'active'
+  },
+  {
+    id: 'breadth-seafood',
+    name: '海鲜虾蟹饭',
+    tags: ['海鲜', '虾', '蟹'],
+    category: '海鲜',
+    distanceMeters: 170,
+    averageCostYuan: 48,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  {
+    id: 'breadth-veggie',
+    name: '素食轻食沙拉',
+    tags: ['素食', '轻食', '沙拉'],
+    category: '素食',
+    distanceMeters: 180,
+    averageCostYuan: 36,
+    openStatus: 'open',
+    rating: 4.3,
+    status: 'active'
+  }
+];
+
+const drinkPreference = profile({
+  selectedOptionIds: ['intent_drink'],
+  preferredTagIds: ['drink', 'coffee', 'milk_tea', 'non_meal', 'afternoon_tea'],
+  avoidedTagIds: ['meal', 'set_meal', 'rice', 'hotpot', 'stir_fry'],
+  maxDistanceMeters: 1000
+});
+const drinkResult = recommend(drinkPreference, breadthRestaurants);
+assert(['breadth-milk-tea', 'breadth-coffee'].includes(drinkResult.candidates[0]?.restaurantId ?? ''), 'when user wants milk tea or coffee, Top1 should not be a meal');
+
+const dessertPreference = profile({
+  selectedOptionIds: ['intent_dessert'],
+  preferredTagIds: ['dessert', 'afternoon_tea', 'non_meal', 'drink'],
+  avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+  maxDistanceMeters: 1000
+});
+const dessertResult = recommend(dessertPreference, breadthRestaurants);
+assert(['breadth-dessert', 'breadth-milk-tea', 'breadth-coffee'].includes(dessertResult.candidates[0]?.restaurantId ?? ''), 'dessert preference should prioritize dessert, bakery, or afternoon tea');
+
+const breakfastResult = recommend(
+  profile({
+    selectedOptionIds: ['time_breakfast'],
+    preferredTagIds: ['breakfast', 'congee', 'noodle', 'staple', 'hot', 'quick'],
+    maxDistanceMeters: 1000,
+    maxEstimatedMinutes: 35
+  }),
+  breadthRestaurants
+);
+assert(breakfastResult.candidates[0]?.restaurantId === 'breadth-breakfast-congee', 'breakfast should prioritize congee, buns, noodles, or breakfast shops');
+
+const lateNightResult = recommend(
+  profile({
+    selectedOptionIds: ['time_late_night'],
+    preferredTagIds: ['late_night', 'quick', 'hot', 'snack'],
+    maxDistanceMeters: 1000,
+    maxEstimatedMinutes: 35
+  }),
+  breadthRestaurants
+);
+assert(lateNightResult.candidates[0]?.restaurantId === 'breadth-late-snack', 'late night should prioritize quick, hot, snack-like food');
+
+const vegetarianPreference = profile({
+  selectedOptionIds: ['dietary_vegetarian'],
+  preferredTagIds: ['vegetarian', 'healthy', 'light'],
+  avoidedTagIds: ['bbq', 'meat_heavy', 'pork', 'fried', 'heavy'],
+  maxDistanceMeters: 1000
+});
+const vegetarianBbqScore = scoreRestaurant(breadthRestaurants.find((restaurant) => restaurant.id === 'breadth-bbq') as Restaurant, vegetarianPreference);
+assert((vegetarianBbqScore.confidenceScore ?? 100) <= 45, 'vegetarian restriction should not give BBQ or meat-heavy candidates a high score');
+assert(vegetarianBbqScore.matchedAvoidedTagIds.includes('meat_heavy') || vegetarianBbqScore.matchedAvoidedTagIds.includes('bbq'), 'vegetarian restriction should expose meat-heavy avoided tags');
+
+const halalPreference = profile({
+  selectedOptionIds: ['dietary_halal'],
+  preferredTagIds: ['halal', 'high_protein'],
+  avoidedTagIds: ['pork'],
+  maxDistanceMeters: 1000
+});
+const halalPorkScore = scoreRestaurant(breadthRestaurants.find((restaurant) => restaurant.id === 'breadth-pork-rice') as Restaurant, halalPreference);
+assert((halalPorkScore.confidenceScore ?? 100) <= 45, 'halal restriction should hard-conflict with pork related candidates');
+const halalResult = recommend(halalPreference, breadthRestaurants);
+assert(halalResult.candidates[0]?.restaurantId === 'breadth-halal-noodle', 'halal preference should prioritize halal candidates');
+
+const lowSugarPreference = profile({
+  selectedOptionIds: ['dietary_low_sugar'],
+  preferredTagIds: ['low_sugar', 'healthy', 'low_burden'],
+  avoidedTagIds: ['dessert', 'milk_tea', 'sweet', 'sugary_drink'],
+  maxDistanceMeters: 1000
+});
+const lowSugarMilkTeaScore = scoreRestaurant(breadthRestaurants.find((restaurant) => restaurant.id === 'breadth-milk-tea') as Restaurant, lowSugarPreference);
+assert((lowSugarMilkTeaScore.confidenceScore ?? 100) <= 70, 'low sugar preference should strongly downgrade milk tea and desserts unless fallback');
+
+const allergyPreference = profile({
+  selectedOptionIds: ['dietary_allergy_sensitive'],
+  preferredTagIds: ['allergy_sensitive', 'light', 'customizable'],
+  avoidedTagIds: ['seafood', 'peanut', 'unclear_ingredients', 'spicy', 'strong_flavor'],
+  maxDistanceMeters: 1000
+});
+const allergySeafoodScore = scoreRestaurant(breadthRestaurants.find((restaurant) => restaurant.id === 'breadth-seafood') as Restaurant, allergyPreference);
+assert((allergySeafoodScore.confidenceScore ?? 100) <= 45, 'allergy sensitive preference should hard-conflict with common allergen keywords');
+
+const proteinResult = recommend(
+  profile({
+    selectedOptionIds: ['dietary_high_protein'],
+    preferredTagIds: ['high_protein', 'healthy', 'low_carb'],
+    avoidedTagIds: ['dessert', 'milk_tea', 'sweet'],
+    maxDistanceMeters: 1000
+  }),
+  breadthRestaurants
+);
+assert(proteinResult.candidates[0]?.restaurantId === 'breadth-fitness', 'high protein should prioritize fitness meals, chicken breast, or beef rice candidates');
+
+const mealPreference = profile({
+  selectedOptionIds: ['intent_meal'],
+  preferredTagIds: ['meal', 'staple', 'rice', 'noodle', 'set_meal'],
+  avoidedTagIds: ['non_meal', 'drink', 'coffee', 'milk_tea', 'dessert'],
+  maxDistanceMeters: 1000
+});
+const mealResult = recommend(mealPreference, breadthRestaurants);
+assert(mealResult.candidates[0]?.restaurantId === 'breadth-rice-meal', 'when user explicitly wants a meal, milk tea coffee and dessert should not be Top1');
+
+const avoidDrinkProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'category_avoidance',
+    type: 'single',
+    value: 'avoid_drinks',
+    optionIds: ['avoid_category_drinks'],
+    answeredAt: '2026-06-02T04:10:00.000Z'
+  }
+]);
+const avoidDrinkQuery = buildAmapRestaurantQuery(avoidDrinkProfile);
+assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinkQuery.keywords ?? ''), 'avoided drink or dessert categories should not be included in AMap keywords');
+const avoidDrinkResult = recommend(avoidDrinkProfile, breadthRestaurants);
+assert(!['breadth-milk-tea', 'breadth-coffee', 'breadth-dessert'].includes(avoidDrinkResult.candidates[0]?.restaurantId ?? ''), 'avoided category should not be Top1');

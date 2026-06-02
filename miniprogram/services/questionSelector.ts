@@ -9,11 +9,12 @@ export interface SelectQuestionsOptions {
 const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
-  ['avoidance', 'distance', 'flavor', 'budget', 'satiety', 'mood'],
-  ['spice_tolerance', 'budget', 'health', 'distance', 'meal_type', 'speed'],
-  ['avoidance', 'health', 'distance', 'budget', 'temperature', 'scene'],
-  ['spice_tolerance', 'distance', 'budget', 'flavor', 'meal_type', 'mood'],
-  ['avoidance', 'budget', 'satiety', 'distance', 'temperature', 'speed']
+  ['avoidance', 'distance', 'budget', 'meal_intent', 'dietary_restriction', 'time_slot'],
+  ['category_preference', 'budget', 'distance', 'dietary_restriction', 'temperature', 'speed'],
+  ['meal_intent', 'category_avoidance', 'health', 'distance', 'budget', 'time_slot'],
+  ['spice_tolerance', 'dietary_restriction', 'budget', 'meal_type', 'category_preference', 'distance'],
+  ['avoidance', 'time_slot', 'budget', 'satiety', 'category_avoidance', 'speed'],
+  ['meal_intent', 'flavor', 'dietary_restriction', 'distance', 'budget', 'mood']
 ];
 
 export function selectQuestionSet(options: SelectQuestionsOptions = {}): QuestionBankItem[] {

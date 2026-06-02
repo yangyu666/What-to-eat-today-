@@ -93,3 +93,86 @@ assert(
   fastDeliveryProfile.maxEstimatedMinutes === 30,
   'strict speed preference should tighten delivery estimated time'
 );
+
+const milkTeaProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'category_preference',
+    type: 'single',
+    value: 'milk_tea',
+    optionIds: ['prefer_milk_tea'],
+    answeredAt: '2026-06-02T04:10:00.000Z'
+  }
+]);
+
+assert(milkTeaProfile.preferredTagIds.includes('milk_tea'), 'milk tea preference should map to milk_tea tag');
+assert(milkTeaProfile.preferredTagIds.includes('non_meal'), 'milk tea preference should map to non_meal tag');
+assert(milkTeaProfile.avoidedTagIds.includes('meal'), 'milk tea preference should avoid meal candidates');
+const milkTeaKeywords = milkTeaProfile.softPreferences?.amapKeywords;
+assert(
+  Array.isArray(milkTeaKeywords) &&
+    milkTeaKeywords.some((keyword) => keyword === '奶茶'),
+  'milk tea preference should add AMap milk tea keyword'
+);
+
+const halalProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'dietary_restriction',
+    type: 'single',
+    value: 'halal',
+    optionIds: ['dietary_halal'],
+    answeredAt: '2026-06-02T04:10:01.000Z'
+  }
+]);
+
+assert(halalProfile.preferredTagIds.includes('halal'), 'halal restriction should map to halal tag');
+assert(halalProfile.avoidedTagIds.includes('pork'), 'halal restriction should avoid pork');
+const halalKeywords = halalProfile.softPreferences?.amapKeywords;
+assert(
+  Array.isArray(halalKeywords) &&
+    halalKeywords.some((keyword) => keyword === '清真'),
+  'halal restriction should add halal AMap keyword'
+);
+
+const breakfastProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'time_slot',
+    type: 'single',
+    value: 'breakfast',
+    optionIds: ['time_breakfast'],
+    answeredAt: '2026-06-02T04:10:02.000Z'
+  }
+]);
+
+assert(breakfastProfile.preferredTagIds.includes('breakfast'), 'breakfast should map to breakfast tag');
+assert(breakfastProfile.maxEstimatedMinutes === 35, 'breakfast should tighten estimated time');
+
+const allergyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'dietary_restriction',
+    type: 'single',
+    value: 'allergy_sensitive',
+    optionIds: ['dietary_allergy_sensitive'],
+    answeredAt: '2026-06-02T04:10:02.500Z'
+  }
+]);
+
+assert(allergyProfile.preferredTagIds.includes('allergy_sensitive'), 'allergy option should map to allergy_sensitive tag');
+assert(allergyProfile.avoidedTagIds.includes('seafood'), 'allergy option should avoid seafood risk tags');
+assert(allergyProfile.avoidedTagIds.includes('peanut'), 'allergy option should avoid peanut risk tags');
+
+const avoidDrinksProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'category_avoidance',
+    type: 'single',
+    value: 'avoid_drinks',
+    optionIds: ['avoid_category_drinks'],
+    answeredAt: '2026-06-02T04:10:03.000Z'
+  }
+]);
+const avoidDrinksQuery = buildAmapRestaurantQuery(avoidDrinksProfile);
+
+assert(avoidDrinksProfile.avoidedTagIds.includes('milk_tea'), 'avoid drinks should map milk_tea to avoided tags');
+assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinksQuery.keywords ?? ''), 'avoid drinks should remove conflicting AMap keywords');
+
+const allOptions = questions.flatMap((question) => question.options ?? []);
+assert(allOptions.every((option) => Boolean(option.imageUrl || option.icon)), 'selected questions should expose imageUrl or icon on every option');

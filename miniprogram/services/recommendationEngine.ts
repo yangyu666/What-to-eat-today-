@@ -55,7 +55,7 @@ const MIN_PRIMARY_POOL_SIZE = 3;
 const MAX_SCORE = 100;
 const MIN_SCORE = 0;
 export const ALGORITHM_VERSION: RecommendationAlgorithmVersion = 'recommendation-v2';
-export const WEIGHT_PROFILE_ID = 'default-v2';
+export const WEIGHT_PROFILE_ID = 'breadth-v2';
 export const DEFAULT_EXPERIMENT_ID = 'default';
 
 const BUDGET_LEVEL_TO_YUAN: Record<number, number> = {
@@ -95,7 +95,30 @@ const TAG_WEIGHTS: Record<string, number> = {
   solo: 8,
   slow: 5,
   spicy: 8,
-  strong_flavor: 7
+  strong_flavor: 7,
+  dessert: 12,
+  milk_tea: 12,
+  coffee: 12,
+  drink: 11,
+  afternoon_tea: 11,
+  breakfast: 12,
+  lunch: 9,
+  dinner: 9,
+  late_night: 12,
+  vegetarian: 16,
+  halal: 16,
+  allergy_sensitive: 16,
+  low_sugar: 15,
+  low_carb: 13,
+  high_protein: 15,
+  non_meal: 12,
+  pork: 6,
+  meat_heavy: 7,
+  seafood: 6,
+  peanut: 6,
+  unclear_ingredients: 6,
+  sweet: 6,
+  sugary_drink: 6
 };
 
 const HOT_FOOD_TAGS = ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'];
@@ -116,6 +139,13 @@ const SPICY_CONFLICT_TAGS = [
 const GREASY_CONFLICT_TAGS = ['bbq', 'fried', 'heavy', 'strong_flavor', 'burger'];
 const LIGHT_CONFLICT_TAGS = ['spicy', 'strong_flavor', 'bbq', 'fried', 'heavy', 'hotpot', 'malatang'];
 const LIGHT_HEALTHY_PREFERENCE_TAGS = ['light', 'healthy', 'low_burden', 'salad', 'fresh'];
+const NON_MEAL_TAGS = ['dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'non_meal'];
+const MEAL_TAGS = ['meal', 'rice', 'noodle', 'staple', 'set_meal', 'hotpot', 'stir_fry'];
+const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
+const HALAL_CONFLICT_TAGS = ['pork'];
+const LOW_SUGAR_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drink'];
+const HIGH_PROTEIN_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drink'];
+const ALLERGY_CONFLICT_TAGS = ['seafood', 'peanut', 'unclear_ingredients'];
 const DEFAULT_SPICY_HEAVY_TAGS = ['spicy', 'strong_flavor', 'heavy'];
 const NOT_SPICY_KEYWORDS = ['不辣', '微辣可选', '清淡', '白汤', '原味', '广式', '粥', '沙拉', '轻食'];
 const SPICY_HEAVY_KEYWORDS = [
@@ -156,6 +186,18 @@ const INFERRED_TAG_RULES: Array<{ keywords: string[]; tags: TagId[]; skipWhenNot
   { keywords: ['盖饭', '便当', '简餐', '套餐'], tags: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
   { keywords: ['包子', '饺子', '煎饼', '烧麦', '小吃'], tags: ['quick', 'snack', 'solo', 'hot'] },
   { keywords: ['日式', '日本', '寿司', '咖喱'], tags: ['rice', 'not_spicy', 'stable', 'solo'] }
+  , { keywords: ['咖啡', 'cafe', 'coffee'], tags: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
+  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '霸王茶姬'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['饮品', '果茶', '糖水'], tags: ['drink', 'non_meal', 'sweet', 'sugary_drink'] },
+  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { keywords: ['早餐', '包子', '豆浆', '油条'], tags: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
+  { keywords: ['夜宵', '宵夜'], tags: ['late_night', 'quick', 'hot', 'snack'] },
+  { keywords: ['清真', '兰州拉面', '牛肉面'], tags: ['halal', 'noodle', 'hot', 'high_protein'] },
+  { keywords: ['素食', '素菜', '素面'], tags: ['vegetarian', 'healthy', 'light', 'not_spicy'] },
+  { keywords: ['健身餐', '鸡胸肉', '高蛋白', '牛肉饭'], tags: ['high_protein', 'healthy', 'low_carb'] },
+  { keywords: ['猪肉', '卤肉', '叉烧', '五花肉'], tags: ['pork', 'meat_heavy'] },
+  { keywords: ['海鲜', '虾', '蟹'], tags: ['seafood', 'unclear_ingredients'] },
+  { keywords: ['花生', '坚果'], tags: ['peanut', 'unclear_ingredients'] }
 ];
 const SPICY_KEYWORDS = [
   '辣',
@@ -174,6 +216,13 @@ const SPICY_KEYWORDS = [
   '串串'
 ];
 const GREASY_KEYWORDS = ['炸', '炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '烧烤', '烤肉', '汉堡', '薯条', '油炸'];
+
+const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶'];
+const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭'];
+const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
+const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
+const SWEET_KEYWORDS = ['甜品', '蛋糕', '奶茶', '茶饮', '糖水'];
+const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
 
 export function recommendRestaurants(options: RecommendationEngineOptions): RecommendationResult {
   const now = options.now ?? new Date();
@@ -615,9 +664,53 @@ function getPreferredTagIds(preference?: UserPreferenceProfile): TagId[] {
 function getAvoidedTagIds(preference?: UserPreferenceProfile): TagId[] {
   const avoided = new Set([...(preference?.avoidedTagIds ?? []), ...(preference?.negativeTags ?? [])]);
   const preferred = new Set(getPreferredTagIds(preference));
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+  const wantsNonMeal =
+    selected.has('intent_drink') ||
+    selected.has('intent_dessert') ||
+    selected.has('time_afternoon_tea') ||
+    selected.has('prefer_milk_tea') ||
+    selected.has('prefer_coffee') ||
+    selected.has('prefer_bakery_dessert') ||
+    selected.has('avoid_category_heavy_meal');
+  const wantsMeal =
+    selected.has('intent_meal') ||
+    selected.has('meal_type_meal') ||
+    selected.has('satiety_filling') ||
+    selected.has('time_lunch') ||
+    selected.has('time_dinner') ||
+    selected.has('avoid_category_drinks');
 
   if (LIGHT_HEALTHY_PREFERENCE_TAGS.some((tagId) => preferred.has(tagId))) {
     [...GREASY_CONFLICT_TAGS, ...LIGHT_CONFLICT_TAGS].forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (wantsNonMeal || (NON_MEAL_TAGS.some((tagId) => preferred.has(tagId)) && !wantsMeal)) {
+    MEAL_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (wantsMeal) {
+    NON_MEAL_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (preferred.has('vegetarian') || avoided.has('meat_heavy') || avoided.has('pork')) {
+    VEGETARIAN_CONFLICT_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (preferred.has('halal') || avoided.has('pork')) {
+    HALAL_CONFLICT_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (preferred.has('low_sugar') || avoided.has('sugary_drink') || avoided.has('sweet')) {
+    LOW_SUGAR_CONFLICT_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (preferred.has('high_protein')) {
+    HIGH_PROTEIN_CONFLICT_TAGS.forEach((tagId) => avoided.add(tagId));
+  }
+
+  if (preferred.has('allergy_sensitive')) {
+    ALLERGY_CONFLICT_TAGS.forEach((tagId) => avoided.add(tagId));
   }
 
   if (avoided.has('spicy')) {
@@ -637,18 +730,36 @@ function getAvoidedTagIds(preference?: UserPreferenceProfile): TagId[] {
 
 function getNegativeConflict(restaurant: Restaurant, preference?: UserPreferenceProfile) {
   const avoided = new Set(getAvoidedTagIds(preference));
+  const preferred = new Set(getPreferredTagIds(preference));
   const tagIds = getRestaurantTagIds(restaurant);
   const text = getRestaurantText(restaurant);
   const tags = new Set<TagId>();
   const labels = new Set<string>();
   let severity: 'none' | 'soft' | 'hard' = 'none';
   const explicitNoSpicy = avoided.has('spicy');
+  const explicitVegetarian = preferred.has('vegetarian');
+  const explicitHalal = preferred.has('halal') || avoided.has('pork');
+  const explicitLowSugar = preferred.has('low_sugar') || avoided.has('sugary_drink') || avoided.has('sweet');
+  const explicitHighProtein = preferred.has('high_protein');
+  const explicitAllergy = preferred.has('allergy_sensitive');
+  const setSeverity = (next: 'soft' | 'hard') => {
+    severity = severity === 'hard' || next === 'hard' ? 'hard' : 'soft';
+  };
 
   tagIds.forEach((tagId) => {
     if (avoided.has(tagId)) {
       tags.add(tagId);
       labels.add(tagId);
-      severity = explicitNoSpicy && SPICY_CONFLICT_TAGS.includes(tagId) ? 'hard' : 'soft';
+      if (
+        (explicitNoSpicy && SPICY_CONFLICT_TAGS.includes(tagId)) ||
+        (explicitHalal && HALAL_CONFLICT_TAGS.includes(tagId)) ||
+        (explicitVegetarian && VEGETARIAN_CONFLICT_TAGS.includes(tagId)) ||
+        (explicitAllergy && ALLERGY_CONFLICT_TAGS.includes(tagId))
+      ) {
+        setSeverity('hard');
+      } else {
+        setSeverity('soft');
+      }
     }
   });
 
@@ -669,6 +780,48 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
     GREASY_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
     labels.add('油腻/油炸/烧烤相关');
     severity = severity === 'hard' ? 'hard' : 'soft';
+  }
+
+  if (explicitHalal && PORK_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    HALAL_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('pork related');
+    setSeverity('hard');
+  }
+
+  if (explicitVegetarian && MEAT_HEAVY_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    VEGETARIAN_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('meat-heavy related');
+    setSeverity('hard');
+  }
+
+  if (explicitLowSugar && SWEET_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    LOW_SUGAR_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('sweet or sugary related');
+    setSeverity('soft');
+  }
+
+  if (explicitHighProtein && SWEET_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    HIGH_PROTEIN_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('low protein sweet related');
+    setSeverity('soft');
+  }
+
+  if (explicitAllergy && ALLERGY_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    ALLERGY_CONFLICT_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('allergy risk related');
+    setSeverity('hard');
+  }
+
+  if (avoided.has('meal') && MEAL_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    MEAL_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('meal category conflict');
+    setSeverity('soft');
+  }
+
+  if (avoided.has('non_meal') && NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    NON_MEAL_TAGS.forEach((tagId) => tags.add(tagId));
+    labels.add('non-meal category conflict');
+    setSeverity('soft');
   }
 
   return {

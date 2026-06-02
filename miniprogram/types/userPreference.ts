@@ -18,7 +18,12 @@ export type PreferenceDimension =
   | 'satiety'
   | 'avoidance'
   | 'mood'
-  | 'scene';
+  | 'scene'
+  | 'meal_intent'
+  | 'dietary_restriction'
+  | 'time_slot'
+  | 'category_avoidance'
+  | 'category_preference';
 
 export interface PreferenceOption {
   id: PreferenceOptionId;
