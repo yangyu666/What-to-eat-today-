@@ -38,6 +38,8 @@ export interface RecommendationScoreBreakdown {
   relativeLeadScore?: number;
   confidenceScore?: number;
   finalScore: number;
+  finalScoreSource?: string;
+  matchPercentSource?: string;
   matchedPreferredTagIds: TagId[];
   matchedAvoidedTagIds: TagId[];
 }

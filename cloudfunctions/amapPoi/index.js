@@ -47,19 +47,19 @@ const TAG_LABELS = {
 };
 
 const TAG_RULES = [
-  { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
-  { pattern: /麻辣烫|麻辣拌/, ids: ['spicy', 'strong_flavor', 'malatang', 'hot', 'quick'] },
-  { pattern: /冒菜/, ids: ['spicy', 'strong_flavor', 'sichuan', 'maocai', 'hot'] },
-  { pattern: /麻辣香锅|香锅|干锅/, ids: ['spicy', 'strong_flavor', 'dry_pot', 'hot'] },
-  { pattern: /火锅|串串|涮锅/, ids: ['spicy', 'strong_flavor', 'hotpot', 'group', 'hot'] },
-  { pattern: /川菜|川味|水煮|麻婆|辣子/, ids: ['spicy', 'strong_flavor', 'sichuan', 'rice'] },
-  { pattern: /湘菜|湖南|小炒|辣椒炒肉/, ids: ['spicy', 'strong_flavor', 'hunan', 'rice'] },
+  { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
+  { pattern: /麻辣烫|麻辣拌/, ids: ['spicy', 'strong_flavor', 'heavy', 'malatang', 'hot', 'quick'] },
+  { pattern: /冒菜/, ids: ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'maocai', 'hot'] },
+  { pattern: /麻辣香锅|香锅|干锅/, ids: ['spicy', 'strong_flavor', 'heavy', 'dry_pot', 'hot'] },
+  { pattern: /火锅|串串|涮锅/, ids: ['spicy', 'strong_flavor', 'heavy', 'hotpot', 'group', 'hot'] },
+  { pattern: /川菜|川味|水煮|麻婆|辣子/, ids: ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'rice'] },
+  { pattern: /湘菜|湖南|小炒|剁椒/, ids: ['spicy', 'strong_flavor', 'heavy', 'hunan', 'rice'] },
   { pattern: /烧烤|烤肉|烤串|烤鱼/, ids: ['bbq', 'heavy', 'strong_flavor', 'group'] },
   { pattern: /炸鸡|油炸|汉堡|薯条/, ids: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
-  { pattern: /粥|粉面|云吞|馄饨|粤菜|广式|茶餐厅/, ids: ['light', 'congee', 'comfort', 'not_spicy', 'quick'] },
+  { pattern: /粥|粉面|云吞|馄饨|粤菜|广式|茶餐厅/, ids: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { pattern: /兰州|牛肉面|拉面|刀削面|米线|面馆/, ids: ['hot', 'staple', 'noodle', 'quick'] },
   { pattern: /快餐|简餐|便当|盖饭|黄焖鸡|卤肉饭|套餐/, ids: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
-  { pattern: /小吃|包子|饺子|馄饨|煎饼|烧麦|点心/, ids: ['quick', 'snack', 'solo'] },
+  { pattern: /小吃|包子|饺子|煎饼|烧麦|点心/, ids: ['quick', 'snack', 'solo', 'hot'] },
   { pattern: /轻食|沙拉|健康|素食|低卡|减脂/, ids: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
   { pattern: /日式|日本|寿司|咖喱|拉面/, ids: ['rice', 'not_spicy', 'stable', 'solo'] },
   { pattern: /西餐|披萨|意式|brunch|牛排|咖啡/, ids: ['western', 'relaxed', 'slow', 'not_spicy'] }
@@ -199,12 +199,18 @@ function convertPoiToRestaurant(poi) {
 
 function mapCategoryToTagIds(text) {
   const ids = new Set();
+  const explicitlyNotSpicy = /不辣|清淡|白汤|原味|广式|粥|沙拉|轻食/.test(text);
 
   TAG_RULES.forEach((rule) => {
     if (rule.pattern.test(text)) {
       rule.ids.forEach((id) => ids.add(id));
     }
   });
+
+  if (explicitlyNotSpicy) {
+    ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'hunan', 'malatang', 'maocai', 'dry_pot', 'hotpot'].forEach((id) => ids.delete(id));
+    ids.add('not_spicy');
+  }
 
   if (ids.size === 0) {
     ids.add('quick');

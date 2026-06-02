@@ -28,6 +28,7 @@ export interface QuestionBankOption extends PreferenceOption {
   desc: string;
   themeClass: string;
   visual: string;
+  icon: string;
   imageUrl: string;
   effect: PreferenceOptionEffect;
 }
@@ -92,6 +93,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'avoid_spicy',
         themeClass: 'theme-green',
         visual: '避',
+        icon: '避',
         imageUrl: QUESTION_OPTION_IMAGES.avoidanceSpicy,
         effect: {
           positiveTags: ['not_spicy', 'light'],
@@ -117,6 +119,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'avoid_greasy',
         themeClass: 'theme-green',
         visual: '清',
+        icon: '清',
         imageUrl: QUESTION_OPTION_IMAGES.avoidanceGreasy,
         effect: {
           positiveTags: ['healthy', 'light', 'low_burden', 'fresh'],
@@ -132,6 +135,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'none',
         themeClass: 'theme-red',
         visual: '开',
+        icon: '开',
         imageUrl: QUESTION_OPTION_IMAGES.avoidanceNone,
         effect: {}
       }
@@ -153,6 +157,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'no_spicy',
         themeClass: 'theme-green',
         visual: '淡',
+        icon: '淡',
         imageUrl: QUESTION_OPTION_IMAGES.spiceNo,
         effect: {
           positiveTags: ['not_spicy', 'light', 'congee'],
@@ -178,6 +183,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'mild',
         themeClass: 'theme-red',
         visual: '微',
+        icon: '微',
         imageUrl: QUESTION_OPTION_IMAGES.spiceMild,
         effect: {
           positiveTags: ['fresh', 'comfort'],
@@ -192,6 +198,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'spicy_ok',
         themeClass: 'theme-red',
         visual: '辣',
+        icon: '辣',
         imageUrl: QUESTION_OPTION_IMAGES.spiceYes,
         effect: {
           positiveTags: ['spicy', 'strong_flavor', 'hunan', 'sichuan'],
@@ -217,6 +224,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 500,
         themeClass: 'theme-green',
         visual: '近',
+        icon: '近',
         imageUrl: QUESTION_OPTION_IMAGES.distanceNear,
         effect: {
           constraints: { maxDistanceMeters: 500, maxEstimatedMinutes: 30 }
@@ -230,6 +238,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 1000,
         themeClass: 'theme-red',
         visual: '行',
+        icon: '行',
         imageUrl: QUESTION_OPTION_IMAGES.distanceWalk,
         effect: {
           constraints: { maxDistanceMeters: 1000, maxEstimatedMinutes: 40 }
@@ -243,6 +252,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'any',
         themeClass: 'theme-green',
         visual: '远',
+        icon: '远',
         imageUrl: QUESTION_OPTION_IMAGES.distanceAny,
         effect: {
           constraints: { maxDistanceMeters: 3000, maxEstimatedMinutes: 60 }
@@ -266,6 +276,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'under_30',
         themeClass: 'theme-green',
         visual: '¥',
+        icon: '¥',
         imageUrl: QUESTION_OPTION_IMAGES.budgetLow,
         effect: {
           constraints: { budgetLevel: 2 },
@@ -280,6 +291,7 @@ export const questionBank: QuestionBankItem[] = [
         value: '30_60',
         themeClass: 'theme-red',
         visual: '¥',
+        icon: '¥',
         imageUrl: QUESTION_OPTION_IMAGES.budgetMid,
         effect: {
           constraints: { budgetLevel: 3 }
@@ -293,6 +305,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'over_60',
         themeClass: 'theme-green',
         visual: '¥',
+        icon: '¥',
         imageUrl: QUESTION_OPTION_IMAGES.budgetHigh,
         effect: {
           constraints: { budgetLevel: 4 },
@@ -316,6 +329,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'light',
         themeClass: 'theme-green',
         visual: '清',
+        icon: '清',
         imageUrl: QUESTION_OPTION_IMAGES.flavorLight,
         effect: {
           positiveTags: ['light', 'healthy', 'not_spicy', 'low_burden'],
@@ -331,6 +345,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'strong',
         themeClass: 'theme-red',
         visual: '辣',
+        icon: '辣',
         imageUrl: QUESTION_OPTION_IMAGES.flavorStrong,
         effect: {
           positiveTags: ['spicy', 'strong_flavor', 'stir_fry'],
@@ -355,6 +370,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'light_burden',
         themeClass: 'theme-green',
         visual: '轻',
+        icon: '轻',
         imageUrl: QUESTION_OPTION_IMAGES.healthLight,
         effect: {
           positiveTags: ['healthy', 'low_burden', 'light', 'fresh', 'salad'],
@@ -370,6 +386,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'free',
         themeClass: 'theme-red',
         visual: '放',
+        icon: '放',
         imageUrl: QUESTION_OPTION_IMAGES.healthFree,
         effect: {
           softPreferences: { mood: 'treat' }
@@ -392,6 +409,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'filling',
         themeClass: 'theme-red',
         visual: '饱',
+        icon: '饱',
         imageUrl: QUESTION_OPTION_IMAGES.satietyFilling,
         effect: {
           positiveTags: ['staple', 'rice', 'noodle', 'meal', 'set_meal'],
@@ -406,6 +424,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'light',
         themeClass: 'theme-green',
         visual: '垫',
+        icon: '垫',
         imageUrl: QUESTION_OPTION_IMAGES.satietyLight,
         effect: {
           positiveTags: ['snack', 'light', 'solo'],
@@ -429,6 +448,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'meal',
         themeClass: 'theme-red',
         visual: '饭',
+        icon: '饭',
         imageUrl: QUESTION_OPTION_IMAGES.mealMain,
         effect: {
           positiveTags: ['staple', 'rice', 'noodle', 'meal', 'set_meal'],
@@ -443,6 +463,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'snack',
         themeClass: 'theme-green',
         visual: '点',
+        icon: '点',
         imageUrl: QUESTION_OPTION_IMAGES.mealSnack,
         effect: {
           positiveTags: ['snack', 'quick', 'solo'],
@@ -466,6 +487,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'hot',
         themeClass: 'theme-red',
         visual: '热',
+        icon: '热',
         imageUrl: QUESTION_OPTION_IMAGES.temperatureHot,
         effect: {
           positiveTags: ['hot', 'comfort', 'congee'],
@@ -480,6 +502,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'cold',
         themeClass: 'theme-green',
         visual: '凉',
+        icon: '凉',
         imageUrl: QUESTION_OPTION_IMAGES.temperatureCold,
         effect: {
           positiveTags: ['cold', 'light', 'salad', 'fresh', 'low_burden'],
@@ -503,6 +526,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'fast',
         themeClass: 'theme-green',
         visual: '快',
+        icon: '快',
         imageUrl: QUESTION_OPTION_IMAGES.speedFast,
         effect: {
           positiveTags: ['quick', 'solo', 'snack'],
@@ -518,6 +542,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'slow',
         themeClass: 'theme-red',
         visual: '慢',
+        icon: '慢',
         imageUrl: QUESTION_OPTION_IMAGES.speedSlow,
         effect: {
           positiveTags: ['relaxed', 'slow'],
@@ -541,6 +566,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'comfort',
         themeClass: 'theme-red',
         visual: '暖',
+        icon: '暖',
         imageUrl: QUESTION_OPTION_IMAGES.moodComfort,
         effect: {
           positiveTags: ['comfort', 'hot', 'stable', 'congee'],
@@ -555,6 +581,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'fresh',
         themeClass: 'theme-green',
         visual: '新',
+        icon: '新',
         imageUrl: QUESTION_OPTION_IMAGES.moodFresh,
         effect: {
           positiveTags: ['fresh', 'western', 'curry', 'customizable'],
@@ -578,6 +605,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'solo',
         themeClass: 'theme-green',
         visual: '一',
+        icon: '一',
         imageUrl: QUESTION_OPTION_IMAGES.sceneSolo,
         effect: {
           positiveTags: ['solo', 'quick', 'stable', 'snack'],
@@ -592,6 +620,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'group',
         themeClass: 'theme-red',
         visual: '聚',
+        icon: '聚',
         imageUrl: QUESTION_OPTION_IMAGES.sceneGroup,
         effect: {
           positiveTags: ['group', 'relaxed'],
@@ -616,6 +645,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'dine_in',
         themeClass: 'theme-red',
         visual: '店',
+        icon: '店',
         imageUrl: QUESTION_OPTION_IMAGES.diningDineIn,
         effect: {
           constraints: { diningMode: 'dine_in', maxEstimatedMinutes: 45 },
@@ -630,6 +660,7 @@ export const questionBank: QuestionBankItem[] = [
         value: 'delivery',
         themeClass: 'theme-green',
         visual: '送',
+        icon: '送',
         imageUrl: QUESTION_OPTION_IMAGES.diningDelivery,
         effect: {
           constraints: { diningMode: 'delivery', maxEstimatedMinutes: 60 },

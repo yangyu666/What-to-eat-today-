@@ -43,6 +43,28 @@ const SPICY_CONFLICT_TAGS = [
 ];
 const GREASY_CONFLICT_TAGS = ['bbq', 'fried', 'heavy', 'strong_flavor', 'burger'];
 const LIGHT_CONFLICT_TAGS = ['spicy', 'strong_flavor', 'bbq', 'fried', 'heavy', 'hotpot', 'malatang'];
+const HOT_FOOD_TAGS = ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'];
+const COLD_FOOD_TAGS = ['cold', 'salad', 'fresh', 'light', 'healthy', 'low_burden'];
+const DEFAULT_SPICY_HEAVY_TAGS = ['spicy', 'strong_flavor', 'heavy'];
+const NOT_SPICY_KEYWORDS = ['不辣', '微辣可选', '清淡', '白汤', '原味', '广式', '粥', '沙拉', '轻食'];
+const SPICY_HEAVY_KEYWORDS = ['辣', '麻辣', '小面', '重庆小面', '酸辣粉', '川', '川味', '川菜', '湘', '湘菜', '麻辣烫', '冒菜', '香锅', '麻辣香锅', '火锅', '串串', '水煮', '剁椒', '干锅', '螺蛳粉'];
+const INFERRED_TAG_RULES = [
+  { keywords: ['重庆小面', '小面'], tags: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'hot', 'quick'], skipWhenNotSpicy: true },
+  { keywords: ['麻辣烫'], tags: ['spicy', 'strong_flavor', 'heavy', 'malatang', 'hot', 'quick'], skipWhenNotSpicy: true },
+  { keywords: ['冒菜'], tags: ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'maocai', 'hot'], skipWhenNotSpicy: true },
+  { keywords: ['麻辣香锅', '香锅', '干锅'], tags: ['spicy', 'strong_flavor', 'heavy', 'dry_pot', 'hot'], skipWhenNotSpicy: true },
+  { keywords: ['川菜', '川味', '水煮', '辣子'], tags: ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'rice'], skipWhenNotSpicy: true },
+  { keywords: ['湘菜', '湖南', '小炒', '剁椒'], tags: ['spicy', 'strong_flavor', 'heavy', 'hunan', 'rice'], skipWhenNotSpicy: true },
+  { keywords: ['酸辣粉'], tags: ['spicy', 'strong_flavor', 'heavy', 'chongqing', 'noodle', 'hot'], skipWhenNotSpicy: true },
+  { keywords: ['火锅', '串串'], tags: ['spicy', 'strong_flavor', 'heavy', 'hotpot', 'hot'], skipWhenNotSpicy: true },
+  { keywords: ['炸鸡', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
+  { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group'] },
+  { keywords: ['粥', '粉面', '云吞', '馄饨', '广式', '茶餐厅'], tags: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
+  { keywords: ['轻食', '沙拉', '健康', '低卡', '减脂'], tags: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
+  { keywords: ['盖饭', '便当', '简餐', '套餐'], tags: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
+  { keywords: ['包子', '饺子', '煎饼', '烧麦', '小吃'], tags: ['quick', 'snack', 'solo', 'hot'] },
+  { keywords: ['日式', '日本', '寿司', '咖喱'], tags: ['rice', 'not_spicy', 'stable', 'solo'] }
+];
 const SPICY_KEYWORDS = ['辣', '麻辣', '小面', '重庆小面', '川', '川味', '川菜', '湘', '湘菜', '麻辣烫', '冒菜', '香锅', '火锅', '串串'];
 const GREASY_KEYWORDS = ['炸', '炸鸡', '烧烤', '烤肉', '汉堡', '油炸'];
 
@@ -417,18 +439,27 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const tagIds = getRestaurantTagIds(restaurant);
   const preferredTagIds = getPreferredTagIds(preference);
   const negativeConflict = getNegativeConflict(restaurant, preference);
+  const temperatureConflict = getTemperatureConflict(restaurant, preference);
   const matchedPreferredTagIds = intersect(tagIds, preferredTagIds);
   const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, getAvoidedTagIds(preference)), ...negativeConflict.tags])];
   const baseScore = 32;
   const preferenceScore = Math.min(34, matchedPreferredTagIds.reduce((sum, tag) => sum + (TAG_WEIGHTS[tag] || 6), 0));
-  const negativePreferencePenalty = negativeConflict.severity === 'hard' ? 88 : negativeConflict.severity === 'soft' ? Math.min(45, 22 + negativeConflict.tags.length * 7) : 0;
+  const negativePreferencePenalty = (negativeConflict.severity === 'hard' ? 88 : negativeConflict.severity === 'soft' ? Math.min(45, 22 + negativeConflict.tags.length * 7) : 0) + temperatureConflict.penalty;
   const distanceScore = getDistanceScore(restaurant, preference, options.fallbackReason !== undefined);
   const priceScore = getPriceScore(restaurant, preference);
   const timeScore = getTimeScore(restaurant, preference);
   const ratingScore = getRatingScore(restaurant);
   const openStatusScore = restaurant.openStatus === 'open' ? 6 : restaurant.openStatus === 'busy' ? 1 : 0;
   const dataCompletenessScore = getDataCompletenessScore(restaurant);
-  const finalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
+  const rawFinalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
+  const finalScore =
+    options.fallbackReason !== undefined &&
+    preference &&
+    preference.maxDistanceMeters !== undefined &&
+    restaurant.distanceMeters !== undefined &&
+    restaurant.distanceMeters > preference.maxDistanceMeters
+      ? Math.min(rawFinalScore, 54)
+      : rawFinalScore;
   const hardConstraintScore = getHardConstraintConfidence(restaurant, preference, options.fallbackReason);
   const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
   const negativeAvoidanceScore = negativeConflict.severity === 'hard' ? 0 : negativeConflict.severity === 'soft' ? 8 : 25;
@@ -440,6 +471,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     dataCompletenessScore,
     relativeLeadScore,
     negativeConflict,
+    temperatureConflict,
     fallbackUsed: options.fallbackReason !== undefined,
     candidatePoolWeak: options.candidatePoolWeak || false
   });
@@ -465,12 +497,14 @@ function scoreRestaurant(restaurant, preference, options = {}) {
       relativeLeadScore,
       confidenceScore,
       finalScore,
+      finalScoreSource: 'base + preferred tag weights - negative/temperature penalties + distance + price + time + rating + open status + data completeness',
+      matchPercentSource: 'hard constraints + positive preference coverage + negative avoidance + data completeness + relative lead, capped by conflict/fallback calibration',
       matchedPreferredTagIds,
       matchedAvoidedTagIds
     },
-    reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason),
+    reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict),
     hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), true, true).reasons,
-    penaltyReasons: buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason),
+    penaltyReasons: buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict),
     matchedPreferredTagIds,
     matchedAvoidedTagIds,
     fallbackReason: options.fallbackReason
@@ -480,6 +514,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
 function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback) {
   const reasons = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
+  const temperatureConflict = getTemperatureConflict(restaurant, preference);
 
   if (restaurant.status !== 'active') reasons.push('餐厅不可用');
   if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') reasons.push('当前不在营业');
@@ -490,6 +525,8 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
   if (isClearlyOverBudget(restaurant, preference)) reasons.push('价格明显超出预算');
   if (preference && preference.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) reasons.push('预计耗时明显超出偏好');
   if (!allowNegativeFallback && negativeConflict.severity === 'hard') reasons.push(`命中明确负向偏好：${negativeConflict.labels.join('、')}`);
+
+  if (!allowNegativeFallback && temperatureConflict.severity === 'soft') reasons.push(`temperature preference conflict: ${temperatureConflict.label}`);
 
   return { passed: reasons.length === 0, reasons };
 }
@@ -546,9 +583,10 @@ function toRecommendationCandidate(scored, source, experimentId) {
   };
 }
 
-function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, fallbackReason) {
+function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }) {
   const reasons = [];
   if (matchedPreferredTagIds.length > 0) reasons.push(`匹配 ${matchedPreferredTagIds.slice(0, 3).join('、')} 等偏好`);
+  if (temperatureConflict.severity !== 'none') reasons.push(`temperature preference conflict: ${temperatureConflict.label}`);
   if (preference && preference.maxDistanceMeters !== undefined && restaurant.distanceMeters !== undefined && restaurant.distanceMeters <= preference.maxDistanceMeters) {
     reasons.push(`距离约 ${restaurant.distanceMeters} 米，在你的范围内`);
   } else if (restaurant.distanceMeters !== undefined) {
@@ -564,9 +602,10 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
   return reasons.length > 0 ? reasons.slice(0, 5) : ['综合距离、价格和口味后较适合今天'];
 }
 
-function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackReason) {
+function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }) {
   const reasons = [];
   if (negativeConflict.severity !== 'none') reasons.push(`负向偏好冲突：${negativeConflict.labels.join('、')}`);
+  if (temperatureConflict.severity !== 'none') reasons.push(`温度偏好冲突：${temperatureConflict.label}`);
   if (preference && preference.maxDistanceMeters !== undefined && restaurant.distanceMeters !== undefined && restaurant.distanceMeters > preference.maxDistanceMeters) reasons.push(`超出距离偏好 ${restaurant.distanceMeters - preference.maxDistanceMeters} 米`);
   if (isOverBudget(restaurant, preference)) reasons.push('超出预算偏好');
   if (fallbackReason) reasons.push(fallbackReason);
@@ -602,7 +641,7 @@ function getNegativeConflict(restaurant, preference) {
     }
   });
 
-  if (explicitNoSpicy && SPICY_KEYWORDS.some((keyword) => text.includes(keyword))) {
+  if (explicitNoSpicy && [...SPICY_KEYWORDS, ...SPICY_HEAVY_KEYWORDS].some((keyword) => text.includes(keyword))) {
     tags.add('spicy');
     labels.add('辣/麻辣/川湘相关');
     severity = 'hard';
@@ -618,7 +657,43 @@ function getNegativeConflict(restaurant, preference) {
 }
 
 function getRestaurantTagIds(restaurant) {
-  return restaurant.tagIds || (restaurant.tagRefs || []).map((tag) => tag.id) || restaurant.tags || [];
+  const explicitTagIds = restaurant.tagIds || (restaurant.tagRefs || []).map((tag) => tag.id) || restaurant.tags || [];
+  const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
+
+  return [...new Set([...explicitTagIds, ...inferredTagIds])];
+}
+
+function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
+  const text = getRestaurantText(restaurant);
+  const inferred = new Set();
+  const explicitlyNotSpicy = explicitTagIds.includes('not_spicy') || NOT_SPICY_KEYWORDS.some((keyword) => text.includes(keyword));
+
+  INFERRED_TAG_RULES.forEach((rule) => {
+    if (rule.skipWhenNotSpicy && explicitlyNotSpicy) return;
+    if (rule.keywords.some((keyword) => text.includes(keyword))) {
+      rule.tags.forEach((tag) => inferred.add(tag));
+    }
+  });
+
+  if (!explicitlyNotSpicy && SPICY_HEAVY_KEYWORDS.some((keyword) => text.includes(keyword))) {
+    DEFAULT_SPICY_HEAVY_TAGS.forEach((tag) => inferred.add(tag));
+  }
+
+  return [...inferred];
+}
+
+function getTemperatureConflict(restaurant, preference) {
+  const preferred = new Set(getPreferredTagIds(preference));
+  const tagIds = getRestaurantTagIds(restaurant);
+  const wantsHot = preferred.has('hot') || preferred.has('comfort') || preferred.has('congee');
+  const wantsCold = preferred.has('cold') || preferred.has('salad') || preferred.has('fresh');
+  const hasHot = tagIds.some((tag) => HOT_FOOD_TAGS.includes(tag));
+  const hasCold = tagIds.some((tag) => COLD_FOOD_TAGS.includes(tag));
+
+  if (wantsHot && hasCold && !hasHot) return { severity: 'soft', label: 'wanted hot food, candidate is cold or light', penalty: 24 };
+  if (wantsCold && hasHot && !hasCold) return { severity: 'soft', label: 'wanted cold or light food, candidate is hot-heavy', penalty: 16 };
+
+  return { severity: 'none', label: '', penalty: 0 };
 }
 
 function getRestaurantText(restaurant) {
@@ -636,8 +711,8 @@ function getDistanceScore(restaurant, preference, fallbackUsed) {
   const ratio = restaurant.distanceMeters / maxDistance;
   if (ratio <= 0.5) return fallbackUsed ? 10 : 18;
   if (ratio <= 1) return fallbackUsed ? 5 : 12;
-  if (ratio <= 1.5) return -12;
-  return -24;
+  if (ratio <= 1.5) return fallbackUsed ? -22 : -16;
+  return fallbackUsed ? -42 : -30;
 }
 
 function getPriceScore(restaurant, preference) {
@@ -699,8 +774,9 @@ function getRelativeLeadScore(ranked, index) {
 function calculateConfidenceScore(input) {
   let score = input.hardConstraintScore + input.positivePreferenceScore + input.negativeAvoidanceScore + input.dataCompletenessScore + input.relativeLeadScore;
   if (input.negativeConflict.severity === 'hard') score = Math.min(score, 42);
-  else if (input.negativeConflict.severity === 'soft') score = Math.min(score, 58);
-  if (input.fallbackUsed) score = Math.min(score - 8, 70);
+  else if (input.negativeConflict.severity === 'soft') score = Math.min(score, 70);
+  if (input.temperatureConflict && input.temperatureConflict.severity === 'soft') score = Math.min(score, 64);
+  if (input.fallbackUsed) score = Math.min(Math.max(score - 10, 45), 64);
   if (input.candidatePoolWeak) score = Math.min(score, 72);
   return Math.round(clamp(score, 0, 95));
 }
