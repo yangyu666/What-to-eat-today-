@@ -7,6 +7,8 @@ coverage/
 
 # Mini Program TypeScript compiler output
 miniprogram/**/*.js
+!miniprogram/app.js
+!miniprogram/pages/**/index.js
 
 # WeChat DevTools
 .idea/
