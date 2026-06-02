@@ -10,6 +10,7 @@ interface RecentMealItem {
 }
 
 const MAX_RECENT_MEALS = 3;
+const DEFAULT_USER_NAME = '朋友';
 const DEFAULT_RECENT_IMAGES = {
   spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
   rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
@@ -21,12 +22,47 @@ const DEFAULT_RECENT_IMAGES = {
 
 Page({
   data: {
-    locationStatus: '北京市 · 海淀区',
+    userName: DEFAULT_USER_NAME,
+    locationStatus: '定位中',
     recentMeals: [] as RecentMealItem[]
   },
 
+  onLoad() {
+    this.initUserName();
+    this.initLocation();
+  },
+
   onShow() {
+    this.initUserName();
     this.loadRecentMeals();
+  },
+
+  initUserName() {
+    const app = getApp<IAppOption>();
+    const storedUserInfo = getStoredUserInfo();
+    const nickName = app.globalData.userInfo?.nickName || storedUserInfo?.nickName;
+
+    this.setData({
+      userName: nickName || DEFAULT_USER_NAME
+    });
+  },
+
+  initLocation() {
+    this.setData({ locationStatus: '定位中' });
+
+    wx.getLocation({
+      type: 'gcj02',
+      success: () => {
+        this.setData({
+          locationStatus: '当前位置已获取'
+        });
+      },
+      fail: () => {
+        this.setData({
+          locationStatus: '点击获取位置'
+        });
+      }
+    });
   },
 
   async loadRecentMeals() {
@@ -59,6 +95,31 @@ Page({
     });
   }
 });
+
+function getStoredUserInfo(): WechatMiniprogram.UserInfo | undefined {
+  const storageKeys = ['userInfo', 'user_profile', 'profile'];
+
+  for (const key of storageKeys) {
+    const value = wx.getStorageSync(key) as
+      | WechatMiniprogram.UserInfo
+      | { userInfo?: WechatMiniprogram.UserInfo }
+      | undefined;
+
+    if (!value) {
+      continue;
+    }
+
+    if ('nickName' in value && value.nickName) {
+      return value;
+    }
+
+    if ('userInfo' in value && value.userInfo?.nickName) {
+      return value.userInfo;
+    }
+  }
+
+  return undefined;
+}
 
 function toRecentMealItem(item: MealHistoryItem): RecentMealItem {
   const name = item.restaurantName || item.mealName;

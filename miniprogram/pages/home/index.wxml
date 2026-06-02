@@ -1,25 +1,19 @@
 <view class="page home-page">
-  <view class="top-row">
-    <view class="location-pill">
-      <text class="location-dot">●</text>
+  <view class="location-row">
+    <view class="location-pill" bindtap="initLocation">
+      <text class="location-dot"></text>
       <text>{{locationStatus}}</text>
-    </view>
-    <view class="weather-card">
-      <text class="weather-icon">☀</text>
-      <text>26°C</text>
     </view>
   </view>
 
   <view class="hero">
-    <text class="greeting">Hi，小明 👋</text>
-    <text class="subtitle">中午好，今天想吃点什么呢？</text>
+    <text class="greeting">Hi，{{userName}} 👋</text>
+    <text class="subtitle">今天想吃点什么呢？</text>
     <text class="title">今天吃<text class="accent">什么</text>？</text>
-    <text class="hero-note"><text class="accent">30秒</text>结束选择困难</text>
   </view>
 
   <view class="action-panel">
     <button class="primary-button" bindtap="startQuestionnaire">帮我决定</button>
-    <button class="secondary-button" bindtap="startQuestionnaire">我有要求</button>
   </view>
 
   <view class="history-entry" bindtap="openHistory">

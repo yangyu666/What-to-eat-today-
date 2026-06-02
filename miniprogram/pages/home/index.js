@@ -1,6 +1,7 @@
 const { getHistory } = require('../../services/historyService');
 
 const MAX_RECENT_MEALS = 3;
+const DEFAULT_USER_NAME = '朋友';
 const DEFAULT_RECENT_IMAGES = {
   spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
   rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
@@ -12,12 +13,48 @@ const DEFAULT_RECENT_IMAGES = {
 
 Page({
   data: {
-    locationStatus: '北京 · 海淀区',
+    userName: DEFAULT_USER_NAME,
+    locationStatus: '定位中',
     recentMeals: []
   },
 
+  onLoad() {
+    this.initUserName();
+    this.initLocation();
+  },
+
   onShow() {
+    this.initUserName();
     this.loadRecentMeals();
+  },
+
+  initUserName() {
+    const app = getApp();
+    const storedUserInfo = getStoredUserInfo();
+    const nickName = (app.globalData.userInfo && app.globalData.userInfo.nickName) ||
+      (storedUserInfo && storedUserInfo.nickName);
+
+    this.setData({
+      userName: nickName || DEFAULT_USER_NAME
+    });
+  },
+
+  initLocation() {
+    this.setData({ locationStatus: '定位中' });
+
+    wx.getLocation({
+      type: 'gcj02',
+      success: () => {
+        this.setData({
+          locationStatus: '当前位置已获取'
+        });
+      },
+      fail: () => {
+        this.setData({
+          locationStatus: '点击获取位置'
+        });
+      }
+    });
   },
 
   async loadRecentMeals() {
@@ -50,6 +87,28 @@ Page({
     });
   }
 });
+
+function getStoredUserInfo() {
+  const storageKeys = ['userInfo', 'user_profile', 'profile'];
+
+  for (const key of storageKeys) {
+    const value = wx.getStorageSync(key);
+
+    if (!value) {
+      continue;
+    }
+
+    if (value.nickName) {
+      return value;
+    }
+
+    if (value.userInfo && value.userInfo.nickName) {
+      return value.userInfo;
+    }
+  }
+
+  return undefined;
+}
 
 function toRecentMealItem(item) {
   const name = item.restaurantName || item.mealName;
@@ -93,7 +152,7 @@ function getFallbackImageUrl(tags, name) {
     return DEFAULT_RECENT_IMAGES.noodle;
   }
 
-  if (/小吃|炸|包子|饺子|馄饨/.test(text)) {
+  if (/小吃|点心|包子|饺子|馄饨/.test(text)) {
     return DEFAULT_RECENT_IMAGES.snack;
   }
 
