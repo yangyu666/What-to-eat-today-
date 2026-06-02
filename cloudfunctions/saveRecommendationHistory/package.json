@@ -1,0 +1,9 @@
+{
+  "name": "saveRecommendationHistory",
+  "version": "1.0.0",
+  "description": "Save recommendation behavior history.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

@@ -16,9 +16,18 @@
   gap: 18rpx;
 }
 
+.empty-state {
+  padding: 56rpx 28rpx;
+  border: 1rpx dashed rgba(56, 45, 35, 0.14);
+  border-radius: 18rpx;
+  color: var(--color-muted);
+  text-align: center;
+  background: rgba(255, 255, 255, 0.58);
+}
+
 .history-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 24rpx;
   padding: 28rpx;
@@ -27,13 +36,34 @@
   background: var(--color-surface);
 }
 
+.history-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.history-title-row,
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+}
+
+.history-title-row {
+  justify-content: space-between;
+}
+
 .meal-name {
   display: block;
+  min-width: 0;
   color: var(--color-text);
   font-size: 30rpx;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+.dish-name,
 .note,
 .date {
   display: block;
@@ -42,7 +72,38 @@
   font-size: 24rpx;
 }
 
+.dish-name,
+.note {
+  line-height: 1.5;
+}
+
+.note {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.meta-row {
+  flex-wrap: wrap;
+  margin-top: 12rpx;
+  color: var(--color-muted);
+  font-size: 22rpx;
+}
+
+.action-pill {
+  flex: none;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  color: var(--color-primary);
+  font-size: 22rpx;
+  font-weight: 700;
+  background: rgba(255, 122, 89, 0.12);
+}
+
 .date {
   flex: none;
   margin-top: 0;
+  max-width: 150rpx;
+  text-align: right;
 }

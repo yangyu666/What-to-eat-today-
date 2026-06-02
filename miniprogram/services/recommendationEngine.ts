@@ -56,7 +56,9 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
 
   const candidates = rankWithLightRandom(scored, random)
     .slice(0, limit)
-    .map(toRecommendationCandidate);
+    .map((scoredRestaurant) =>
+      toRecommendationCandidate(scoredRestaurant, options.source ?? 'mock')
+    );
 
   return {
     id: `rec-${now.getTime()}`,
@@ -193,7 +195,10 @@ function rankWithLightRandom(scored: ScoredRestaurant[], random: () => number): 
   return [selected, ...remaining];
 }
 
-function toRecommendationCandidate(scored: ScoredRestaurant): RecommendationCandidate {
+function toRecommendationCandidate(
+  scored: ScoredRestaurant,
+  source: RecommendationSource
+): RecommendationCandidate {
   const restaurant = scored.restaurant;
 
   return {
@@ -205,7 +210,8 @@ function toRecommendationCandidate(scored: ScoredRestaurant): RecommendationCand
       tags: restaurant.tags,
       distanceMeters: restaurant.distanceMeters,
       averageCostYuan: restaurant.averageCostYuan,
-      openStatus: restaurant.openStatus
+      openStatus: restaurant.openStatus,
+      rating: restaurant.rating
     },
     name: restaurant.name,
     mealName: restaurant.signatureDishes?.[0] ?? restaurant.name,
@@ -217,7 +223,8 @@ function toRecommendationCandidate(scored: ScoredRestaurant): RecommendationCand
     confidenceLabel: scored.confidenceLabel,
     scoreBreakdown: scored.breakdown,
     matchedTagIds: scored.breakdown.matchedPreferredTagIds,
-    imageUrl: restaurant.coverImageUrl
+    imageUrl: restaurant.coverImageUrl,
+    source
   };
 }
 

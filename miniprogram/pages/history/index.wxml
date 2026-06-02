@@ -1,14 +1,30 @@
 <view class="page history-page">
   <view class="section-heading">
     <text class="section-title">吃饭记录</text>
-    <text class="muted">后续会从云数据库读取你的选择历史。</text>
+    <text class="muted">记录最近展示、跳过和采纳的推荐。</text>
   </view>
 
-  <view class="history-list">
+  <view class="empty-state" wx:if="{{loading}}">
+    <text>正在读取历史记录...</text>
+  </view>
+
+  <view class="empty-state" wx:elif="{{history.length === 0}}">
+    <text>{{emptyText}}</text>
+  </view>
+
+  <view class="history-list" wx:else>
     <view class="history-item" wx:for="{{history}}" wx:key="id">
-      <view>
-        <text class="meal-name">{{item.mealName}}</text>
-        <text class="note" wx:if="{{item.note}}">{{item.note}}</text>
+      <view class="history-main">
+        <view class="history-title-row">
+          <text class="meal-name">{{item.titleText}}</text>
+          <text class="action-pill">{{item.actionText}}</text>
+        </view>
+        <text class="dish-name">{{item.subtitleText}}</text>
+        <text class="note">{{item.reasonText}}</text>
+        <view class="meta-row">
+          <text>{{item.matchText}}</text>
+          <text>{{item.sourceText}}</text>
+        </view>
       </view>
       <text class="date">{{item.dateText}}</text>
     </view>

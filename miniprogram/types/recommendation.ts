@@ -42,6 +42,7 @@ export interface RecommendationCandidate {
   scoreBreakdown?: RecommendationScoreBreakdown;
   matchedTagIds?: TagId[];
   imageUrl?: string;
+  source?: RecommendationSource;
 }
 
 export type MealCandidate = RecommendationCandidate;
@@ -84,9 +85,20 @@ export interface RecommendationHistoryRecord {
   tags?: string[];
   dateText: string;
   note?: string;
+  reasonSummary?: string;
   action?: RecommendationAction;
   selectedAt?: IsoDateString;
   createdAt?: IsoDateString;
+  updatedAt?: IsoDateString;
+  source?: RecommendationSource;
+  matchPercent?: number;
+  switchCount?: number;
+  questionnaire?: {
+    version?: string;
+    answerCount: number;
+    submittedAt?: IsoDateString;
+    answers?: UserPreferenceAnswer[];
+  };
 }
 
 export type MealHistoryItem = RecommendationHistoryRecord;
@@ -111,6 +123,14 @@ export interface ListHistoryResponse {
   hasMore: boolean;
 }
 
+export interface SaveRecommendationHistoryRequest {
+  record: RecommendationHistoryRecord;
+}
+
+export interface SaveRecommendationHistoryResponse {
+  record: RecommendationHistoryRecord;
+}
+
 export interface ApiError {
   code: string;
   message: string;
@@ -133,6 +153,7 @@ export type CloudFunctionName =
   | 'recommendRestaurant'
   | 'recommendMeal'
   | 'amapPoi'
+  | 'saveRecommendationHistory'
   | 'savePreference'
   | 'listHistory';
 

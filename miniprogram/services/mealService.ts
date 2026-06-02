@@ -107,7 +107,10 @@ async function getCloudRecommendations(
     throw new Error(message);
   }
 
-  return payload.data.recommendation.candidates;
+  return payload.data.recommendation.candidates.map((candidate) => ({
+    ...candidate,
+    source: candidate.source ?? payload.data.recommendation.source ?? 'cloud'
+  }));
 }
 
 function ensureCloudInitialized() {
