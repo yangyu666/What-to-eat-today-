@@ -6,6 +6,13 @@ const ALGORITHM_VERSION = 'recommendation-v2';
 const WEIGHT_PROFILE_ID = 'default-v2';
 const DEFAULT_EXPERIMENT_ID = 'default';
 const BUDGET_LEVEL_TO_YUAN = { 1: 20, 2: 30, 3: 60, 4: 100, 5: 200 };
+const BUDGET_LEVEL_TO_RANGE = {
+  1: { max: 20 },
+  2: { max: 30 },
+  3: { min: 30, max: 60 },
+  4: { min: 60, max: 100 },
+  5: { min: 100, max: 200 }
+};
 const TAG_WEIGHTS = {
   light: 14,
   healthy: 12,
@@ -43,6 +50,7 @@ const SPICY_CONFLICT_TAGS = [
 ];
 const GREASY_CONFLICT_TAGS = ['bbq', 'fried', 'heavy', 'strong_flavor', 'burger'];
 const LIGHT_CONFLICT_TAGS = ['spicy', 'strong_flavor', 'bbq', 'fried', 'heavy', 'hotpot', 'malatang'];
+const LIGHT_HEALTHY_PREFERENCE_TAGS = ['light', 'healthy', 'low_burden', 'salad', 'fresh'];
 const HOT_FOOD_TAGS = ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'];
 const COLD_FOOD_TAGS = ['cold', 'salad', 'fresh', 'light', 'healthy', 'low_burden'];
 const DEFAULT_SPICY_HEAVY_TAGS = ['spicy', 'strong_flavor', 'heavy'];
@@ -472,6 +480,8 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     relativeLeadScore,
     negativeConflict,
     temperatureConflict,
+    priceOverBudget: isOverBudget(restaurant, preference),
+    timeOverPreference: isOverTimePreference(restaurant, preference),
     fallbackUsed: options.fallbackReason !== undefined,
     candidatePoolWeak: options.candidatePoolWeak || false
   });
@@ -618,6 +628,10 @@ function getPreferredTagIds(preference) {
 
 function getAvoidedTagIds(preference) {
   const avoided = new Set([...(preference && preference.avoidedTagIds ? preference.avoidedTagIds : []), ...(preference && preference.negativeTags ? preference.negativeTags : [])]);
+  const preferred = new Set(getPreferredTagIds(preference));
+  if (LIGHT_HEALTHY_PREFERENCE_TAGS.some((tag) => preferred.has(tag))) {
+    [...GREASY_CONFLICT_TAGS, ...LIGHT_CONFLICT_TAGS].forEach((tag) => avoided.add(tag));
+  }
   if (avoided.has('spicy')) SPICY_CONFLICT_TAGS.forEach((tag) => avoided.add(tag));
   if (avoided.has('strong_flavor')) LIGHT_CONFLICT_TAGS.forEach((tag) => avoided.add(tag));
   if (avoided.has('fried') || avoided.has('heavy') || avoided.has('bbq')) GREASY_CONFLICT_TAGS.forEach((tag) => avoided.add(tag));
@@ -717,12 +731,14 @@ function getDistanceScore(restaurant, preference, fallbackUsed) {
 
 function getPriceScore(restaurant, preference) {
   if (!preference || preference.budgetLevel === undefined) return 0;
-  if (restaurant.averageCostYuan === undefined && restaurant.priceLevel === undefined) return 0;
-  const budgetMax = getBudgetMaxYuan(preference);
-  const estimatedCost = restaurant.averageCostYuan === undefined ? getPriceLevelCost(restaurant.priceLevel) : restaurant.averageCostYuan;
-  if (estimatedCost <= budgetMax) return 12;
-  if (estimatedCost <= budgetMax * 1.2) return -10;
-  return -28;
+  const estimatedCost = getEstimatedCost(restaurant);
+  if (estimatedCost === undefined) return 0;
+  const range = getBudgetRange(preference);
+  if (estimatedCost <= range.max && (range.min === undefined || estimatedCost >= range.min)) return 14;
+  if (range.min !== undefined && estimatedCost < range.min) return estimatedCost >= range.min * 0.75 ? 7 : 3;
+  if (estimatedCost <= range.max * 1.1) return -10;
+  if (estimatedCost <= range.max * 1.2) return -22;
+  return -34;
 }
 
 function getTimeScore(restaurant, preference) {
@@ -776,6 +792,8 @@ function calculateConfidenceScore(input) {
   if (input.negativeConflict.severity === 'hard') score = Math.min(score, 42);
   else if (input.negativeConflict.severity === 'soft') score = Math.min(score, 70);
   if (input.temperatureConflict && input.temperatureConflict.severity === 'soft') score = Math.min(score, 64);
+  if (input.priceOverBudget) score = Math.min(score, 70);
+  if (input.timeOverPreference) score = Math.min(score, 70);
   if (input.fallbackUsed) score = Math.min(Math.max(score - 10, 45), 64);
   if (input.candidatePoolWeak) score = Math.min(score, 72);
   return Math.round(clamp(score, 0, 95));
@@ -783,18 +801,32 @@ function calculateConfidenceScore(input) {
 
 function isOverBudget(restaurant, preference) {
   if (!preference || preference.budgetLevel === undefined) return false;
-  const estimatedCost = restaurant.averageCostYuan === undefined ? getPriceLevelCost(restaurant.priceLevel) : restaurant.averageCostYuan;
-  return estimatedCost > getBudgetMaxYuan(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+  return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max;
 }
 
 function isClearlyOverBudget(restaurant, preference) {
   if (!preference || preference.budgetLevel === undefined) return false;
-  const estimatedCost = restaurant.averageCostYuan === undefined ? getPriceLevelCost(restaurant.priceLevel) : restaurant.averageCostYuan;
-  return estimatedCost > getBudgetMaxYuan(preference) * 1.45;
+  const estimatedCost = getEstimatedCost(restaurant);
+  return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
+}
+
+function isOverTimePreference(restaurant, preference) {
+  return preference && preference.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes;
 }
 
 function getBudgetMaxYuan(preference) {
-  return BUDGET_LEVEL_TO_YUAN[preference.budgetLevel || 3] || 60;
+  return getBudgetRange(preference).max;
+}
+
+function getBudgetRange(preference) {
+  return BUDGET_LEVEL_TO_RANGE[preference.budgetLevel || 3] || BUDGET_LEVEL_TO_RANGE[3];
+}
+
+function getEstimatedCost(restaurant) {
+  if (restaurant.averageCostYuan !== undefined) return restaurant.averageCostYuan;
+  if (restaurant.priceLevel !== undefined) return getPriceLevelCost(restaurant.priceLevel);
+  return undefined;
 }
 
 function getPriceLevelCost(priceLevel) {

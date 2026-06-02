@@ -70,6 +70,28 @@ assert(
   '500 米偏好应过滤超距离候选，除非 fallback'
 );
 
+const slowButMatchingScore = scoreRestaurant(
+  {
+    id: 'slow-matching',
+    name: '慢但匹配的盖饭',
+    tags: ['盖饭'],
+    tagIds: ['quick', 'rice', 'meal', 'set_meal', 'not_spicy'],
+    category: '简餐',
+    distanceMeters: 1800,
+    averageCostYuan: 32,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  profile({
+    preferredTagIds: ['quick', 'rice', 'meal'],
+    budgetLevel: 3,
+    maxDistanceMeters: 3000,
+    maxEstimatedMinutes: 25
+  })
+);
+assert((slowButMatchingScore.confidenceScore ?? 100) <= 70, '超过耗时偏好的候选不能拿到高匹配度');
+
 const cheap = profile({
   preferredTagIds: ['rice', 'staple', 'quick'],
   budgetLevel: 2,
@@ -80,6 +102,67 @@ assert(
   (cheapResult.candidates[0]?.restaurant?.averageCostYuan ?? 999) <= 30,
   '30 元以下预算时高价餐厅不能排第一'
 );
+
+const budgetRangePreference = profile({
+  preferredTagIds: ['rice', 'meal', 'quick'],
+  budgetLevel: 3,
+  maxDistanceMeters: 1000
+});
+const budgetRangeResult = recommend(budgetRangePreference, [
+  {
+    id: 'budget-too-low',
+    name: '便宜小吃',
+    tags: ['小吃'],
+    tagIds: ['quick', 'snack', 'solo'],
+    category: '小吃',
+    distanceMeters: 220,
+    averageCostYuan: 16,
+    openStatus: 'open',
+    rating: 4.5,
+    status: 'active'
+  },
+  {
+    id: 'budget-in-range',
+    name: '范围内盖饭',
+    tags: ['盖饭'],
+    tagIds: ['quick', 'rice', 'meal', 'set_meal'],
+    category: '简餐',
+    distanceMeters: 240,
+    averageCostYuan: 45,
+    openStatus: 'open',
+    rating: 4.2,
+    status: 'active'
+  },
+  {
+    id: 'budget-slightly-over',
+    name: '略超预算套餐',
+    tags: ['套餐'],
+    tagIds: ['quick', 'rice', 'meal', 'set_meal'],
+    category: '简餐',
+    distanceMeters: 230,
+    averageCostYuan: 66,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  }
+]);
+assert(budgetRangeResult.candidates[0]?.restaurantId === 'budget-in-range', '30~60 预算应优先范围内候选');
+const slightlyOverBudgetScore = scoreRestaurant(
+  {
+    id: 'score-over-budget',
+    name: '略超预算好店',
+    tags: ['套餐'],
+    tagIds: ['quick', 'rice', 'meal', 'set_meal'],
+    category: '简餐',
+    distanceMeters: 200,
+    averageCostYuan: 66,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  },
+  budgetRangePreference
+);
+assert((slightlyOverBudgetScore.confidenceScore ?? 100) <= 70, '略超预算候选不能拿到高匹配度');
 
 const light = profile({
   preferredTagIds: ['light', 'healthy', 'low_burden', 'not_spicy'],
@@ -94,6 +177,17 @@ const lightCongeeScore = scoreRestaurant(
   light
 );
 assert(lightCongeeScore.score > lightHeavyScore.score, '清淡偏好下重口味餐厅不能高分');
+
+const implicitLight = profile({
+  preferredTagIds: ['light', 'healthy', 'low_burden'],
+  avoidedTagIds: []
+});
+const implicitLightFriedScore = scoreRestaurant(
+  mockRestaurants.find((restaurant) => restaurant.id === 'r-fried-chicken') as Restaurant,
+  implicitLight
+);
+assert(implicitLightFriedScore.matchedAvoidedTagIds.includes('fried'), '轻食/健康偏好应隐含避开炸物油腻');
+assert((implicitLightFriedScore.confidenceScore ?? 100) <= 70, '轻食/健康偏好下油腻候选不能高匹配');
 
 const snack = profile({
   preferredTagIds: ['snack', 'quick', 'solo'],
