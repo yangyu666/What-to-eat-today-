@@ -61,6 +61,7 @@ export interface RecommendationCandidate {
   hardFilterReasons?: string[];
   penaltyReasons?: string[];
   fallbackReason?: string;
+  candidatePoolStats?: CandidatePoolStats;
   algorithmVersion?: RecommendationAlgorithmVersion;
   weightProfileId?: string;
   experimentId?: string;

@@ -5,7 +5,7 @@ import type { RecommendationAction, RecommendationSource } from '../../types/rec
 import type { UserQuestionnaireResult } from '../../types/userPreference';
 
 const MAX_SWITCH_COUNT = 3;
-const DEFAULT_RESULT_IMAGE_URL = '';
+const DEFAULT_RESULT_IMAGE_URL = '/assets/images/meals/general.png';
 
 interface ReasonItem {
   title: string;
@@ -29,7 +29,7 @@ Page({
     walkText: '',
     ratingText: '',
     mealNameText: '',
-    coverImageUrl: DEFAULT_RESULT_IMAGE_URL,
+    coverImageUrl: '',
     errorText: '',
     sourceText: '',
     reasonItems: [] as ReasonItem[],
@@ -60,7 +60,7 @@ Page({
           switchCount: 0,
           locked: false,
           accepted: false,
-          errorText: '暂无可推荐候选'
+          errorText: '推荐加载失败，请稍后重试'
         });
         return;
       }
@@ -93,7 +93,9 @@ Page({
       return;
     }
 
-    if (this.data.switchCount >= MAX_SWITCH_COUNT) {
+    const nextSwitchCount = this.data.switchCount + 1;
+
+    if (nextSwitchCount > MAX_SWITCH_COUNT) {
       this.setData({
         locked: true,
         switchButtonText: '已锁定'
@@ -105,9 +107,7 @@ Page({
       return;
     }
 
-    const nextSwitchCount = this.data.switchCount + 1;
     const nextIndex = (this.data.currentIndex + 1) % this.data.candidates.length;
-
     this.trackCurrentRecommendation(
       'skipped',
       this.data.recommendation,
@@ -116,6 +116,7 @@ Page({
     );
     this.setCurrentRecommendation(this.data.candidates, nextIndex, {
       switchCount: nextSwitchCount,
+      locked: nextSwitchCount >= MAX_SWITCH_COUNT,
       switchButtonText: nextSwitchCount >= MAX_SWITCH_COUNT ? '锁定结果' : '换一家'
     });
   },
@@ -186,7 +187,7 @@ Page({
         typeof distanceMeters === 'number' ? `${(distanceMeters / 1000).toFixed(1)} km` : '距离未知',
       averageCostText: typeof averageCostYuan === 'number' ? `¥${averageCostYuan}/人` : '人均未知',
       walkText: walkingMinutes ? `步行${walkingMinutes}分钟` : '步行时间未知',
-      ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分稳定',
+      ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分未知',
       mealNameText: recommendation?.mealName || recommendation?.name || '',
       coverImageUrl: getStableCoverImageUrl(recommendation),
       sourceText: this.getSourceText(source),
@@ -202,25 +203,35 @@ Page({
     walkingMinutes: number | null,
     averageCostYuan: number | undefined
   ): ReasonItem[] {
-    const tags = new Set(recommendation.tags);
-    const isHot = tags.has('热乎') || tags.has('麻辣烫') || tags.has('hot');
+    const algorithmReasons = recommendation.reason
+      .split('；')
+      .map((reason) => reason.trim())
+      .filter(Boolean)
+      .slice(0, 4)
+      .map((reason) => ({
+        title: reason,
+        desc: '来自推荐算法对距离、预算、口味和负向偏好的综合判断'
+      }));
+
+    if (recommendation.fallbackReason) {
+      algorithmReasons.push({
+        title: recommendation.fallbackReason,
+        desc: '候选池不足时会降低匹配度，并记录在推荐诊断数据中'
+      });
+    }
+
+    if (algorithmReasons.length > 0) {
+      return algorithmReasons;
+    }
 
     return [
       {
-        title: isHot ? '热食偏好匹配' : '口味偏好匹配',
-        desc: isHot ? '符合你选择的热食倾向' : '符合你今天的口味倾向'
+        title: walkingMinutes ? `步行约 ${walkingMinutes} 分钟` : '距离信息可用',
+        desc: '距离是当前推荐的核心约束之一'
       },
       {
-        title: walkingMinutes ? `步行${walkingMinutes}分钟` : '距离较近',
-        desc: '距离和用餐便利性已纳入排序'
-      },
-      {
-        title: typeof averageCostYuan === 'number' ? `人均${averageCostYuan}元` : '人均适中',
-        desc: '预算信息已参与推荐匹配'
-      },
-      {
-        title: `${Math.round(recommendation.confidenceScore ?? 0)}% 匹配`,
-        desc: recommendation.reason || '根据你的问答偏好综合排序'
+        title: typeof averageCostYuan === 'number' ? `人均约 ${averageCostYuan} 元` : '人均未知',
+        desc: '预算未知不会默认加高分'
       }
     ];
   },
@@ -285,9 +296,11 @@ function getStableCoverImageUrl(recommendation: MealCandidate | null): string {
     return DEFAULT_RESULT_IMAGE_URL;
   }
 
-  const imageUrl = recommendation.imageUrl;
+  const restaurantImageUrl = (recommendation.restaurant as { coverImageUrl?: string } | undefined)
+    ?.coverImageUrl;
+  const imageUrl = recommendation.imageUrl || restaurantImageUrl;
 
-  if (imageUrl) {
+  if (imageUrl && !/images\.unsplash\.com/i.test(imageUrl)) {
     return imageUrl;
   }
 

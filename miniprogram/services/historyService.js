@@ -76,11 +76,21 @@ function buildHistoryRecord(options) {
     createdAt: selectedAt,
     updatedAt: selectedAt,
     source: inferRecommendationSource(candidate),
+    algorithmVersion: candidate.algorithmVersion,
+    weightProfileId: candidate.weightProfileId,
+    experimentId: candidate.experimentId,
     matchPercent:
       typeof candidate.confidenceScore === 'number'
         ? Math.round(candidate.confidenceScore)
         : undefined,
     switchCount: options.switchCount || 0,
+    scoreBreakdown: candidate.scoreBreakdown,
+    matchedPreferredTagIds: candidate.matchedPreferredTagIds || candidate.matchedTagIds,
+    matchedAvoidedTagIds: candidate.matchedAvoidedTagIds,
+    hardFilterReasons: candidate.hardFilterReasons,
+    penaltyReasons: candidate.penaltyReasons,
+    fallbackReason: candidate.fallbackReason,
+    candidatePoolStats: candidate.candidatePoolStats,
     questionnaire: buildQuestionnaireSnapshot(options.questionnaire)
   };
 }

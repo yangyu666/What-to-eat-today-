@@ -1,6 +1,6 @@
-﻿<view class="page result-page">
+<view class="page result-page">
   <view class="empty-state" wx:if="{{loading}}">
-    <text>姝ｅ湪鍖归厤闄勮繎閫傚悎鐨勪竴瀹?..</text>
+    <text>正在匹配附近适合的一家...</text>
   </view>
 
   <view class="result-card" wx:elif="{{recommendation}}">
@@ -13,45 +13,45 @@
         binderror="handleCoverImageError"
       />
       <view class="cover-placeholder" wx:else>
-        <text class="placeholder-title">楂樺痉鏆傛棤闂ㄥ簵鍥?/text>
-        <text class="placeholder-desc">鍥剧墖灏嗕紭鍏堜娇鐢ㄩ珮寰?POI 杩斿洖鐨勫簵閾虹収鐗?/text>
+        <text class="placeholder-title">暂无门店图片</text>
+        <text class="placeholder-desc">优先使用高德 POI 或本地餐厅图片</text>
       </view>
       <view class="match-badge">
         <text class="match-number">{{matchPercent}}<text class="percent">%</text></text>
-        <text class="match-label">鍖归厤搴?/text>
+        <text class="match-label">匹配度</text>
       </view>
     </view>
 
     <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
-    <text class="meal-name">鎺ㄨ崘鑿滐細{{mealNameText}}</text>
+    <text class="meal-name">推荐：{{mealNameText}}</text>
 
     <text class="source-text">{{sourceText}}</text>
 
     <view class="info-row">
       <view class="info-item">
-        <text class="info-icon">鈱?/text>
+        <text class="info-icon">距</text>
         <text>{{walkText}}</text>
       </view>
       <view class="divider"></view>
       <view class="info-item">
-        <text class="info-icon">鈾?/text>
+        <text class="info-icon">¥</text>
         <text>{{averageCostText}}</text>
       </view>
       <view class="divider"></view>
       <view class="info-item">
-        <text class="star">鈽?/text>
+        <text class="star">★</text>
         <text>{{ratingText}}</text>
       </view>
     </view>
 
     <view class="reason-card">
-      <text class="reason-title">鎺ㄨ崘鐞嗙敱</text>
+      <text class="reason-title">推荐理由</text>
       <view
         class="reason-item"
         wx:for="{{reasonItems}}"
         wx:key="title"
       >
-        <text class="check-icon">鉁?/text>
+        <text class="check-icon">✓</text>
         <view class="reason-copy">
           <text class="reason-name">{{item.title}}</text>
           <text class="reason-desc">{{item.desc}}</text>
@@ -60,27 +60,27 @@
     </view>
 
     <view class="lock-card" wx:if="{{locked && !accepted}}">
-      <view class="lock-icon">鈻?/view>
+      <view class="lock-icon">锁</view>
       <view>
-        <text class="lock-title">宸蹭负浣犻攣瀹氭渶浣虫帹鑽?/text>
-        <text class="lock-desc">澶氭鍒锋柊鍚庯紝涓轰綘淇濈暀褰撳墠鏈€鍖归厤鏂规</text>
+        <text class="lock-title">已为你锁定当前推荐</text>
+        <text class="lock-desc">多次刷新后，保留当前最匹配方案</text>
       </view>
     </view>
 
     <view class="switch-limit" wx:else>
-      <text wx:if="{{accepted}}">宸查噰绾筹紝杩欓】楗畾浜嗐€?/text>
-      <text wx:elif="{{switchCount >= maxSwitchCount}}">宸叉崲 3 娆★紝鍐嶇偣涓€娆￠攣瀹氱粨鏋溿€?/text>
-      <text wx:else>杩樺彲浠ユ崲 {{maxSwitchCount - switchCount}} 娆?/text>
+      <text wx:if="{{accepted}}">已采纳，这一餐定了。</text>
+      <text wx:elif="{{switchCount >= maxSwitchCount}}">已换 3 次，当前结果已锁定。</text>
+      <text wx:else>还可以换 {{maxSwitchCount - switchCount}} 次</text>
     </view>
 
     <view class="action-row">
       <button class="secondary-button" bindtap="switchRestaurant" disabled="{{locked || accepted}}">
-        <text class="button-icon">鈫?/text>
-        {{locked || accepted ? '宸查攣瀹? : switchButtonText}}
+        <text class="button-icon">↻</text>
+        {{locked || accepted ? '已锁定' : switchButtonText}}
       </button>
       <button class="primary-button" bindtap="acceptRestaurant" disabled="{{accepted}}">
-        <text class="button-icon">鉁?/text>
-        {{accepted ? '宸查噰绾? : '灏卞悆杩欏'}}
+        <text class="button-icon">✓</text>
+        {{accepted ? '已采纳' : '就吃这家'}}
       </button>
     </view>
   </view>

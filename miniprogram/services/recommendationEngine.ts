@@ -187,7 +187,10 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
       candidatePoolWeak: poolStats.fallbackUsed || poolStats.afterNegativeFilter < MIN_PRIMARY_POOL_SIZE
     });
 
-    return toRecommendationCandidate(next, source, experimentId);
+    return {
+      ...toRecommendationCandidate(next, source, experimentId),
+      candidatePoolStats: poolStats
+    };
   });
 
   return {
@@ -344,8 +347,8 @@ function rankWithLightRandom(scored: ScoredRestaurant[], random: () => number): 
   const nonConflict = scored.filter((item) => item.matchedAvoidedTagIds.length === 0);
   const conflict = scored.filter((item) => item.matchedAvoidedTagIds.length > 0);
   const sorted = [
-    ...nonConflict.sort((left, right) => right.score - left.score),
-    ...conflict.sort((left, right) => right.score - left.score)
+    ...nonConflict.sort(compareScoredRestaurants),
+    ...conflict.sort(compareScoredRestaurants)
   ];
   const topThree = sorted.slice(0, 3);
 
@@ -366,6 +369,15 @@ function rankWithLightRandom(scored: ScoredRestaurant[], random: () => number): 
   const remaining = sorted.filter((item) => item.restaurant.id !== selected.restaurant.id);
 
   return [selected, ...remaining];
+}
+
+function compareScoredRestaurants(left: ScoredRestaurant, right: ScoredRestaurant): number {
+  return (
+    right.score - left.score ||
+    right.confidenceScore - left.confidenceScore ||
+    right.breakdown.preferenceScore - left.breakdown.preferenceScore ||
+    right.breakdown.distanceScore - left.breakdown.distanceScore
+  );
 }
 
 function toRecommendationCandidate(

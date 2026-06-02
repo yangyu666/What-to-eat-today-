@@ -75,10 +75,62 @@ function normalizeRecord(record, openid) {
     createdAt: normalizeIsoDate(record.createdAt) || now,
     updatedAt: now,
     source,
+    algorithmVersion: normalizeText(record.algorithmVersion),
+    weightProfileId: normalizeText(record.weightProfileId),
+    experimentId: normalizeText(record.experimentId),
     matchPercent: normalizePercent(record.matchPercent),
     switchCount: normalizeSwitchCount(record.switchCount),
+    scoreBreakdown: normalizePlainObject(record.scoreBreakdown),
+    matchedPreferredTagIds: normalizeStringArray(record.matchedPreferredTagIds),
+    matchedAvoidedTagIds: normalizeStringArray(record.matchedAvoidedTagIds),
+    hardFilterReasons: normalizeStringArray(record.hardFilterReasons),
+    penaltyReasons: normalizeStringArray(record.penaltyReasons),
+    fallbackReason: normalizeText(record.fallbackReason),
+    candidatePoolStats: normalizeCandidatePoolStats(record.candidatePoolStats),
     questionnaire: normalizeQuestionnaire(record.questionnaire)
   });
+}
+
+function normalizeText(value) {
+  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function normalizePlainObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value;
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value.filter((item) => typeof item === 'string').slice(0, 30);
+}
+
+function normalizeCandidatePoolStats(value) {
+  if (!value || typeof value !== 'object') {
+    return undefined;
+  }
+
+  return removeUndefined({
+    totalFetched: normalizeNonNegativeInteger(value.totalFetched),
+    afterHardFilter: normalizeNonNegativeInteger(value.afterHardFilter),
+    afterNegativeFilter: normalizeNonNegativeInteger(value.afterNegativeFilter),
+    finalCandidateCount: normalizeNonNegativeInteger(value.finalCandidateCount),
+    fallbackUsed: typeof value.fallbackUsed === 'boolean' ? value.fallbackUsed : undefined
+  });
+}
+
+function normalizeNonNegativeInteger(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return undefined;
+  }
+
+  return Math.max(0, Math.floor(value));
 }
 
 function normalizeQuestionnaire(questionnaire) {

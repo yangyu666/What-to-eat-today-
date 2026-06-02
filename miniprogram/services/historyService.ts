@@ -105,8 +105,18 @@ function buildHistoryRecord(options: TrackRecommendationOptions): Recommendation
     createdAt: selectedAt,
     updatedAt: selectedAt,
     source: inferRecommendationSource(candidate),
+    algorithmVersion: candidate.algorithmVersion,
+    weightProfileId: candidate.weightProfileId,
+    experimentId: candidate.experimentId,
     matchPercent,
     switchCount: options.switchCount,
+    scoreBreakdown: candidate.scoreBreakdown,
+    matchedPreferredTagIds: candidate.matchedPreferredTagIds ?? candidate.matchedTagIds,
+    matchedAvoidedTagIds: candidate.matchedAvoidedTagIds,
+    hardFilterReasons: candidate.hardFilterReasons,
+    penaltyReasons: candidate.penaltyReasons,
+    fallbackReason: candidate.fallbackReason,
+    candidatePoolStats: candidate.candidatePoolStats,
     questionnaire: buildQuestionnaireSnapshot(options.questionnaire)
   };
 }
