@@ -69,6 +69,7 @@ function normalizeRecord(record, openid) {
     dateText: record.dateText,
     note: record.note,
     reasonSummary: record.reasonSummary,
+    imageUrl: record.imageUrl,
     action,
     selectedAt: normalizeIsoDate(record.selectedAt) || now,
     createdAt: normalizeIsoDate(record.createdAt) || now,

@@ -472,6 +472,7 @@ function rankRestaurants(restaurants, preference) {
         tags: restaurant.tags || [],
         confidenceScore,
         reason: buildReason(restaurant, confidenceScore),
+        imageUrl: restaurant.coverImageUrl || restaurant.imageUrl || '',
         source: restaurant.source || 'amap'
       };
     })

@@ -1,29 +1,36 @@
+const { getHistory } = require('../../services/historyService');
+
+const MAX_RECENT_MEALS = 3;
+const DEFAULT_RECENT_IMAGES = {
+  spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
+  rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
+  light: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=360&q=80',
+  noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=360&q=80',
+  snack: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=360&q=80',
+  general: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=360&q=80'
+};
+
 Page({
   data: {
     locationStatus: '北京 · 海淀区',
-    recentMeals: [
-      {
-        id: 'recent-1',
-        name: '杨国福麻辣烫',
-        timeText: '今天 12:30',
-        matchText: '86% 匹配',
-        coverClass: 'is-red'
-      },
-      {
-        id: 'recent-2',
-        name: '黄焖鸡米饭',
-        timeText: '昨天 12:15',
-        matchText: '78% 匹配',
-        coverClass: 'is-orange'
-      },
-      {
-        id: 'recent-3',
-        name: '兰州拉面',
-        timeText: '05-20 12:40',
-        matchText: '82% 匹配',
-        coverClass: 'is-green'
-      }
-    ]
+    recentMeals: []
+  },
+
+  onShow() {
+    this.loadRecentMeals();
+  },
+
+  async loadRecentMeals() {
+    try {
+      const history = await getHistory();
+
+      this.setData({
+        recentMeals: history.slice(0, MAX_RECENT_MEALS).map(toRecentMealItem)
+      });
+    } catch (error) {
+      console.warn('Failed to load recent recommendations.', error);
+      this.setData({ recentMeals: [] });
+    }
   },
 
   startQuestionnaire() {
@@ -42,3 +49,42 @@ Page({
     });
   }
 });
+
+function toRecentMealItem(item) {
+  const name = item.restaurantName || item.mealName;
+
+  return {
+    id: item.id,
+    name,
+    timeText: item.dateText,
+    matchText:
+      typeof item.matchPercent === 'number' ? `${Math.round(item.matchPercent)}% 匹配` : '已推荐',
+    imageUrl: item.imageUrl || getFallbackImageUrl(item.tags, name)
+  };
+}
+
+function getFallbackImageUrl(tags, name) {
+  const text = `${name} ${(tags || []).join(' ')}`;
+
+  if (/辣|麻辣|火锅|川|湘|烧烤|重口/.test(text)) {
+    return DEFAULT_RECENT_IMAGES.spicy;
+  }
+
+  if (/饭|米|炒|盖饭|咖喱/.test(text)) {
+    return DEFAULT_RECENT_IMAGES.rice;
+  }
+
+  if (/轻食|沙拉|健康|清淡/.test(text)) {
+    return DEFAULT_RECENT_IMAGES.light;
+  }
+
+  if (/面|粉|粥|拉面|牛肉面/.test(text)) {
+    return DEFAULT_RECENT_IMAGES.noodle;
+  }
+
+  if (/小吃|炸|包子|饺子|馄饨/.test(text)) {
+    return DEFAULT_RECENT_IMAGES.snack;
+  }
+
+  return DEFAULT_RECENT_IMAGES.general;
+}

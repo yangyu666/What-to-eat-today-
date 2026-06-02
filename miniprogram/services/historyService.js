@@ -3,6 +3,14 @@ const MAX_LOCAL_HISTORY = 50;
 const SAVE_HISTORY_FUNCTION_NAME = 'saveRecommendationHistory';
 const RECOMMENDATION_HISTORY_COLLECTION = 'recommendation_history';
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
+const DEFAULT_RESTAURANT_IMAGES = {
+  spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
+  rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
+  light: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=360&q=80',
+  noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=360&q=80',
+  snack: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=360&q=80',
+  general: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=360&q=80'
+};
 
 let cloudInitialized = false;
 
@@ -62,6 +70,7 @@ function buildHistoryRecord(options) {
     dateText: formatDateText(now),
     note: buildHistoryNote(candidate, options.switchCount || 0),
     reasonSummary,
+    imageUrl: candidate.imageUrl || getFallbackImageUrl(candidate.tags, restaurantName),
     action: options.action,
     selectedAt,
     createdAt: selectedAt,
@@ -74,6 +83,32 @@ function buildHistoryRecord(options) {
     switchCount: options.switchCount || 0,
     questionnaire: buildQuestionnaireSnapshot(options.questionnaire)
   };
+}
+
+function getFallbackImageUrl(tags, name) {
+  const text = `${name} ${(tags || []).join(' ')}`;
+
+  if (/辣|麻辣|火锅|川|湘|烧烤|重口/.test(text)) {
+    return DEFAULT_RESTAURANT_IMAGES.spicy;
+  }
+
+  if (/饭|米|炒|盖饭|咖喱/.test(text)) {
+    return DEFAULT_RESTAURANT_IMAGES.rice;
+  }
+
+  if (/轻食|沙拉|健康|清淡/.test(text)) {
+    return DEFAULT_RESTAURANT_IMAGES.light;
+  }
+
+  if (/面|粉|粥|拉面|牛肉面/.test(text)) {
+    return DEFAULT_RESTAURANT_IMAGES.noodle;
+  }
+
+  if (/小吃|炸|包子|饺子|馄饨/.test(text)) {
+    return DEFAULT_RESTAURANT_IMAGES.snack;
+  }
+
+  return DEFAULT_RESTAURANT_IMAGES.general;
 }
 
 function saveHistoryRecordLocal(record) {

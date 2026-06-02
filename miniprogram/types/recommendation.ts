@@ -86,6 +86,7 @@ export interface RecommendationHistoryRecord {
   dateText: string;
   note?: string;
   reasonSummary?: string;
+  imageUrl?: string;
   action?: RecommendationAction;
   selectedAt?: IsoDateString;
   createdAt?: IsoDateString;

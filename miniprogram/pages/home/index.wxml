@@ -30,14 +30,15 @@
     <text class="entry-arrow">›</text>
   </view>
 
-  <view class="recent-section">
+  <view class="recent-section" wx:if="{{recentMeals.length > 0}}">
     <view class="section-header">
       <text class="section-title">最近推荐</text>
       <text class="section-link" bindtap="openHistory">查看全部 ›</text>
     </view>
     <view class="recent-list">
       <view class="recent-card" wx:for="{{recentMeals}}" wx:key="id">
-        <view class="meal-cover {{item.coverClass}}">
+        <view class="meal-cover">
+          <image class="meal-cover-image" src="{{item.imageUrl}}" mode="aspectFill" lazy-load="true" />
           <text>{{item.matchText}}</text>
         </view>
         <text class="meal-name">{{item.name}}</text>
