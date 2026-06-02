@@ -55,7 +55,7 @@ const TAG_RULES = [
   { pattern: /川菜|川味|水煮|麻婆|辣子/, ids: ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'rice'] },
   { pattern: /湘菜|湖南|小炒|剁椒/, ids: ['spicy', 'strong_flavor', 'heavy', 'hunan', 'rice'] },
   { pattern: /烧烤|烤肉|烤串|烤鱼/, ids: ['bbq', 'heavy', 'strong_flavor', 'group'] },
-  { pattern: /炸鸡|油炸|汉堡|薯条/, ids: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
+  { pattern: /炸鸡|鸡柳|鸡排|肯德基|kfc|麦当劳|汉堡王|油炸|汉堡|薯条/i, ids: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
   { pattern: /粥|粉面|云吞|馄饨|粤菜|广式|茶餐厅/, ids: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { pattern: /兰州|牛肉面|拉面|刀削面|米线|面馆/, ids: ['hot', 'staple', 'noodle', 'quick'] },
   { pattern: /快餐|简餐|便当|盖饭|黄焖鸡|卤肉饭|套餐/, ids: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
@@ -170,7 +170,7 @@ function convertPoiToRestaurant(poi) {
   }
 
   const location = parseAmapLocation(poi.location);
-  const averageCostYuan = parseNumber(poi.biz_ext && poi.biz_ext.cost);
+  const averageCostYuan = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
   const tagIds = mapCategoryToTagIds([poi.type, poi.typecode, poi.name].filter(Boolean).join(';'));
   const photos = Array.isArray(poi.photos) ? poi.photos : [];
   const firstPhoto = photos.find((photo) => photo && photo.url);
@@ -239,6 +239,11 @@ function parseAmapLocation(value) {
 function parseNumber(value) {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? number : undefined;
+}
+
+function parsePositiveNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : undefined;
 }
 
 function toPriceLevel(cost) {

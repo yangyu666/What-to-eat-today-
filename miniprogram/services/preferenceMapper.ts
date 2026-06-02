@@ -8,7 +8,7 @@ export const DEFAULT_PREFERENCE_PROFILE: UserPreferenceProfile = {
   avoidedTagIds: [],
   positiveTags: ['quick', 'staple'],
   negativeTags: [],
-  constraints: {},
+  constraints: { diningMode: 'either' },
   softPreferences: {},
   budgetLevel: 3,
   maxDistanceMeters: 1500,

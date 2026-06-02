@@ -65,7 +65,7 @@ const INFERRED_TAG_RULES = [
   { keywords: ['湘菜', '湖南', '小炒', '剁椒'], tags: ['spicy', 'strong_flavor', 'heavy', 'hunan', 'rice'], skipWhenNotSpicy: true },
   { keywords: ['酸辣粉'], tags: ['spicy', 'strong_flavor', 'heavy', 'chongqing', 'noodle', 'hot'], skipWhenNotSpicy: true },
   { keywords: ['火锅', '串串'], tags: ['spicy', 'strong_flavor', 'heavy', 'hotpot', 'hot'], skipWhenNotSpicy: true },
-  { keywords: ['炸鸡', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
+  { keywords: ['炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
   { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group'] },
   { keywords: ['粥', '粉面', '云吞', '馄饨', '广式', '茶餐厅'], tags: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { keywords: ['轻食', '沙拉', '健康', '低卡', '减脂'], tags: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
@@ -74,7 +74,7 @@ const INFERRED_TAG_RULES = [
   { keywords: ['日式', '日本', '寿司', '咖喱'], tags: ['rice', 'not_spicy', 'stable', 'solo'] }
 ];
 const SPICY_KEYWORDS = ['辣', '麻辣', '小面', '重庆小面', '川', '川味', '川菜', '湘', '湘菜', '麻辣烫', '冒菜', '香锅', '火锅', '串串'];
-const GREASY_KEYWORDS = ['炸', '炸鸡', '烧烤', '烤肉', '汉堡', '油炸'];
+const GREASY_KEYWORDS = ['炸', '炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '烧烤', '烤肉', '汉堡', '薯条', '油炸'];
 
 const DEFAULT_PREFERENCE = {
   selectedOptionIds: ['quick', 'light'],
@@ -824,7 +824,7 @@ function getBudgetRange(preference) {
 }
 
 function getEstimatedCost(restaurant) {
-  if (restaurant.averageCostYuan !== undefined) return restaurant.averageCostYuan;
+  if (restaurant.averageCostYuan !== undefined && restaurant.averageCostYuan > 0) return restaurant.averageCostYuan;
   if (restaurant.priceLevel !== undefined) return getPriceLevelCost(restaurant.priceLevel);
   return undefined;
 }

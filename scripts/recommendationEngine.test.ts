@@ -164,6 +164,23 @@ const slightlyOverBudgetScore = scoreRestaurant(
 );
 assert((slightlyOverBudgetScore.confidenceScore ?? 100) <= 70, '略超预算候选不能拿到高匹配度');
 
+const unknownZeroCostScore = scoreRestaurant(
+  {
+    id: 'zero-cost-amap',
+    name: '高德价格未知盖饭',
+    tags: ['盖饭'],
+    tagIds: ['quick', 'rice', 'meal', 'set_meal'],
+    category: '简餐',
+    distanceMeters: 200,
+    averageCostYuan: 0,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  budgetRangePreference
+);
+assert(unknownZeroCostScore.breakdown.priceScore === 0, '高德 cost=0 应按价格未知处理，不能当作 0 元加分');
+
 const light = profile({
   preferredTagIds: ['light', 'healthy', 'low_burden', 'not_spicy'],
   avoidedTagIds: ['spicy', 'strong_flavor', 'bbq', 'fried', 'heavy']
@@ -188,6 +205,23 @@ const implicitLightFriedScore = scoreRestaurant(
 );
 assert(implicitLightFriedScore.matchedAvoidedTagIds.includes('fried'), '轻食/健康偏好应隐含避开炸物油腻');
 assert((implicitLightFriedScore.confidenceScore ?? 100) <= 70, '轻食/健康偏好下油腻候选不能高匹配');
+
+const implicitLightKfcScore = scoreRestaurant(
+  {
+    id: 'keyword-kfc',
+    name: '肯德基(商场店)',
+    tags: ['快餐'],
+    category: '西式快餐',
+    distanceMeters: 200,
+    averageCostYuan: 44,
+    openStatus: 'open',
+    rating: 4.6,
+    status: 'active'
+  },
+  implicitLight
+);
+assert(implicitLightKfcScore.matchedAvoidedTagIds.includes('fried'), '轻食/健康偏好应把肯德基类快餐识别为油炸油腻');
+assert((implicitLightKfcScore.confidenceScore ?? 100) <= 70, '轻食/健康偏好下肯德基类候选不能高匹配');
 
 const snack = profile({
   preferredTagIds: ['snack', 'quick', 'solo'],
