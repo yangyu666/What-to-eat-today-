@@ -1,0 +1,9 @@
+{
+  "name": "syncUserProfile",
+  "version": "1.0.0",
+  "description": "Sync user profile to cloud database.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

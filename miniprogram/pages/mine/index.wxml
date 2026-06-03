@@ -1,14 +1,40 @@
 <view class="page mine-page">
-  <view class="profile">
-    <view class="avatar">吃</view>
-    <view>
-      <text class="nickname">{{nickname}}</text>
-      <text class="status">{{cloudStatus}}</text>
+  <view class="profile-card">
+    <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="选择头像">
+      <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+      <view wx:else class="avatar-placeholder">未</view>
+    </button>
+
+    <view class="profile-main">
+      <input
+        class="nickname-input"
+        type="nickname"
+        value="{{nickname}}"
+        placeholder="未登录用户"
+        confirm-type="done"
+        bindinput="onNicknameInput"
+        bindconfirm="onNicknameConfirm"
+        bindblur="onNicknameBlur"
+      />
+      <text class="status">{{statusText}}</text>
     </view>
   </view>
 
-  <view class="info-panel">
-    <text class="panel-title">开发状态</text>
-    <text class="panel-text">当前仅初始化工程骨架，登录、订阅提醒、云数据库会在后续迭代接入。</text>
+  <view class="menu-list">
+    <button
+      wx:for="{{actions}}"
+      wx:key="key"
+      class="menu-item {{item.danger ? 'menu-item-danger' : ''}}"
+      data-key="{{item.key}}"
+      bindtap="onActionTap"
+    >
+      <view class="menu-copy">
+        <text class="menu-title">{{item.title}}</text>
+        <text class="menu-desc">{{item.desc}}</text>
+      </view>
+      <text class="menu-arrow">›</text>
+    </button>
   </view>
+
+  <text class="version">{{version}}</text>
 </view>
