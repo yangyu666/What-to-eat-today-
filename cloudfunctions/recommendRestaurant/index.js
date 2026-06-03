@@ -277,7 +277,11 @@ exports.main = async (event = {}, cloudContext = {}) => {
       restaurants: Array.isArray(event.restaurants) && event.restaurants.length > 0 ? event.restaurants : mockRestaurants,
       context: {
         preferenceSnapshot,
-        excludeRestaurantIds: context.excludeRestaurantIds || [],
+        excludeRestaurantIds: context.excludeRestaurantIds || context.excludedHistoryRestaurantIds || [],
+        historyFilterEnabled: context.historyFilterEnabled === true,
+        excludedHistoryRestaurantIds: context.excludedHistoryRestaurantIds || context.excludeRestaurantIds || [],
+        historyPenaltyRestaurantIds: context.historyPenaltyRestaurantIds || [],
+        historyPenaltyReasons: context.historyPenaltyReasons || [],
         experimentId: context.experimentId || DEFAULT_EXPERIMENT_ID
       },
       limit: normalizeLimit(event.limit),
@@ -435,7 +439,19 @@ function recommendRestaurants(options) {
   const now = options.now || new Date();
   const limit = options.limit || DEFAULT_LIMIT;
   const preference = options.context && options.context.preferenceSnapshot;
-  const excludeRestaurantIds = new Set((options.context && options.context.excludeRestaurantIds) || []);
+  const excludedHistoryRestaurantIds =
+    (options.context && (options.context.excludedHistoryRestaurantIds || options.context.excludeRestaurantIds)) || [];
+  const excludeRestaurantIds = new Set(excludedHistoryRestaurantIds);
+  const historyFilterEnabled =
+    options.context && options.context.historyFilterEnabled === true && excludedHistoryRestaurantIds.length > 0;
+  const historyPenaltyRestaurantIds = (options.context && options.context.historyPenaltyRestaurantIds) || [];
+  const historyPenaltyReasons = (options.context && options.context.historyPenaltyReasons) || [];
+  const scoreOptionsBase = {
+    historyFilterEnabled: options.context && options.context.historyFilterEnabled === true,
+    excludedHistoryRestaurantIds,
+    historyPenaltyRestaurantIds,
+    historyPenaltyReasons
+  };
   const experimentId = (options.context && options.context.experimentId) || DEFAULT_EXPERIMENT_ID;
   const baseHardFiltered = options.restaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false).passed;
@@ -444,35 +460,69 @@ function recommendRestaurants(options) {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, false).passed;
   });
   let fallbackReason;
-  let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference));
+  let historyFallbackUsed = false;
+  let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference, scoreOptionsBase));
+
+  if (historyFilterEnabled && scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
+    fallbackReason = '附近新选择较少，已放宽历史过滤';
+    historyFallbackUsed = true;
+    scored = options.restaurants
+      .filter((restaurant) => applyHardFilters(restaurant, preference, new Set(), false, false).passed)
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
+  }
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = options.restaurants
-      .filter((restaurant) => applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false).passed)
-      .map((restaurant) => scoreRestaurant(restaurant, preference, { fallbackReason }));
+      .filter((restaurant) =>
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false).passed
+      )
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
   }
 
   if (scored.length === 0) {
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = options.restaurants
-      .filter((restaurant) => applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true).passed)
-      .map((restaurant) => scoreRestaurant(restaurant, preference, { fallbackReason }));
+      .filter((restaurant) =>
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true).passed
+      )
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
   }
 
   const poolStats = {
     totalFetched: options.restaurants.length,
     afterHardFilter: baseHardFiltered.length,
+    afterHistoryFilter: primaryHardFiltered.length,
     afterNegativeFilter: primaryHardFiltered.length,
     finalCandidateCount: Math.min(limit, scored.length),
-    fallbackUsed: fallbackReason !== undefined
+    fallbackUsed: fallbackReason !== undefined,
+    historyFallbackUsed
   };
   const ranked = rankWithLightRandom(scored);
   const candidates = ranked.slice(0, limit).map((item, index) => {
     const rescored = scoreRestaurant(item.restaurant, preference, {
       fallbackReason: item.fallbackReason,
       relativeLeadScore: getRelativeLeadScore(ranked, index),
-      candidatePoolWeak: poolStats.fallbackUsed || poolStats.afterNegativeFilter < MIN_PRIMARY_POOL_SIZE
+      candidatePoolWeak: poolStats.fallbackUsed || poolStats.afterNegativeFilter < MIN_PRIMARY_POOL_SIZE,
+      historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
+      excludedHistoryRestaurantIds: scoreOptionsBase.excludedHistoryRestaurantIds,
+      historyPenaltyRestaurantIds: scoreOptionsBase.historyPenaltyRestaurantIds,
+      historyPenaltyReasons: scoreOptionsBase.historyPenaltyReasons
     });
     return {
       ...toRecommendationCandidate(rescored, options.source || 'cloud', experimentId),
@@ -491,6 +541,9 @@ function recommendRestaurants(options) {
     selectedCandidateId: candidates[0] && candidates[0].id,
     reasonSummary: candidates[0] && `${candidates[0].name} 匹配度 ${candidates[0].confidenceScore || 0}%，${candidates[0].reason}`,
     fallbackReason,
+    historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
+    excludedHistoryRestaurantIds,
+    historyPenaltyReasons,
     candidatePoolStats: poolStats
   };
 }
@@ -505,13 +558,16 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const baseScore = 32;
   const preferenceScore = Math.min(34, matchedPreferredTagIds.reduce((sum, tag) => sum + (TAG_WEIGHTS[tag] || 6), 0));
   const negativePreferencePenalty = (negativeConflict.severity === 'hard' ? 88 : negativeConflict.severity === 'soft' ? Math.min(45, 22 + negativeConflict.tags.length * 7) : 0) + temperatureConflict.penalty;
+  const historyPenaltyApplies =
+    Array.isArray(options.historyPenaltyRestaurantIds) && options.historyPenaltyRestaurantIds.includes(restaurant.id);
+  const historyPenalty = historyPenaltyApplies ? 8 : 0;
   const distanceScore = getDistanceScore(restaurant, preference, options.fallbackReason !== undefined);
   const priceScore = getPriceScore(restaurant, preference);
   const timeScore = getTimeScore(restaurant, preference);
   const ratingScore = getRatingScore(restaurant);
   const openStatusScore = restaurant.openStatus === 'open' ? 6 : restaurant.openStatus === 'busy' ? 1 : 0;
   const dataCompletenessScore = getDataCompletenessScore(restaurant);
-  const rawFinalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
+  const rawFinalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty - historyPenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
   const finalScore =
     options.fallbackReason !== undefined &&
     preference &&
@@ -524,7 +580,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
   const negativeAvoidanceScore = negativeConflict.severity === 'hard' ? 0 : negativeConflict.severity === 'soft' ? 8 : 25;
   const relativeLeadScore = options.relativeLeadScore || 0;
-  const confidenceScore = calculateConfidenceScore({
+  const rawConfidenceScore = calculateConfidenceScore({
     hardConstraintScore,
     positivePreferenceScore,
     negativeAvoidanceScore,
@@ -537,6 +593,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     fallbackUsed: options.fallbackReason !== undefined,
     candidatePoolWeak: options.candidatePoolWeak || false
   });
+  const confidenceScore = historyPenaltyApplies ? Math.min(rawConfidenceScore, 72) : rawConfidenceScore;
 
   return {
     restaurant,
@@ -566,10 +623,16 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     },
     reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict),
     hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), true, true).reasons,
-    penaltyReasons: buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict),
+    penaltyReasons: [
+      ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict),
+      ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
+    ],
     matchedPreferredTagIds,
     matchedAvoidedTagIds,
-    fallbackReason: options.fallbackReason
+    fallbackReason: options.fallbackReason,
+    historyFilterEnabled: options.historyFilterEnabled,
+    excludedHistoryRestaurantIds: options.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: options.historyPenaltyReasons
   };
 }
 
@@ -637,6 +700,9 @@ function toRecommendationCandidate(scored, source, experimentId) {
     hardFilterReasons: scored.hardFilterReasons,
     penaltyReasons: scored.penaltyReasons,
     fallbackReason: scored.fallbackReason,
+    historyFilterEnabled: scored.historyFilterEnabled,
+    excludedHistoryRestaurantIds: scored.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: scored.historyPenaltyReasons,
     algorithmVersion: ALGORITHM_VERSION,
     weightProfileId: WEIGHT_PROFILE_ID,
     experimentId,

@@ -5,6 +5,7 @@ import type { ApiResponse, RecommendMealResponse } from '../types/recommendation
 import type { UserQuestionnaireResult } from '../types/userPreference';
 import { buildAmapRestaurantQuery } from './amapQueryBuilder';
 import { getNearbyRestaurants } from './amapPoiService';
+import type { HistoryFilterContext } from './historyService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
 
@@ -21,23 +22,25 @@ export async function getTodayRecommendation(): Promise<MealCandidate> {
 }
 
 export async function getLocalRecommendations(
-  questionnaire?: UserQuestionnaireResult
+  questionnaire?: UserQuestionnaireResult,
+  historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
-  return getRecommendations(questionnaire, 4);
+  return getRecommendations(questionnaire, 4, historyFilterContext);
 }
 
 async function getRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
-  limit: number
+  limit: number,
+  historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
-  const poiCandidates = await getAmapRecommendations(questionnaire, limit);
+  const poiCandidates = await getAmapRecommendations(questionnaire, limit, historyFilterContext);
 
   if (poiCandidates.length > 0) {
     return poiCandidates;
   }
 
   try {
-    const cloudCandidates = await getCloudRecommendations(questionnaire, limit);
+    const cloudCandidates = await getCloudRecommendations(questionnaire, limit, historyFilterContext);
 
     if (cloudCandidates.length > 0) {
       return cloudCandidates;
@@ -46,7 +49,7 @@ async function getRecommendations(
     console.warn('Fallback to local mock recommendation after cloud recommendation failed.', error);
   }
 
-  const mockCandidates = getMockRecommendations(questionnaire, limit);
+  const mockCandidates = getMockRecommendations(questionnaire, limit, historyFilterContext);
 
   if (mockCandidates.length === 0) {
     throw new Error('No recommendation candidates available after all fallbacks.');
@@ -57,9 +60,11 @@ async function getRecommendations(
 
 async function getAmapRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
-  limit: number
+  limit: number,
+  historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
   const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
+  const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
 
   try {
@@ -76,9 +81,7 @@ async function getAmapRecommendations(
 
     const result = recommendRestaurants({
       restaurants,
-      context: {
-        preferenceSnapshot
-      },
+      context: recommendationContext,
       limit,
       source: 'amap'
     });
@@ -92,17 +95,17 @@ async function getAmapRecommendations(
 
 async function getCloudRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
-  limit: number
+  limit: number,
+  historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
   ensureCloudInitialized();
+  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
 
   const response = await wx.cloud.callFunction({
     name: cloudConfig.recommendRestaurantFunctionName,
     data: {
       questionnaire,
-      context: {
-        preferenceSnapshot: mapAnswersToPreferenceProfile(questionnaire?.answers ?? [])
-      },
+      context: buildRecommendationContext(preferenceSnapshot, historyFilterContext),
       limit
     }
   });
@@ -137,17 +140,41 @@ function ensureCloudInitialized() {
 
 function getMockRecommendations(
   questionnaire: UserQuestionnaireResult | undefined,
-  limit: number
+  limit: number,
+  historyFilterContext?: HistoryFilterContext
 ): MealCandidate[] {
+  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
   const result = recommendRestaurants({
     restaurants: mockRestaurants,
-    context: {
-      preferenceSnapshot: mapAnswersToPreferenceProfile(questionnaire?.answers ?? [])
-    },
+    context: buildRecommendationContext(preferenceSnapshot, historyFilterContext),
     limit,
     random: () => 0,
     source: 'mock'
   });
 
   return result.candidates;
+}
+
+function buildRecommendationContext(
+  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>,
+  historyFilterContext?: HistoryFilterContext
+) {
+  const historyFilterEnabled = historyFilterContext?.historyFilterEnabled === true;
+
+  return {
+    preferenceSnapshot,
+    excludeRestaurantIds: historyFilterEnabled
+      ? historyFilterContext?.excludedHistoryRestaurantIds ?? []
+      : [],
+    historyFilterEnabled,
+    excludedHistoryRestaurantIds: historyFilterEnabled
+      ? historyFilterContext?.excludedHistoryRestaurantIds ?? []
+      : [],
+    historyPenaltyRestaurantIds: historyFilterEnabled
+      ? historyFilterContext?.historyPenaltyRestaurantIds ?? []
+      : [],
+    historyPenaltyReasons: historyFilterEnabled
+      ? historyFilterContext?.historyPenaltyReasons ?? []
+      : []
+  };
 }

@@ -1,5 +1,8 @@
 import type { MealCandidate } from '../../models/meal';
-import { trackRecommendationAction } from '../../services/historyService';
+import {
+  getRecentHistoryFilterContext,
+  trackRecommendationAction
+} from '../../services/historyService';
 import { getLocalRecommendations } from '../../services/mealService';
 import type { RecommendationAction, RecommendationSource } from '../../types/recommendation';
 import type { UserQuestionnaireResult } from '../../types/userPreference';
@@ -33,6 +36,9 @@ Page({
     errorText: '',
     sourceText: '',
     reasonItems: [] as ReasonItem[],
+    historyFilterEnabled: true,
+    excludedHistoryRestaurantIds: [] as string[],
+    historyPenaltyReasons: [] as string[],
     switchButtonText: '换一家'
   },
 
@@ -52,7 +58,8 @@ Page({
     this.setData({ loading: true, errorText: '' });
 
     try {
-      const candidates = await getLocalRecommendations(result);
+      const historyFilterContext = getRecentHistoryFilterContext();
+      const candidates = await getLocalRecommendations(result, historyFilterContext);
 
       if (candidates.length === 0) {
         this.setCurrentRecommendation([], 0, {
@@ -60,6 +67,9 @@ Page({
           switchCount: 0,
           locked: false,
           accepted: false,
+          historyFilterEnabled: historyFilterContext.historyFilterEnabled,
+          excludedHistoryRestaurantIds: historyFilterContext.excludedHistoryRestaurantIds,
+          historyPenaltyReasons: historyFilterContext.historyPenaltyReasons,
           errorText: '推荐加载失败，请稍后重试'
         });
         return;
@@ -70,6 +80,9 @@ Page({
         switchCount: 0,
         locked: false,
         accepted: false,
+        historyFilterEnabled: historyFilterContext.historyFilterEnabled,
+        excludedHistoryRestaurantIds: historyFilterContext.excludedHistoryRestaurantIds,
+        historyPenaltyReasons: historyFilterContext.historyPenaltyReasons,
         switchButtonText: '换一家'
       });
       this.trackCurrentRecommendation('shown', candidates[0], 0, result);

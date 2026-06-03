@@ -17,9 +17,11 @@ export type RecommendationAlgorithmVersion = 'recommendation-v2';
 export interface CandidatePoolStats {
   totalFetched: number;
   afterHardFilter: number;
+  afterHistoryFilter?: number;
   afterNegativeFilter: number;
   finalCandidateCount: number;
   fallbackUsed: boolean;
+  historyFallbackUsed?: boolean;
 }
 
 export interface RecommendationScoreBreakdown {
@@ -63,6 +65,9 @@ export interface RecommendationCandidate {
   hardFilterReasons?: string[];
   penaltyReasons?: string[];
   fallbackReason?: string;
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
   candidatePoolStats?: CandidatePoolStats;
   algorithmVersion?: RecommendationAlgorithmVersion;
   weightProfileId?: string;
@@ -78,6 +83,10 @@ export interface RecommendationContext {
   answerSnapshot?: UserPreferenceAnswer[];
   preferenceSnapshot?: UserPreferenceProfile;
   excludeRestaurantIds?: RestaurantId[];
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
   excludeHistoryDays?: number;
 }
 
@@ -98,6 +107,9 @@ export interface RecommendationResult {
   selectedCandidateId?: RecommendationCandidateId;
   reasonSummary?: string;
   fallbackReason?: string;
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
   candidatePoolStats?: CandidatePoolStats;
 }
 
@@ -134,6 +146,9 @@ export interface RecommendationHistoryRecord {
   hardFilterReasons?: string[];
   penaltyReasons?: string[];
   fallbackReason?: string;
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
   candidatePoolStats?: CandidatePoolStats;
   questionnaire?: {
     version?: string;

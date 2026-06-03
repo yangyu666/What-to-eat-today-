@@ -1,5 +1,7 @@
 const HISTORY_STORAGE_KEY = 'meal_recommendation_history';
+const HISTORY_FILTER_STORAGE_KEY = 'meal_filter_recent_history';
 const MAX_LOCAL_HISTORY = 50;
+const DEFAULT_HISTORY_FILTER_LIMIT = 10;
 const SAVE_HISTORY_FUNCTION_NAME = 'saveRecommendationHistory';
 const RECOMMENDATION_HISTORY_COLLECTION = 'recommendation_history';
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
@@ -51,6 +53,58 @@ function getLocalHistory() {
   }
 }
 
+function getHistoryFilterEnabled() {
+  const stored = wx.getStorageSync(HISTORY_FILTER_STORAGE_KEY);
+
+  return typeof stored === 'boolean' ? stored : true;
+}
+
+function setHistoryFilterEnabled(enabled) {
+  wx.setStorageSync(HISTORY_FILTER_STORAGE_KEY, enabled);
+}
+
+function getRecentHistoryFilterContext(limit = DEFAULT_HISTORY_FILTER_LIMIT) {
+  const historyFilterEnabled = getHistoryFilterEnabled();
+
+  if (!historyFilterEnabled) {
+    return {
+      historyFilterEnabled,
+      excludedHistoryRestaurantIds: [],
+      historyPenaltyRestaurantIds: [],
+      historyPenaltyReasons: []
+    };
+  }
+
+  const recentHistory = getLocalHistory().slice(0, limit);
+  const excludedHistoryRestaurantIds = uniqueRestaurantIds(
+    recentHistory.filter((item) => item.action === 'accepted' || item.action === 'shown')
+  );
+  const historyPenaltyRestaurantIds = uniqueRestaurantIds(
+    recentHistory.filter((item) => item.action === 'skipped')
+  ).filter((restaurantId) => !excludedHistoryRestaurantIds.includes(restaurantId));
+  const historyPenaltyReasons = [
+    ...excludedHistoryRestaurantIds.map((restaurantId) => `recent-history-excluded:${restaurantId}`),
+    ...historyPenaltyRestaurantIds.map((restaurantId) => `recent-history-penalty:${restaurantId}`)
+  ];
+
+  return {
+    historyFilterEnabled,
+    excludedHistoryRestaurantIds,
+    historyPenaltyRestaurantIds,
+    historyPenaltyReasons
+  };
+}
+
+function uniqueRestaurantIds(records) {
+  return [
+    ...new Set(
+      records
+        .map((item) => item.restaurantId)
+        .filter(Boolean)
+    )
+  ];
+}
+
 function buildHistoryRecord(options) {
   const now = new Date();
   const candidate = options.candidate;
@@ -90,6 +144,9 @@ function buildHistoryRecord(options) {
     hardFilterReasons: candidate.hardFilterReasons,
     penaltyReasons: candidate.penaltyReasons,
     fallbackReason: candidate.fallbackReason,
+    historyFilterEnabled: candidate.historyFilterEnabled,
+    excludedHistoryRestaurantIds: candidate.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: candidate.historyPenaltyReasons,
     candidatePoolStats: candidate.candidatePoolStats,
     questionnaire: buildQuestionnaireSnapshot(options.questionnaire)
   };
@@ -306,5 +363,9 @@ function getRecordTime(record) {
 module.exports = {
   trackRecommendationAction,
   getHistory,
-  getLocalHistory
+  getLocalHistory,
+  getHistoryFilterEnabled,
+  setHistoryFilterEnabled,
+  getRecentHistoryFilterContext,
+  HISTORY_FILTER_STORAGE_KEY
 };

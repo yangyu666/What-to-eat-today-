@@ -1,4 +1,8 @@
-import { getHistory } from '../../services/historyService';
+import {
+  getHistory,
+  getHistoryFilterEnabled,
+  setHistoryFilterEnabled
+} from '../../services/historyService';
 import type { MealHistoryItem } from '../../models/meal';
 
 interface RecentMealItem {
@@ -24,17 +28,26 @@ Page({
   data: {
     userName: DEFAULT_USER_NAME,
     locationStatus: '定位中',
+    historyFilterEnabled: true,
     recentMeals: [] as RecentMealItem[]
   },
 
   onLoad() {
     this.initUserName();
     this.initLocation();
+    this.initHistoryFilter();
   },
 
   onShow() {
     this.initUserName();
+    this.initHistoryFilter();
     this.loadRecentMeals();
+  },
+
+  initHistoryFilter() {
+    this.setData({
+      historyFilterEnabled: getHistoryFilterEnabled()
+    });
   },
 
   initUserName() {
@@ -80,8 +93,11 @@ Page({
   },
 
   startQuestionnaire() {
+    setHistoryFilterEnabled(this.data.historyFilterEnabled);
+
     wx.setStorageSync('meal_questionnaire_draft', {
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      historyFilterEnabled: this.data.historyFilterEnabled
     });
 
     wx.navigateTo({
@@ -93,6 +109,15 @@ Page({
     wx.switchTab({
       url: '/pages/history/index'
     });
+  },
+
+  toggleHistoryFilter(event: WechatMiniprogram.SwitchChange) {
+    const enabled = event.detail.value;
+
+    this.setData({
+      historyFilterEnabled: enabled
+    });
+    setHistoryFilterEnabled(enabled);
   }
 });
 

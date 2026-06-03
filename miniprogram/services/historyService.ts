@@ -11,7 +11,9 @@ import { RECOMMENDATION_HISTORY_COLLECTION } from '../types/recommendation';
 import type { UserQuestionnaireResult } from '../types/userPreference';
 
 const HISTORY_STORAGE_KEY = 'meal_recommendation_history';
+export const HISTORY_FILTER_STORAGE_KEY = 'meal_filter_recent_history';
 const MAX_LOCAL_HISTORY = 50;
+const DEFAULT_HISTORY_FILTER_LIMIT = 10;
 const SAVE_HISTORY_FUNCTION_NAME = 'saveRecommendationHistory';
 const DEFAULT_RESTAURANT_IMAGES = {
   spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
@@ -34,6 +36,13 @@ type CloudHistoryRecord = RecommendationHistoryRecord & {
 };
 
 let cloudInitialized = false;
+
+export interface HistoryFilterContext {
+  historyFilterEnabled: boolean;
+  excludedHistoryRestaurantIds: string[];
+  historyPenaltyRestaurantIds: string[];
+  historyPenaltyReasons: string[];
+}
 
 export async function trackRecommendationAction(
   options: TrackRecommendationOptions
@@ -76,6 +85,60 @@ export function getLocalHistory(): RecommendationHistoryRecord[] {
   }
 }
 
+export function getHistoryFilterEnabled(): boolean {
+  const stored = wx.getStorageSync(HISTORY_FILTER_STORAGE_KEY) as boolean | undefined;
+
+  return typeof stored === 'boolean' ? stored : true;
+}
+
+export function setHistoryFilterEnabled(enabled: boolean) {
+  wx.setStorageSync(HISTORY_FILTER_STORAGE_KEY, enabled);
+}
+
+export function getRecentHistoryFilterContext(
+  limit = DEFAULT_HISTORY_FILTER_LIMIT
+): HistoryFilterContext {
+  const historyFilterEnabled = getHistoryFilterEnabled();
+
+  if (!historyFilterEnabled) {
+    return {
+      historyFilterEnabled,
+      excludedHistoryRestaurantIds: [],
+      historyPenaltyRestaurantIds: [],
+      historyPenaltyReasons: []
+    };
+  }
+
+  const recentHistory = getLocalHistory().slice(0, limit);
+  const excludedHistoryRestaurantIds = uniqueRestaurantIds(
+    recentHistory.filter((item) => item.action === 'accepted' || item.action === 'shown')
+  );
+  const historyPenaltyRestaurantIds = uniqueRestaurantIds(
+    recentHistory.filter((item) => item.action === 'skipped')
+  ).filter((restaurantId) => !excludedHistoryRestaurantIds.includes(restaurantId));
+  const historyPenaltyReasons = [
+    ...excludedHistoryRestaurantIds.map((restaurantId) => `recent-history-excluded:${restaurantId}`),
+    ...historyPenaltyRestaurantIds.map((restaurantId) => `recent-history-penalty:${restaurantId}`)
+  ];
+
+  return {
+    historyFilterEnabled,
+    excludedHistoryRestaurantIds,
+    historyPenaltyRestaurantIds,
+    historyPenaltyReasons
+  };
+}
+
+function uniqueRestaurantIds(records: RecommendationHistoryRecord[]): string[] {
+  return [
+    ...new Set(
+      records
+        .map((item) => item.restaurantId)
+        .filter((restaurantId): restaurantId is string => Boolean(restaurantId))
+    )
+  ];
+}
+
 function buildHistoryRecord(options: TrackRecommendationOptions): RecommendationHistoryRecord {
   const now = new Date();
   const candidate = options.candidate;
@@ -116,6 +179,9 @@ function buildHistoryRecord(options: TrackRecommendationOptions): Recommendation
     hardFilterReasons: candidate.hardFilterReasons,
     penaltyReasons: candidate.penaltyReasons,
     fallbackReason: candidate.fallbackReason,
+    historyFilterEnabled: candidate.historyFilterEnabled,
+    excludedHistoryRestaurantIds: candidate.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: candidate.historyPenaltyReasons,
     candidatePoolStats: candidate.candidatePoolStats,
     questionnaire: buildQuestionnaireSnapshot(options.questionnaire)
   };

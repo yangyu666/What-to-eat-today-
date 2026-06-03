@@ -1,4 +1,7 @@
-const { trackRecommendationAction } = require('../../services/historyService');
+const {
+  getRecentHistoryFilterContext,
+  trackRecommendationAction
+} = require('../../services/historyService');
 
 const MAX_SWITCH_COUNT = 3;
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
@@ -27,6 +30,9 @@ Page({
     errorText: '',
     sourceText: '',
     reasonItems: [],
+    historyFilterEnabled: true,
+    excludedHistoryRestaurantIds: [],
+    historyPenaltyReasons: [],
     switchButtonText: '换一家'
   },
 
@@ -44,7 +50,8 @@ Page({
     this.setData({ loading: true, errorText: '' });
 
     try {
-      const candidates = await getRecommendations(result);
+      const historyFilterContext = getRecentHistoryFilterContext();
+      const candidates = await getRecommendations(result, historyFilterContext);
 
       if (candidates.length === 0) {
         this.setCurrentRecommendation([], 0, {
@@ -52,6 +59,9 @@ Page({
           switchCount: 0,
           locked: false,
           accepted: false,
+          historyFilterEnabled: historyFilterContext.historyFilterEnabled,
+          excludedHistoryRestaurantIds: historyFilterContext.excludedHistoryRestaurantIds,
+          historyPenaltyReasons: historyFilterContext.historyPenaltyReasons,
           errorText: '推荐加载失败，请稍后重试'
         });
         return;
@@ -62,6 +72,9 @@ Page({
         switchCount: 0,
         locked: false,
         accepted: false,
+        historyFilterEnabled: historyFilterContext.historyFilterEnabled,
+        excludedHistoryRestaurantIds: historyFilterContext.excludedHistoryRestaurantIds,
+        historyPenaltyReasons: historyFilterContext.historyPenaltyReasons,
         switchButtonText: '换一家'
       });
       this.trackCurrentRecommendation('shown', candidates[0], 0, result);
@@ -194,8 +207,9 @@ Page({
   }
 });
 
-async function getRecommendations(questionnaire) {
+async function getRecommendations(questionnaire, historyFilterContext = getRecentHistoryFilterContext()) {
   ensureCloudInitialized();
+  const historyFilterEnabled = historyFilterContext.historyFilterEnabled === true;
 
   const response = await wx.cloud.callFunction({
     name: 'recommendRestaurant',
@@ -203,7 +217,20 @@ async function getRecommendations(questionnaire) {
       questionnaire,
       limit: 4,
       context: {
-        experimentId: 'default'
+        experimentId: 'default',
+        excludeRestaurantIds: historyFilterEnabled
+          ? historyFilterContext.excludedHistoryRestaurantIds
+          : [],
+        historyFilterEnabled,
+        excludedHistoryRestaurantIds: historyFilterEnabled
+          ? historyFilterContext.excludedHistoryRestaurantIds
+          : [],
+        historyPenaltyRestaurantIds: historyFilterEnabled
+          ? historyFilterContext.historyPenaltyRestaurantIds
+          : [],
+        historyPenaltyReasons: historyFilterEnabled
+          ? historyFilterContext.historyPenaltyReasons
+          : []
       }
     }
   });
@@ -221,7 +248,17 @@ async function getRecommendations(questionnaire) {
   return candidates.map((candidate) => ({
     ...candidate,
     source: candidate.source || (recommendation && recommendation.source) || 'cloud',
-    candidatePoolStats: candidate.candidatePoolStats || (recommendation && recommendation.candidatePoolStats)
+    candidatePoolStats: candidate.candidatePoolStats || (recommendation && recommendation.candidatePoolStats),
+    historyFilterEnabled:
+      candidate.historyFilterEnabled ?? (recommendation && recommendation.historyFilterEnabled) ?? historyFilterEnabled,
+    excludedHistoryRestaurantIds:
+      candidate.excludedHistoryRestaurantIds ??
+      (recommendation && recommendation.excludedHistoryRestaurantIds) ??
+      historyFilterContext.excludedHistoryRestaurantIds,
+    historyPenaltyReasons:
+      candidate.historyPenaltyReasons ??
+      (recommendation && recommendation.historyPenaltyReasons) ??
+      historyFilterContext.historyPenaltyReasons
   }));
 }
 

@@ -16,6 +16,19 @@
     <button class="primary-button" bindtap="startQuestionnaire">帮我决定</button>
   </view>
 
+  <view class="history-filter-card">
+    <view class="history-filter-copy">
+      <text class="history-filter-title">避开最近推荐</text>
+      <text class="history-filter-desc">开启后优先换新选择</text>
+    </view>
+    <switch
+      class="history-filter-switch"
+      checked="{{historyFilterEnabled}}"
+      color="#18c653"
+      bindchange="toggleHistoryFilter"
+    />
+  </view>
+
   <view class="history-entry" bindtap="openHistory">
     <view>
       <text class="entry-title">历史记录</text>

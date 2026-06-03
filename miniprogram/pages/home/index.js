@@ -1,4 +1,8 @@
-const { getHistory } = require('../../services/historyService');
+const {
+  getHistory,
+  getHistoryFilterEnabled,
+  setHistoryFilterEnabled
+} = require('../../services/historyService');
 
 const MAX_RECENT_MEALS = 3;
 const DEFAULT_USER_NAME = '朋友';
@@ -15,17 +19,26 @@ Page({
   data: {
     userName: DEFAULT_USER_NAME,
     locationStatus: '定位中',
+    historyFilterEnabled: true,
     recentMeals: []
   },
 
   onLoad() {
     this.initUserName();
     this.initLocation();
+    this.initHistoryFilter();
   },
 
   onShow() {
     this.initUserName();
+    this.initHistoryFilter();
     this.loadRecentMeals();
+  },
+
+  initHistoryFilter() {
+    this.setData({
+      historyFilterEnabled: getHistoryFilterEnabled()
+    });
   },
 
   initUserName() {
@@ -72,8 +85,11 @@ Page({
   },
 
   startQuestionnaire() {
+    setHistoryFilterEnabled(this.data.historyFilterEnabled);
+
     wx.setStorageSync('meal_questionnaire_draft', {
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
+      historyFilterEnabled: this.data.historyFilterEnabled
     });
 
     wx.navigateTo({
@@ -85,6 +101,15 @@ Page({
     wx.switchTab({
       url: '/pages/history/index'
     });
+  },
+
+  toggleHistoryFilter(event) {
+    const enabled = event.detail.value;
+
+    this.setData({
+      historyFilterEnabled: enabled
+    });
+    setHistoryFilterEnabled(enabled);
   }
 });
 

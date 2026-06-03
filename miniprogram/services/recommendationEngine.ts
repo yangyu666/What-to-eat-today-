@@ -13,6 +13,10 @@ import type { UserPreferenceProfile } from '../types/userPreference';
 export interface RecommendationEngineContext {
   preferenceSnapshot?: UserPreferenceProfile;
   excludeRestaurantIds?: RestaurantId[];
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
   experimentId?: string;
 }
 
@@ -42,12 +46,19 @@ export interface ScoredRestaurant {
   matchedPreferredTagIds: TagId[];
   matchedAvoidedTagIds: TagId[];
   fallbackReason?: string;
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
 }
 
 interface ScoreOptions {
   fallbackReason?: string;
   relativeLeadScore?: number;
   candidatePoolWeak?: boolean;
+  historyFilterEnabled?: boolean;
+  excludedHistoryRestaurantIds?: RestaurantId[];
+  historyPenaltyRestaurantIds?: RestaurantId[];
+  historyPenaltyReasons?: string[];
 }
 
 const DEFAULT_LIMIT = 3;
@@ -230,9 +241,21 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const limit = options.limit ?? DEFAULT_LIMIT;
   const source = options.source ?? 'mock';
   const preference = options.context?.preferenceSnapshot;
-  const excludeRestaurantIds = new Set(options.context?.excludeRestaurantIds ?? []);
+  const excludedHistoryRestaurantIds =
+    options.context?.excludedHistoryRestaurantIds ?? options.context?.excludeRestaurantIds ?? [];
+  const excludeRestaurantIds = new Set(excludedHistoryRestaurantIds);
+  const historyFilterEnabled =
+    options.context?.historyFilterEnabled === true && excludedHistoryRestaurantIds.length > 0;
+  const historyPenaltyRestaurantIds = options.context?.historyPenaltyRestaurantIds ?? [];
+  const historyPenaltyReasons = options.context?.historyPenaltyReasons ?? [];
   const experimentId = options.context?.experimentId ?? DEFAULT_EXPERIMENT_ID;
   const totalFetched = options.restaurants.length;
+  const scoreOptionsBase: ScoreOptions = {
+    historyFilterEnabled: options.context?.historyFilterEnabled === true,
+    excludedHistoryRestaurantIds,
+    historyPenaltyRestaurantIds,
+    historyPenaltyReasons
+  };
   const baseHardFiltered = options.restaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
@@ -248,45 +271,82 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const afterNegativeFilter = primaryHardFiltered.length;
 
   let fallbackReason: string | undefined;
-  let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference));
+  let historyFallbackUsed = false;
+  let scored = primaryHardFiltered.map((restaurant) =>
+    scoreRestaurant(restaurant, preference, scoreOptionsBase)
+  );
+
+  if (historyFilterEnabled && scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
+    fallbackReason = '附近新选择较少，已放宽历史过滤';
+    historyFallbackUsed = true;
+    scored = options.restaurants
+      .filter((restaurant) => {
+        return applyHardFilters(restaurant, preference, new Set(), {
+          allowDistanceFallback: false,
+          allowNegativeFallback: false
+        }).passed;
+      })
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
+  }
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = options.restaurants
       .filter((restaurant) => {
-        return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
+        return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: false
         }).passed;
       })
-      .map((restaurant) => scoreRestaurant(restaurant, preference, { fallbackReason }));
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
   }
 
   if (scored.length === 0) {
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = options.restaurants
       .filter((restaurant) => {
-        return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
+        return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: true
         }).passed;
       })
-      .map((restaurant) => scoreRestaurant(restaurant, preference, { fallbackReason }));
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason
+        })
+      );
   }
 
   const poolStats: CandidatePoolStats = {
     totalFetched,
     afterHardFilter: baseHardFiltered.length,
+    afterHistoryFilter: primaryHardFiltered.length,
     afterNegativeFilter,
     finalCandidateCount: Math.min(limit, scored.length),
-    fallbackUsed: fallbackReason !== undefined
+    fallbackUsed: fallbackReason !== undefined,
+    historyFallbackUsed
   };
   const ranked = rankWithLightRandom(scored, random);
   const candidates = ranked.slice(0, limit).map((scoredRestaurant, index) => {
     const next = scoreRestaurant(scoredRestaurant.restaurant, preference, {
       fallbackReason: scoredRestaurant.fallbackReason,
       relativeLeadScore: getRelativeLeadScore(ranked, index),
-      candidatePoolWeak: poolStats.fallbackUsed || poolStats.afterNegativeFilter < MIN_PRIMARY_POOL_SIZE
+      candidatePoolWeak: poolStats.fallbackUsed || poolStats.afterNegativeFilter < MIN_PRIMARY_POOL_SIZE,
+      historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
+      excludedHistoryRestaurantIds: scoreOptionsBase.excludedHistoryRestaurantIds,
+      historyPenaltyRestaurantIds: scoreOptionsBase.historyPenaltyRestaurantIds,
+      historyPenaltyReasons: scoreOptionsBase.historyPenaltyReasons
     });
 
     return {
@@ -306,6 +366,9 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
     selectedCandidateId: candidates[0]?.id,
     reasonSummary: buildReasonSummary(candidates[0]),
     fallbackReason,
+    historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
+    excludedHistoryRestaurantIds,
+    historyPenaltyReasons,
     candidatePoolStats: poolStats
   };
 }
@@ -325,6 +388,9 @@ export function scoreRestaurant(
   const baseScore = 32;
   const preferenceScore = getPreferenceScore(matchedPreferredTagIds);
   const negativePreferencePenalty = getNegativePenalty(negativeConflict) + temperatureConflict.penalty;
+  const historyPenaltyApplies =
+    options.historyPenaltyRestaurantIds?.includes(restaurant.id) === true;
+  const historyPenalty = historyPenaltyApplies ? 8 : 0;
   const distanceScore = getDistanceScore(restaurant, preference, options.fallbackReason !== undefined);
   const priceScore = getPriceScore(restaurant, preference);
   const timeScore = getTimeScore(restaurant, preference);
@@ -335,6 +401,7 @@ export function scoreRestaurant(
     baseScore +
       preferenceScore -
       negativePreferencePenalty +
+      - historyPenalty +
       distanceScore +
       priceScore +
       timeScore +
@@ -355,7 +422,7 @@ export function scoreRestaurant(
   const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
   const negativeAvoidanceScore = getNegativeAvoidanceConfidence(negativeConflict);
   const relativeLeadScore = options.relativeLeadScore ?? 0;
-  const confidenceScore = calculateConfidenceScore({
+  const rawConfidenceScore = calculateConfidenceScore({
     hardConstraintScore,
     positivePreferenceScore,
     negativeAvoidanceScore,
@@ -368,6 +435,9 @@ export function scoreRestaurant(
     fallbackUsed: options.fallbackReason !== undefined,
     candidatePoolWeak: options.candidatePoolWeak ?? false
   });
+  const confidenceScore = historyPenaltyApplies
+    ? Math.min(rawConfidenceScore, 72)
+    : rawConfidenceScore;
 
   return {
     restaurant,
@@ -409,16 +479,22 @@ export function scoreRestaurant(
       allowDistanceFallback: options.fallbackReason !== undefined,
       allowNegativeFallback: true
     }).reasons,
-    penaltyReasons: buildPenaltyReasons(
-      restaurant,
-      negativeConflict,
-      preference,
-      options.fallbackReason,
-      temperatureConflict
-    ),
+    penaltyReasons: [
+      ...buildPenaltyReasons(
+        restaurant,
+        negativeConflict,
+        preference,
+        options.fallbackReason,
+        temperatureConflict
+      ),
+      ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
+    ],
     matchedPreferredTagIds,
     matchedAvoidedTagIds,
-    fallbackReason: options.fallbackReason
+    fallbackReason: options.fallbackReason,
+    historyFilterEnabled: options.historyFilterEnabled,
+    excludedHistoryRestaurantIds: options.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: options.historyPenaltyReasons
   };
 }
 
@@ -549,6 +625,9 @@ function toRecommendationCandidate(
     hardFilterReasons: scored.hardFilterReasons,
     penaltyReasons: scored.penaltyReasons,
     fallbackReason: scored.fallbackReason,
+    historyFilterEnabled: scored.historyFilterEnabled,
+    excludedHistoryRestaurantIds: scored.excludedHistoryRestaurantIds,
+    historyPenaltyReasons: scored.historyPenaltyReasons,
     algorithmVersion: ALGORITHM_VERSION,
     weightProfileId: WEIGHT_PROFILE_ID,
     experimentId,
