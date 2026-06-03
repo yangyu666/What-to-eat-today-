@@ -48,30 +48,38 @@ Page({
     }
 
     const answers = this.upsertAnswer(question, option);
+    const questions = selectQuestionSet({
+      answers,
+      previousQuestions: this.data.questions as QuestionBankItem[]
+    });
     const nextIndex = this.data.currentIndex + 1;
 
-    this.setData({ answers });
+    this.setData({ answers, questions });
 
-    if (nextIndex >= this.data.questions.length) {
+    if (nextIndex >= questions.length) {
       this.finishQuestionnaire(answers);
       return;
     }
 
-    this.showQuestion(nextIndex);
+    this.showQuestion(nextIndex, questions);
   },
 
   skipQuestion() {
     const answers = this.upsertAnswer(this.data.currentQuestion as QuestionBankItem, null);
+    const questions = selectQuestionSet({
+      answers,
+      previousQuestions: this.data.questions as QuestionBankItem[]
+    });
     const nextIndex = this.data.currentIndex + 1;
 
-    this.setData({ answers });
+    this.setData({ answers, questions });
 
-    if (nextIndex >= this.data.questions.length) {
+    if (nextIndex >= questions.length) {
       this.finishQuestionnaire(answers);
       return;
     }
 
-    this.showQuestion(nextIndex);
+    this.showQuestion(nextIndex, questions);
   },
 
   goBack() {
@@ -83,8 +91,8 @@ Page({
     this.showQuestion(this.data.currentIndex - 1);
   },
 
-  showQuestion(index: number) {
-    const questions = this.data.questions as QuestionBankItem[];
+  showQuestion(index: number, nextQuestions?: QuestionBankItem[]) {
+    const questions = nextQuestions ?? (this.data.questions as QuestionBankItem[]);
 
     this.setData({
       currentIndex: index,

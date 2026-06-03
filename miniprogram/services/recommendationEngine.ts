@@ -306,7 +306,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
         return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: false,
-          allowPriceFallback: true
+          allowPriceFallback: preference?.budgetLevel !== 6
         }).passed;
       })
       .map((restaurant) =>
@@ -324,7 +324,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
         return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: true,
-          allowPriceFallback: true
+          allowPriceFallback: preference?.budgetLevel !== 6
         }).passed;
       })
       .map((restaurant) =>
@@ -1020,6 +1020,21 @@ function getDistanceScore(
   }
 
   const maxDistance = preference?.maxDistanceMeters ?? 1500;
+  const distanceFlexible =
+    preference?.selectedOptionIds?.includes('distance_any') === true || maxDistance >= 5000;
+
+  if (distanceFlexible) {
+    if (restaurant.distanceMeters <= 1000) {
+      return 6;
+    }
+
+    if (restaurant.distanceMeters <= maxDistance) {
+      return 0;
+    }
+
+    return fallbackUsed ? -12 : -8;
+  }
+
   const ratio = restaurant.distanceMeters / maxDistance;
 
   if (ratio <= 0.5) {
@@ -1064,7 +1079,7 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
         return -8;
       }
 
-      return -45;
+      return preference.budgetLevel >= 6 ? -70 : -45;
     }
 
     return estimatedCost >= range.min * 0.75 ? 4 : -6;
@@ -1279,7 +1294,15 @@ function isClearlyUnderBudget(restaurant: Restaurant, preference?: UserPreferenc
   const range = getBudgetRange(preference);
   const estimatedCost = getEstimatedCost(restaurant);
 
-  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min * 0.65;
+  if (range.min === undefined || estimatedCost === undefined) {
+    return false;
+  }
+
+  if (preference.budgetLevel >= 6) {
+    return estimatedCost < range.min;
+  }
+
+  return estimatedCost < range.min * 0.65;
 }
 
 function isOverTimePreference(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {

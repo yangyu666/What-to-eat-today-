@@ -261,6 +261,30 @@ const luxuryBudgetResult = recommend(
 );
 assert(luxuryBudgetResult.candidates[0]?.restaurantId === 'luxury-in-range', '200+ budget should not recommend a dozens-yuan restaurant when in-range candidates exist');
 
+const luxuryLowOnlyResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'slow', 'group'],
+    budgetLevel: 6,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'luxury-low-only',
+      name: 'low price fast food',
+      tags: ['fast food'],
+      tagIds: ['quick', 'meal', 'set_meal'],
+      category: 'fast food',
+      distanceMeters: 120,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryLowOnlyResult.candidates.length === 0, '200+ budget should not fallback to clearly low-price candidates');
+
+
 
 
 const unknownZeroCostScore = scoreRestaurant(
@@ -512,6 +536,43 @@ const nearDistanceResult = recommend(
 );
 assert(nearDistanceResult.candidates[0]?.restaurantId !== 'far-perfect', '远距离候选不能只靠标签匹配排到 Top1');
 
+const flexibleDistanceResult = recommend(
+  profile({
+    selectedOptionIds: ['distance_any'],
+    preferredTagIds: ['light', 'healthy', 'salad', 'fresh', 'low_burden'],
+    maxDistanceMeters: 5000,
+    maxEstimatedMinutes: 90
+  }),
+  [
+    {
+      id: 'near-weak',
+      name: 'near weak match',
+      tags: ['meal'],
+      tagIds: ['meal', 'rice', 'quick'],
+      category: 'meal',
+      distanceMeters: 180,
+      averageCostYuan: 35,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'far-better-match',
+      name: 'far better light food',
+      tags: ['light'],
+      tagIds: ['light', 'healthy', 'salad', 'fresh', 'low_burden', 'not_spicy'],
+      category: 'light food',
+      distanceMeters: 2600,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    }
+  ]
+);
+assert(flexibleDistanceResult.candidates[0]?.restaurantId === 'far-better-match', 'distance_any should allow farther candidates to win when they better match preferences');
+
+
 const hotPreference = profile({
   preferredTagIds: ['hot', 'comfort', 'congee'],
   maxDistanceMeters: 1000
@@ -637,6 +698,26 @@ assert(
 assert(
   ['avoidance', 'flavor', 'health'].filter((id) => selectedQuestionIds.has(id)).length <= 1,
   'avoidance, flavor, and health should not repeat the same light or healthy intent'
+);
+const mealFollowUpQuestions = selectQuestionSet({
+  answers: [
+    {
+      questionId: 'meal_intent',
+      type: 'single',
+      value: 'meal',
+      optionIds: ['intent_meal'],
+      answeredAt: '2026-06-02T04:00:10.000Z'
+    }
+  ],
+  previousQuestions: selectedQuestions,
+  random: () => 0.2
+});
+assert(!mealFollowUpQuestions.some((question) => question.id === 'category_preference'), 'meal intent should skip non-meal category preference follow-up');
+assert(
+  mealFollowUpQuestions.every((question) => {
+    return question.options.every((option) => !['prefer_milk_tea', 'prefer_coffee', 'prefer_bakery_dessert'].includes(option.id));
+  }),
+  'meal intent should remove drink and dessert follow-up options'
 );
 
 const optionWithoutEffect = questionBank.flatMap((question) => question.options).find((option) => !option.effect);

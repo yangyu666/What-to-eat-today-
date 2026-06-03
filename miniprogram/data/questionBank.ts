@@ -271,7 +271,7 @@ export const questionBank: QuestionBankItem[] = [
         icon: '远',
         imageUrl: QUESTION_OPTION_IMAGES.distanceAny,
         effect: {
-          constraints: { maxDistanceMeters: 3000, maxEstimatedMinutes: 60 }
+          constraints: { maxDistanceMeters: 5000, maxEstimatedMinutes: 90 }
         }
       }
     ]
@@ -1082,22 +1082,7 @@ export const questionBank: QuestionBankItem[] = [
           softPreferences: { mealWeight: 'light', amapKeywords: ['甜品', '面包', '蛋糕'] }
         }
       },
-      {
-        id: 'prefer_halal_noodle',
-        label: '清真/牛肉面',
-        desc: '清真、兰州拉面、牛肉面优先',
-        selected: false,
-        value: 'halal_noodle',
-        themeClass: 'theme-green',
-        visual: 'halal',
-        icon: 'halal',
-        imageUrl: QUESTION_OPTION_IMAGES.preferHalal,
-        effect: {
-          positiveTags: ['halal', 'noodle', 'hot', 'high_protein'],
-          negativeTags: ['pork'],
-          softPreferences: { amapKeywords: ['清真', '兰州拉面', '牛肉面'] }
-        }
-      }
+
     ]
   },
   {

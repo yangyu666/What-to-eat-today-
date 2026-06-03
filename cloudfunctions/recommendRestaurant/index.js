@@ -381,8 +381,8 @@ function buildPreferenceProfile(answers) {
     }
 
     if (answer.questionId === 'distance') {
-      maxDistanceMeters = answer.value === 500 || answer.value === 1000 ? answer.value : 3000;
-      maxEstimatedMinutes = answer.value === 500 ? 30 : answer.value === 1000 ? 40 : 60;
+      maxDistanceMeters = answer.value === 500 || answer.value === 1000 ? answer.value : 5000;
+      maxEstimatedMinutes = answer.value === 500 ? 30 : answer.value === 1000 ? 40 : 90;
     }
   });
 
@@ -490,7 +490,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = options.restaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false, true).passed
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false, !preference || preference.budgetLevel !== 6).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -504,7 +504,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = options.restaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true, true).passed
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true, !preference || preference.budgetLevel !== 6).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -936,6 +936,16 @@ function intersect(left, right) {
 function getDistanceScore(restaurant, preference, fallbackUsed) {
   if (restaurant.distanceMeters === undefined) return 0;
   const maxDistance = (preference && preference.maxDistanceMeters) || 1500;
+  const distanceFlexible =
+    (preference && Array.isArray(preference.selectedOptionIds) && preference.selectedOptionIds.includes('distance_any')) ||
+    maxDistance >= 5000;
+
+  if (distanceFlexible) {
+    if (restaurant.distanceMeters <= 1000) return 6;
+    if (restaurant.distanceMeters <= maxDistance) return 0;
+    return fallbackUsed ? -12 : -8;
+  }
+
   const ratio = restaurant.distanceMeters / maxDistance;
   if (ratio <= 0.5) return fallbackUsed ? 10 : 18;
   if (ratio <= 1) return fallbackUsed ? 5 : 12;
@@ -953,7 +963,7 @@ function getPriceScore(restaurant, preference) {
     if ((preference.budgetLevel || 3) >= 4) {
       if (estimatedCost >= range.min * 0.85) return 4;
       if (estimatedCost >= range.min * 0.65) return -8;
-      return -45;
+      return preference.budgetLevel >= 6 ? -70 : -45;
     }
 
     return estimatedCost >= range.min * 0.75 ? 4 : -6;
@@ -1037,7 +1047,9 @@ function isClearlyUnderBudget(restaurant, preference) {
   if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5) return false;
   const range = getBudgetRange(preference);
   const estimatedCost = getEstimatedCost(restaurant);
-  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min * 0.65;
+  if (range.min === undefined || estimatedCost === undefined) return false;
+  if (preference.budgetLevel >= 6) return estimatedCost < range.min;
+  return estimatedCost < range.min * 0.65;
 }
 
 function isOverTimePreference(restaurant, preference) {

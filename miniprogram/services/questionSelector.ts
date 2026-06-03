@@ -1,20 +1,21 @@
 import { questionBank, type QuestionBankItem } from '../data/questionBank';
-import type { PreferenceDimension } from '../types/userPreference';
+import type { PreferenceDimension, UserPreferenceAnswer } from '../types/userPreference';
 
 export interface SelectQuestionsOptions {
+  answers?: UserPreferenceAnswer[];
   count?: number;
+  previousQuestions?: QuestionBankItem[];
   random?: () => number;
 }
 
 const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
-  ['meal_intent', 'dietary_restriction', 'distance', 'budget', 'time_slot', 'category_avoidance'],
-  ['category_preference', 'budget', 'distance', 'nutrition_goal', 'temperature', 'speed'],
-  ['meal_intent', 'category_avoidance', 'time_slot', 'distance', 'budget', 'mood'],
-  ['meal_intent', 'spice_tolerance', 'nutrition_goal', 'budget', 'category_preference', 'distance'],
-  ['meal_intent', 'flavor', 'time_slot', 'budget', 'distance', 'speed'],
-  ['meal_intent', 'category_preference', 'dietary_restriction', 'distance', 'budget', 'scene']
+  ['meal_intent', 'budget', 'distance', 'dietary_restriction', 'nutrition_goal', 'time_slot'],
+  ['meal_intent', 'budget', 'distance', 'category_preference', 'temperature', 'speed'],
+  ['meal_intent', 'budget', 'distance', 'category_avoidance', 'dietary_restriction', 'mood'],
+  ['meal_intent', 'budget', 'distance', 'spice_tolerance', 'nutrition_goal', 'scene'],
+  ['meal_intent', 'budget', 'distance', 'flavor', 'time_slot', 'speed']
 ];
 
 const CONFLICTING_QUESTION_GROUPS = [
@@ -22,21 +23,63 @@ const CONFLICTING_QUESTION_GROUPS = [
   ['satiety', 'meal_type', 'meal_intent'],
   ['avoidance', 'flavor', 'health']
 ];
+const NON_MEAL_OPTION_IDS = new Set([
+  'intent_drink',
+  'intent_dessert',
+  'prefer_milk_tea',
+  'prefer_coffee',
+  'prefer_bakery_dessert',
+  'time_afternoon_tea',
+  'avoid_category_heavy_meal'
+]);
+const MEAL_OPTION_IDS = new Set([
+  'intent_meal',
+  'time_lunch',
+  'time_dinner',
+  'avoid_category_drinks'
+]);
+const MEAL_ONLY_QUESTION_IDS = new Set(['category_preference']);
 
 export function selectQuestionSet(options: SelectQuestionsOptions = {}): QuestionBankItem[] {
   const count = options.count ?? DEFAULT_QUESTION_COUNT;
   const random = options.random ?? Math.random;
+  const selectedOptionIds = new Set(options.answers?.flatMap((answer) => answer.optionIds ?? []) ?? []);
   const selectableQuestions = questionBank.filter((question) => {
     return !EXCLUDED_DIMENSIONS.includes(question.dimension);
-  });
+  }).map((question) => filterQuestionByAnswers(question, selectedOptionIds)).filter(isQuestion);
   const flow = QUESTION_FLOWS[Math.floor(random() * QUESTION_FLOWS.length)] ?? QUESTION_FLOWS[0];
-  const selected = flow
+  const answeredQuestionIds = options.answers?.map((answer) => answer.questionId) ?? [];
+  const selected = answeredQuestionIds
     .map((id) => selectableQuestions.find((question) => question.id === id))
     .filter(isQuestion)
     .slice(0, count);
+  const selectedIds = new Set(selected.map((question) => question.id));
+  const previousQuestions = options.previousQuestions ?? [];
+
+  previousQuestions.forEach((question) => {
+    const nextQuestion = selectableQuestions.find((item) => item.id === question.id);
+
+    if (
+      nextQuestion &&
+      selected.length < count &&
+      !selectedIds.has(nextQuestion.id) &&
+      !conflictsWithSelected(nextQuestion.id, selectedIds)
+    ) {
+      selected.push(nextQuestion);
+      selectedIds.add(nextQuestion.id);
+    }
+  });
+
+  const flowSelected = flow
+    .map((id) => selectableQuestions.find((question) => question.id === id))
+    .filter(isQuestion)
+    .filter((question) => !selectedIds.has(question.id) && !conflictsWithSelected(question.id, selectedIds));
+  flowSelected.slice(0, count - selected.length).forEach((question) => {
+    selected.push(question);
+    selectedIds.add(question.id);
+  });
 
   if (selected.length < count) {
-    const selectedIds = new Set(selected.map((question) => question.id));
     const fallbackPool = selectableQuestions.filter((question) => {
       return !selectedIds.has(question.id) && !conflictsWithSelected(question.id, selectedIds);
     });
@@ -44,6 +87,39 @@ export function selectQuestionSet(options: SelectQuestionsOptions = {}): Questio
   }
 
   return selected;
+}
+
+function filterQuestionByAnswers(
+  question: QuestionBankItem,
+  selectedOptionIds: Set<string>
+): QuestionBankItem | undefined {
+  const wantsMeal = [...selectedOptionIds].some((id) => MEAL_OPTION_IDS.has(id));
+  const wantsNonMeal = [...selectedOptionIds].some((id) => NON_MEAL_OPTION_IDS.has(id));
+
+  if (wantsMeal && MEAL_ONLY_QUESTION_IDS.has(question.id)) {
+    return undefined;
+  }
+
+  const options = question.options.filter((option) => {
+    if (wantsMeal && NON_MEAL_OPTION_IDS.has(option.id)) {
+      return false;
+    }
+
+    if (wantsNonMeal && MEAL_OPTION_IDS.has(option.id)) {
+      return false;
+    }
+
+    return true;
+  });
+
+  if (options.length === 0) {
+    return undefined;
+  }
+
+  return {
+    ...question,
+    options
+  };
 }
 
 function conflictsWithSelected(questionId: string, selectedIds: Set<string>): boolean {
