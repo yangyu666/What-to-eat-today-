@@ -274,8 +274,11 @@ exports.main = async (event = {}, cloudContext = {}) => {
     const context = event.context || {};
     const answers = getAnswers(event, context);
     const preferenceSnapshot = context.preferenceSnapshot || buildPreferenceProfile(answers);
+    const inputRestaurants = Array.isArray(event.restaurants) ? event.restaurants : [];
+    const allowMock = event.allowMock === true || context.allowMock === true;
+    const restaurants = inputRestaurants.length > 0 ? inputRestaurants : allowMock ? mockRestaurants : [];
     const result = recommendRestaurants({
-      restaurants: Array.isArray(event.restaurants) && event.restaurants.length > 0 ? event.restaurants : mockRestaurants,
+      restaurants,
       context: {
         preferenceSnapshot,
         excludeRestaurantIds: context.excludeRestaurantIds || context.excludedHistoryRestaurantIds || [],
@@ -286,7 +289,7 @@ exports.main = async (event = {}, cloudContext = {}) => {
         experimentId: context.experimentId || DEFAULT_EXPERIMENT_ID
       },
       limit: normalizeLimit(event.limit),
-      source: 'cloud',
+      source: allowMock && inputRestaurants.length === 0 ? 'mock' : 'cloud',
       now: new Date()
     });
 
@@ -992,6 +995,7 @@ function getDataCompletenessScore(restaurant) {
     restaurant.averageCostYuan !== undefined || restaurant.priceLevel !== undefined,
     restaurant.rating !== undefined,
     restaurant.openStatus !== undefined && restaurant.openStatus !== 'unknown',
+    Boolean(restaurant.coverImageUrl),
     getRestaurantTagIds(restaurant).length > 0
   ];
   return Math.round((checks.filter(Boolean).length / checks.length) * 10);

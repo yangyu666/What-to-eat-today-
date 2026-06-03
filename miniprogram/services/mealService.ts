@@ -1,15 +1,10 @@
-import { cloudConfig } from '../config/cloud';
-import { mockRestaurants } from '../data/mockRestaurants';
 import type { MealCandidate } from '../models/meal';
-import type { ApiResponse, RecommendMealResponse } from '../types/recommendation';
 import type { UserQuestionnaireResult } from '../types/userPreference';
 import { buildAmapRestaurantQuery } from './amapQueryBuilder';
 import { getNearbyRestaurants } from './amapPoiService';
 import type { HistoryFilterContext } from './historyService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
-
-let cloudInitialized = false;
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
   const [candidate] = await getRecommendations(undefined, 1);
@@ -39,23 +34,7 @@ async function getRecommendations(
     return poiCandidates;
   }
 
-  try {
-    const cloudCandidates = await getCloudRecommendations(questionnaire, limit, historyFilterContext);
-
-    if (cloudCandidates.length > 0) {
-      return cloudCandidates;
-    }
-  } catch (error) {
-    console.warn('Fallback to local mock recommendation after cloud recommendation failed.', error);
-  }
-
-  const mockCandidates = getMockRecommendations(questionnaire, limit, historyFilterContext);
-
-  if (mockCandidates.length === 0) {
-    throw new Error('No recommendation candidates available after all fallbacks.');
-  }
-
-  return mockCandidates;
+  throw new Error('No real nearby restaurant candidates available from AMap.');
 }
 
 async function getAmapRecommendations(
@@ -66,17 +45,21 @@ async function getAmapRecommendations(
   const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
   const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
+  const attempts = buildAmapQueryAttempts(amapQuery);
 
-  try {
+  for (const attempt of attempts) {
     const restaurants = await getNearbyRestaurants({
-      radiusMeters: amapQuery.radiusMeters,
-      keyword: amapQuery.keywords,
-      types: amapQuery.types,
+      radiusMeters: attempt.radiusMeters,
+      keyword: attempt.keyword,
+      types: attempt.types,
       pageSize: 25
+    }).catch((error) => {
+      console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
+      return [];
     });
 
     if (restaurants.length === 0) {
-      return [];
+      continue;
     }
 
     const result = recommendRestaurants({
@@ -86,73 +69,41 @@ async function getAmapRecommendations(
       source: 'amap'
     });
 
-    return result.candidates;
-  } catch (error) {
-    console.warn('Fallback after nearby AMap POI recommendation failed.', error);
-    return [];
-  }
-}
-
-async function getCloudRecommendations(
-  questionnaire: UserQuestionnaireResult | undefined,
-  limit: number,
-  historyFilterContext?: HistoryFilterContext
-): Promise<MealCandidate[]> {
-  ensureCloudInitialized();
-  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
-
-  const response = await wx.cloud.callFunction({
-    name: cloudConfig.recommendRestaurantFunctionName,
-    data: {
-      questionnaire,
-      context: buildRecommendationContext(preferenceSnapshot, historyFilterContext),
-      limit
+    if (result.candidates.length > 0) {
+      return result.candidates;
     }
-  });
-  const payload = response.result as ApiResponse<RecommendMealResponse> | undefined;
-
-  if (!payload?.ok) {
-    const message = payload?.ok === false ? payload.error.message : 'Cloud recommendation failed.';
-    throw new Error(message);
   }
 
-  return payload.data.recommendation.candidates.map((candidate) => ({
-    ...candidate,
-    source: candidate.source ?? payload.data.recommendation.source ?? 'cloud'
-  }));
+  return [];
 }
 
-function ensureCloudInitialized() {
-  if (!wx.cloud) {
-    throw new Error('Current base library does not support cloud development.');
-  }
+function buildAmapQueryAttempts(
+  amapQuery: ReturnType<typeof buildAmapRestaurantQuery>
+): Array<{ radiusMeters: number; keyword: string; types: string }> {
+  const baseRadius = amapQuery.radiusMeters;
+  const wideRadius = Math.max(baseRadius, 3000);
 
-  if (cloudInitialized) {
-    return;
-  }
-
-  wx.cloud.init({
-    env: cloudConfig.envId || undefined,
-    traceUser: true
+  return [
+    {
+      radiusMeters: baseRadius,
+      keyword: amapQuery.keywords ?? '',
+      types: amapQuery.types
+    },
+    {
+      radiusMeters: wideRadius,
+      keyword: '',
+      types: amapQuery.types
+    },
+    {
+      radiusMeters: 5000,
+      keyword: '',
+      types: amapQuery.types
+    }
+  ].filter((attempt, index, attempts) => {
+    return attempts.findIndex((item) => {
+      return item.radiusMeters === attempt.radiusMeters && item.keyword === attempt.keyword && item.types === attempt.types;
+    }) === index;
   });
-  cloudInitialized = true;
-}
-
-function getMockRecommendations(
-  questionnaire: UserQuestionnaireResult | undefined,
-  limit: number,
-  historyFilterContext?: HistoryFilterContext
-): MealCandidate[] {
-  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
-  const result = recommendRestaurants({
-    restaurants: mockRestaurants,
-    context: buildRecommendationContext(preferenceSnapshot, historyFilterContext),
-    limit,
-    random: () => 0,
-    source: 'mock'
-  });
-
-  return result.candidates;
 }
 
 function buildRecommendationContext(

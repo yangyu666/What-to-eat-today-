@@ -1137,6 +1137,7 @@ function getDataCompletenessScore(restaurant: Restaurant): number {
     restaurant.averageCostYuan !== undefined || restaurant.priceLevel !== undefined,
     restaurant.rating !== undefined,
     restaurant.openStatus !== undefined && restaurant.openStatus !== 'unknown',
+    Boolean(restaurant.coverImageUrl),
     getRestaurantTagIds(restaurant).length > 0
   ];
 

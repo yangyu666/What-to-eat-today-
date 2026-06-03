@@ -5,6 +5,11 @@ const {
 
 const MAX_SWITCH_COUNT = 3;
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
+const AMAP_POI_FUNCTION_NAME = 'amapPoi';
+const AMAP_SEARCH_ATTEMPTS = [
+  { radiusMeters: 3000, keyword: '' },
+  { radiusMeters: 5000, keyword: '' }
+];
 const TAG_LABEL_MAP = {
   coffee: '咖啡',
   relaxed: '放松',
@@ -261,12 +266,18 @@ Page({
 async function getRecommendations(questionnaire, historyFilterContext = getRecentHistoryFilterContext()) {
   ensureCloudInitialized();
   const historyFilterEnabled = historyFilterContext.historyFilterEnabled === true;
+  const restaurants = await getNearbyAmapRestaurants();
+
+  if (restaurants.length === 0) {
+    throw new Error('No real nearby restaurant candidates available from AMap.');
+  }
 
   const response = await wx.cloud.callFunction({
     name: 'recommendRestaurant',
     data: {
       questionnaire,
       limit: 4,
+      restaurants,
       context: {
         experimentId: 'default',
         excludeRestaurantIds: historyFilterEnabled
@@ -311,6 +322,54 @@ async function getRecommendations(questionnaire, historyFilterContext = getRecen
       (recommendation && recommendation.historyPenaltyReasons) ??
       historyFilterContext.historyPenaltyReasons
   }));
+}
+
+async function getNearbyAmapRestaurants() {
+  const location = await getUserLocation();
+
+  for (const attempt of AMAP_SEARCH_ATTEMPTS) {
+    const response = await wx.cloud.callFunction({
+      name: AMAP_POI_FUNCTION_NAME,
+      data: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radiusMeters: attempt.radiusMeters,
+        pageSize: 25,
+        keyword: attempt.keyword,
+        types: '050000'
+      }
+    });
+    const payload = response && response.result;
+    const restaurants =
+      payload &&
+      payload.ok &&
+      payload.data &&
+      Array.isArray(payload.data.restaurants)
+        ? payload.data.restaurants
+        : [];
+
+    if (restaurants.length > 0) {
+      return restaurants;
+    }
+  }
+
+  return [];
+}
+
+function getUserLocation() {
+  return new Promise((resolve, reject) => {
+    wx.getLocation({
+      type: 'gcj02',
+      isHighAccuracy: true,
+      success: (result) => {
+        resolve({
+          latitude: result.latitude,
+          longitude: result.longitude
+        });
+      },
+      fail: reject
+    });
+  });
 }
 
 function ensureCloudInitialized() {
