@@ -226,6 +226,42 @@ const cheapForPremiumScore = scoreRestaurant(
 );
 assert(cheapForPremiumScore.breakdown.priceScore < 0, 'high budget preference should penalize candidates far below the requested range');
 
+const luxuryBudgetResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'slow', 'group'],
+    budgetLevel: 6,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'luxury-too-cheap',
+      name: '?????',
+      tags: ['??'],
+      tagIds: ['quick', 'meal', 'set_meal'],
+      category: '??',
+      distanceMeters: 120,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    },
+    {
+      id: 'luxury-in-range',
+      name: '??????',
+      tags: ['??', '??'],
+      tagIds: ['relaxed', 'slow', 'group', 'meal'],
+      category: '??',
+      distanceMeters: 300,
+      averageCostYuan: 240,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryBudgetResult.candidates[0]?.restaurantId === 'luxury-in-range', '200+ budget should not recommend a dozens-yuan restaurant when in-range candidates exist');
+
+
 
 const unknownZeroCostScore = scoreRestaurant(
   {
@@ -589,7 +625,7 @@ assert(selectedQuestions.some((question) => question.id === 'distance'), '6 题�
 assert(selectedQuestions.some((question) => question.id === 'budget'), '6 题应覆盖预算');
 assert(selectedQuestions.some((question) => question.id === 'meal_intent'), '6 questions should prioritize meal intent');
 assert(
-  selectedQuestions.filter((question) => ['meal_intent', 'dietary_restriction', 'time_slot', 'category_avoidance', 'category_preference'].includes(question.id)).length >= 2,
+  selectedQuestions.filter((question) => ['meal_intent', 'dietary_restriction', 'nutrition_goal', 'time_slot', 'category_avoidance', 'category_preference'].includes(question.id)).length >= 2,
   '6 题应覆盖至少两个口味/健康/饱腹相关维度'
 );
 const selectedQuestionIds = new Set(selectedQuestions.map((question) => question.id));
@@ -610,6 +646,9 @@ const optionWithoutImageOrIcon = questionBank
   .flatMap((question) => question.options)
   .find((option) => !option.imageUrl || !option.icon);
 assert(optionWithoutImageOrIcon === undefined, '每个选项都必须有 imageUrl 和 icon');
+
+const questionWithTooManyOptions = questionBank.find((question) => question.options.length > 5);
+assert(questionWithTooManyOptions === undefined, 'each question should have no more than five options');
 
 const answers: UserPreferenceAnswer[] = [
   {
@@ -821,7 +860,7 @@ const halalResult = recommend(halalPreference, breadthRestaurants);
 assert(halalResult.candidates[0]?.restaurantId === 'breadth-halal-noodle', 'halal preference should prioritize halal candidates');
 
 const lowSugarPreference = profile({
-  selectedOptionIds: ['dietary_low_sugar'],
+  selectedOptionIds: ['nutrition_low_sugar'],
   preferredTagIds: ['low_sugar', 'healthy', 'low_burden'],
   avoidedTagIds: ['dessert', 'milk_tea', 'sweet', 'sugary_drink'],
   maxDistanceMeters: 1000
@@ -840,7 +879,7 @@ assert((allergySeafoodScore.confidenceScore ?? 100) <= 45, 'allergy sensitive pr
 
 const proteinResult = recommend(
   profile({
-    selectedOptionIds: ['dietary_high_protein'],
+    selectedOptionIds: ['nutrition_high_protein'],
     preferredTagIds: ['high_protein', 'healthy', 'low_carb'],
     avoidedTagIds: ['dessert', 'milk_tea', 'sweet'],
     maxDistanceMeters: 1000

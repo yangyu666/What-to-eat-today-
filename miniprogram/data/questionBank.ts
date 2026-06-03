@@ -784,34 +784,6 @@ export const questionBank: QuestionBankItem[] = [
         }
       },
       {
-        id: 'dietary_low_sugar',
-        label: '无糖/控糖',
-        desc: '轻食健康餐优先，奶茶甜品高糖方向强降权',
-        selected: false,
-        value: 'low_sugar',
-        themeClass: 'theme-green',
-        visual: 'lowSugar',
-        icon: '0sugar',
-        imageUrl: QUESTION_OPTION_IMAGES.dietaryLowSugar,
-        effect: {
-          positiveTags: ['low_sugar', 'healthy', 'low_burden'],
-          negativeTags: ['dessert', 'milk_tea', 'sweet', 'sugary_drink'],
-          softPreferences: { amapKeywords: ['轻食', '无糖', '健康餐'] }
-        }
-      },
-      {
-        id: 'dietary_no_allergy',
-        label: '没有过敏忌口',
-        desc: '不用额外避开过敏原，按其他偏好推荐',
-        selected: false,
-        value: 'no_allergy',
-        themeClass: 'theme-red',
-        visual: 'open',
-        icon: 'ok',
-        imageUrl: QUESTION_OPTION_IMAGES.avoidanceNone,
-        effect: {}
-      },
-      {
         id: 'dietary_allergy_sensitive',
         label: '过敏/忌口',
         desc: '优先配料清楚、可定制，避开海鲜花生等常见高风险',
@@ -827,22 +799,7 @@ export const questionBank: QuestionBankItem[] = [
           softPreferences: { amapKeywords: ['轻食', '简餐', '粥'] }
         }
       },
-      {
-        id: 'dietary_high_protein',
-        label: '高蛋白',
-        desc: '健身餐、鸡胸肉、牛肉饭、轻食优先',
-        selected: false,
-        value: 'high_protein',
-        themeClass: 'theme-green',
-        visual: 'protein',
-        icon: 'protein',
-        imageUrl: QUESTION_OPTION_IMAGES.dietaryProtein,
-        effect: {
-          positiveTags: ['high_protein', 'healthy', 'low_carb'],
-          negativeTags: ['dessert', 'milk_tea', 'sweet'],
-          softPreferences: { amapKeywords: ['健身餐', '鸡胸肉', '牛肉饭', '轻食'] }
-        }
-      }
+
     ]
   },
   {
@@ -928,6 +885,75 @@ export const questionBank: QuestionBankItem[] = [
           positiveTags: ['afternoon_tea', 'dessert', 'coffee', 'drink', 'non_meal'],
           negativeTags: ['meal', 'rice', 'hotpot'],
           softPreferences: { mealWeight: 'light', amapKeywords: ['下午茶', '咖啡', '甜品', '奶茶'] }
+        }
+      }
+    ]
+  },
+  {
+    id: 'nutrition_goal',
+    dimension: 'nutrition_goal',
+    title: '这顿有没有营养目标？',
+    subtitle: '是放飞自我，还是给身体一点明确 KPI？',
+    type: 'single',
+    options: [
+      {
+        id: 'nutrition_none',
+        label: '没有目标',
+        desc: '不用按营养方向筛，继续看口味、距离和预算',
+        selected: false,
+        value: 'none',
+        themeClass: 'theme-red',
+        visual: 'open',
+        icon: 'ok',
+        imageUrl: QUESTION_OPTION_IMAGES.avoidanceNone,
+        effect: {}
+      },
+      {
+        id: 'nutrition_low_sugar',
+        label: '无糖/控糖',
+        desc: '轻食健康餐优先，奶茶甜品高糖方向强降权',
+        selected: false,
+        value: 'low_sugar',
+        themeClass: 'theme-green',
+        visual: 'lowSugar',
+        icon: '0sugar',
+        imageUrl: QUESTION_OPTION_IMAGES.dietaryLowSugar,
+        effect: {
+          positiveTags: ['low_sugar', 'healthy', 'low_burden'],
+          negativeTags: ['dessert', 'milk_tea', 'sweet', 'sugary_drink'],
+          softPreferences: { amapKeywords: ['轻食', '无糖', '健康餐'] }
+        }
+      },
+      {
+        id: 'nutrition_high_protein',
+        label: '高蛋白',
+        desc: '健身餐、鸡胸肉、牛肉饭、轻食优先',
+        selected: false,
+        value: 'high_protein',
+        themeClass: 'theme-green',
+        visual: 'protein',
+        icon: 'protein',
+        imageUrl: QUESTION_OPTION_IMAGES.dietaryProtein,
+        effect: {
+          positiveTags: ['high_protein', 'healthy', 'low_carb'],
+          negativeTags: ['dessert', 'milk_tea', 'sweet'],
+          softPreferences: { amapKeywords: ['健身餐', '鸡胸肉', '牛肉饭', '轻食'] }
+        }
+      },
+      {
+        id: 'nutrition_low_carb',
+        label: '低碳轻负担',
+        desc: '少主食、轻食和健身餐优先',
+        selected: false,
+        value: 'low_carb',
+        themeClass: 'theme-green',
+        visual: 'lowCarb',
+        icon: 'lowCarb',
+        imageUrl: QUESTION_OPTION_IMAGES.healthLight,
+        effect: {
+          positiveTags: ['low_carb', 'healthy', 'low_burden', 'light'],
+          negativeTags: ['rice', 'set_meal', 'dessert', 'milk_tea'],
+          softPreferences: { amapKeywords: ['轻食', '健身餐', '沙拉'] }
         }
       }
     ]

@@ -184,18 +184,18 @@ assert(allergyProfile.preferredTagIds.includes('allergy_sensitive'), 'allergy op
 assert(allergyProfile.avoidedTagIds.includes('seafood'), 'allergy option should avoid seafood risk tags');
 assert(allergyProfile.avoidedTagIds.includes('peanut'), 'allergy option should avoid peanut risk tags');
 
-const noAllergyProfile = mapAnswersToPreferenceProfile([
+const nutritionProfile = mapAnswersToPreferenceProfile([
   {
-    questionId: 'dietary_restriction',
+    questionId: 'nutrition_goal',
     type: 'single',
-    value: 'no_allergy',
-    optionIds: ['dietary_no_allergy'],
+    value: 'low_sugar',
+    optionIds: ['nutrition_low_sugar'],
     answeredAt: '2026-06-02T04:10:02.800Z'
   }
 ]);
 
-assert(!noAllergyProfile.avoidedTagIds.includes('seafood'), 'no allergy option should not add seafood risk tags');
-assert(!noAllergyProfile.avoidedTagIds.includes('peanut'), 'no allergy option should not add peanut risk tags');
+assert(nutritionProfile.preferredTagIds.includes('low_sugar'), 'nutrition goal should map low sugar tags');
+assert(nutritionProfile.avoidedTagIds.includes('milk_tea'), 'low sugar nutrition goal should avoid sugary drinks');
 
 const avoidDrinksProfile = mapAnswersToPreferenceProfile([
   {

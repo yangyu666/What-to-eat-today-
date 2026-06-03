@@ -10,9 +10,9 @@ const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
   ['meal_intent', 'dietary_restriction', 'distance', 'budget', 'time_slot', 'category_avoidance'],
-  ['category_preference', 'budget', 'distance', 'dietary_restriction', 'temperature', 'speed'],
+  ['category_preference', 'budget', 'distance', 'nutrition_goal', 'temperature', 'speed'],
   ['meal_intent', 'category_avoidance', 'time_slot', 'distance', 'budget', 'mood'],
-  ['meal_intent', 'spice_tolerance', 'dietary_restriction', 'budget', 'category_preference', 'distance'],
+  ['meal_intent', 'spice_tolerance', 'nutrition_goal', 'budget', 'category_preference', 'distance'],
   ['meal_intent', 'flavor', 'time_slot', 'budget', 'distance', 'speed'],
   ['meal_intent', 'category_preference', 'dietary_restriction', 'distance', 'budget', 'scene']
 ];

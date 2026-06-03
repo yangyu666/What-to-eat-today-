@@ -21,6 +21,7 @@ export type PreferenceDimension =
   | 'scene'
   | 'meal_intent'
   | 'dietary_restriction'
+  | 'nutrition_goal'
   | 'time_slot'
   | 'category_avoidance'
   | 'category_preference';

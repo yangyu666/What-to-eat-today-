@@ -261,13 +261,15 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const baseHardFiltered = options.restaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
-      allowNegativeFallback: true
+      allowNegativeFallback: true,
+      allowPriceFallback: false
     }).passed;
   });
   const primaryHardFiltered = options.restaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
-      allowNegativeFallback: false
+      allowNegativeFallback: false,
+      allowPriceFallback: false
     }).passed;
   });
   const afterNegativeFilter = primaryHardFiltered.length;
@@ -285,7 +287,8 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, new Set(), {
           allowDistanceFallback: false,
-          allowNegativeFallback: false
+          allowNegativeFallback: false,
+          allowPriceFallback: false
         }).passed;
       })
       .map((restaurant) =>
@@ -302,7 +305,8 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
-          allowNegativeFallback: false
+          allowNegativeFallback: false,
+          allowPriceFallback: true
         }).passed;
       })
       .map((restaurant) =>
@@ -319,7 +323,8 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
           allowDistanceFallback: true,
-          allowNegativeFallback: true
+          allowNegativeFallback: true,
+          allowPriceFallback: true
         }).passed;
       })
       .map((restaurant) =>
@@ -479,7 +484,8 @@ export function scoreRestaurant(
     ),
     hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), {
       allowDistanceFallback: options.fallbackReason !== undefined,
-      allowNegativeFallback: true
+      allowNegativeFallback: true,
+      allowPriceFallback: true
     }).reasons,
     penaltyReasons: [
       ...buildPenaltyReasons(
@@ -504,7 +510,7 @@ export function applyHardFilters(
   restaurant: Restaurant,
   preference: UserPreferenceProfile | undefined,
   excludeRestaurantIds: Set<RestaurantId>,
-  options: { allowDistanceFallback: boolean; allowNegativeFallback: boolean }
+  options: { allowDistanceFallback: boolean; allowNegativeFallback: boolean; allowPriceFallback: boolean }
 ): HardFilterResult {
   const reasons: string[] = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
@@ -533,6 +539,10 @@ export function applyHardFilters(
 
   if (isClearlyOverBudget(restaurant, preference)) {
     reasons.push('价格明显超出预算');
+  }
+
+  if (!options.allowPriceFallback && isClearlyUnderBudget(restaurant, preference)) {
+    reasons.push('???????????');
   }
 
   if (
@@ -1054,7 +1064,7 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
         return -8;
       }
 
-      return -20;
+      return -45;
     }
 
     return estimatedCost >= range.min * 0.75 ? 4 : -6;
@@ -1259,6 +1269,17 @@ function isClearlyOverBudget(restaurant: Restaurant, preference?: UserPreference
   const estimatedCost = getEstimatedCost(restaurant);
 
   return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
+}
+
+function isClearlyUnderBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
+  if (preference?.budgetLevel === undefined || preference.budgetLevel < 5) {
+    return false;
+  }
+
+  const range = getBudgetRange(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+
+  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min * 0.65;
 }
 
 function isOverTimePreference(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {

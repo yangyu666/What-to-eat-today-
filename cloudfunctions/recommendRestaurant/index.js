@@ -464,10 +464,10 @@ function recommendRestaurants(options) {
   };
   const experimentId = (options.context && options.context.experimentId) || DEFAULT_EXPERIMENT_ID;
   const baseHardFiltered = options.restaurants.filter((restaurant) => {
-    return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false).passed;
+    return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, false).passed;
   });
   const primaryHardFiltered = options.restaurants.filter((restaurant) => {
-    return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, false).passed;
+    return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, false, false).passed;
   });
   let fallbackReason;
   let historyFallbackUsed = false;
@@ -477,7 +477,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近新选择较少，已放宽历史过滤';
     historyFallbackUsed = true;
     scored = options.restaurants
-      .filter((restaurant) => applyHardFilters(restaurant, preference, new Set(), false, false).passed)
+      .filter((restaurant) => applyHardFilters(restaurant, preference, new Set(), false, false, false).passed)
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
           ...scoreOptionsBase,
@@ -490,7 +490,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = options.restaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false).passed
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false, true).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -504,7 +504,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = options.restaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true).passed
+        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true, true).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -632,7 +632,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
       matchedAvoidedTagIds
     },
     reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict),
-    hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), true, true).reasons,
+    hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), true, true, true).reasons,
     penaltyReasons: [
       ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict),
       ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
@@ -646,7 +646,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   };
 }
 
-function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback) {
+function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback, allowPriceFallback) {
   const reasons = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
@@ -658,6 +658,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
     reasons.push(`距离 ${restaurant.distanceMeters} 米，超出 ${preference.maxDistanceMeters} 米偏好`);
   }
   if (isClearlyOverBudget(restaurant, preference)) reasons.push('价格明显超出预算');
+  if (!allowPriceFallback && isClearlyUnderBudget(restaurant, preference)) reasons.push('???????????');
   if (preference && preference.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) reasons.push('预计耗时明显超出偏好');
   if (!allowNegativeFallback && negativeConflict.severity === 'hard') reasons.push(`命中明确负向偏好：${negativeConflict.labels.join('、')}`);
 
@@ -952,7 +953,7 @@ function getPriceScore(restaurant, preference) {
     if ((preference.budgetLevel || 3) >= 4) {
       if (estimatedCost >= range.min * 0.85) return 4;
       if (estimatedCost >= range.min * 0.65) return -8;
-      return -20;
+      return -45;
     }
 
     return estimatedCost >= range.min * 0.75 ? 4 : -6;
@@ -1030,6 +1031,13 @@ function isClearlyOverBudget(restaurant, preference) {
   if (!preference || preference.budgetLevel === undefined) return false;
   const estimatedCost = getEstimatedCost(restaurant);
   return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
+}
+
+function isClearlyUnderBudget(restaurant, preference) {
+  if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5) return false;
+  const range = getBudgetRange(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min * 0.65;
 }
 
 function isOverTimePreference(restaurant, preference) {
