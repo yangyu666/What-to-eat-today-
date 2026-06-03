@@ -94,6 +94,30 @@ assert(
   'strict speed preference should tighten delivery estimated time'
 );
 
+const premiumBudgetProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: '100_200',
+    optionIds: ['budget_100_200'],
+    answeredAt: '2026-06-02T04:00:06.000Z'
+  }
+]);
+
+assert(premiumBudgetProfile.budgetLevel === 5, '100-200 budget should map to premium budget level');
+
+const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: 'over_200',
+    optionIds: ['budget_over_200'],
+    answeredAt: '2026-06-02T04:00:07.000Z'
+  }
+]);
+
+assert(luxuryBudgetProfile.budgetLevel === 6, '200+ budget should map to luxury budget level');
+
 const milkTeaProfile = mapAnswersToPreferenceProfile([
   {
     questionId: 'category_preference',

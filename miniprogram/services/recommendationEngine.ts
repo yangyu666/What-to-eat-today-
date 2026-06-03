@@ -74,7 +74,8 @@ const BUDGET_LEVEL_TO_YUAN: Record<number, number> = {
   2: 30,
   3: 60,
   4: 100,
-  5: 200
+  5: 200,
+  6: 320
 };
 
 const BUDGET_LEVEL_TO_RANGE: Record<number, { min?: number; max: number }> = {
@@ -82,7 +83,8 @@ const BUDGET_LEVEL_TO_RANGE: Record<number, { min?: number; max: number }> = {
   2: { max: 30 },
   3: { min: 30, max: 60 },
   4: { min: 60, max: 100 },
-  5: { min: 100, max: 200 }
+  5: { min: 100, max: 200 },
+  6: { min: 200, max: 9999 }
 };
 
 const TAG_WEIGHTS: Record<string, number> = {
@@ -1043,7 +1045,19 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
   }
 
   if (range.min !== undefined && estimatedCost < range.min) {
-    return estimatedCost >= range.min * 0.75 ? 7 : 3;
+    if ((preference.budgetLevel ?? 3) >= 4) {
+      if (estimatedCost >= range.min * 0.85) {
+        return 4;
+      }
+
+      if (estimatedCost >= range.min * 0.65) {
+        return -8;
+      }
+
+      return -20;
+    }
+
+    return estimatedCost >= range.min * 0.75 ? 4 : -6;
   }
 
   if (estimatedCost <= range.max * 1.1) {

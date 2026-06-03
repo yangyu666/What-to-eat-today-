@@ -329,7 +329,11 @@ function toPriceLevel(cost) {
     return 4;
   }
 
-  return 5;
+  if (cost <= 200) {
+    return 5;
+  }
+
+  return 6;
 }
 
 function normalizeAmapText(value) {

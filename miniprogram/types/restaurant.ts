@@ -1,7 +1,7 @@
 export type IsoDateString = string;
 export type RestaurantId = string;
 export type TagId = string;
-export type PriceLevel = 1 | 2 | 3 | 4 | 5;
+export type PriceLevel = 1 | 2 | 3 | 4 | 5 | 6;
 
 export type TagGroup =
   | 'taste'

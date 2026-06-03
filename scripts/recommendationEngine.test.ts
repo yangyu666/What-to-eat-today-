@@ -164,6 +164,69 @@ const slightlyOverBudgetScore = scoreRestaurant(
 );
 assert((slightlyOverBudgetScore.confidenceScore ?? 100) <= 70, '略超预算候选不能拿到高匹配度');
 
+const premiumBudgetPreference = profile({
+  preferredTagIds: ['relaxed', 'slow', 'group'],
+  budgetLevel: 5,
+  maxDistanceMeters: 1000
+});
+const premiumBudgetResult = recommend(premiumBudgetPreference, [
+  {
+    id: 'premium-too-cheap',
+    name: '??????',
+    tags: ['??'],
+    tagIds: ['quick', 'meal', 'set_meal'],
+    category: '??',
+    distanceMeters: 150,
+    averageCostYuan: 28,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  },
+  {
+    id: 'premium-in-range',
+    name: '?????',
+    tags: ['??', '??'],
+    tagIds: ['relaxed', 'slow', 'group', 'meal'],
+    category: '??',
+    distanceMeters: 260,
+    averageCostYuan: 138,
+    openStatus: 'open',
+    rating: 4.3,
+    status: 'active'
+  },
+  {
+    id: 'premium-over',
+    name: '????',
+    tags: ['??'],
+    tagIds: ['relaxed', 'slow', 'group', 'meal'],
+    category: '??',
+    distanceMeters: 260,
+    averageCostYuan: 260,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  }
+]);
+assert(premiumBudgetResult.candidates[0]?.restaurantId === 'premium-in-range', '100-200 budget should prefer candidates inside the requested price range');
+
+const cheapForPremiumScore = scoreRestaurant(
+  {
+    id: 'cheap-for-premium',
+    name: '????',
+    tags: ['??'],
+    tagIds: ['quick', 'meal', 'set_meal'],
+    category: '??',
+    distanceMeters: 100,
+    averageCostYuan: 25,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  },
+  premiumBudgetPreference
+);
+assert(cheapForPremiumScore.breakdown.priceScore < 0, 'high budget preference should penalize candidates far below the requested range');
+
+
 const unknownZeroCostScore = scoreRestaurant(
   {
     id: 'zero-cost-amap',

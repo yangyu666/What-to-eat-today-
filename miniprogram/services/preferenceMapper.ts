@@ -113,7 +113,16 @@ function applyOptionEffect(
 
 function applyLegacyAnswer(draft: MutablePreferenceProfile, answer: UserPreferenceAnswer) {
   if (answer.questionId === 'budget') {
-    draft.budgetLevel = answer.value === 'under_30' ? 2 : answer.value === 'over_60' ? 4 : 3;
+    draft.budgetLevel =
+      answer.value === 'under_30'
+        ? 2
+        : answer.value === '60_100' || answer.value === 'over_60'
+          ? 4
+          : answer.value === '100_200'
+            ? 5
+            : answer.value === 'over_200'
+              ? 6
+              : 3;
   }
 
   if (answer.questionId === 'distance') {

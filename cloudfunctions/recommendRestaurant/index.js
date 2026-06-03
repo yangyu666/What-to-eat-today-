@@ -5,13 +5,14 @@ const MIN_PRIMARY_POOL_SIZE = 3;
 const ALGORITHM_VERSION = 'recommendation-v2';
 const WEIGHT_PROFILE_ID = 'breadth-v2';
 const DEFAULT_EXPERIMENT_ID = 'default';
-const BUDGET_LEVEL_TO_YUAN = { 1: 20, 2: 30, 3: 60, 4: 100, 5: 200 };
+const BUDGET_LEVEL_TO_YUAN = { 1: 20, 2: 30, 3: 60, 4: 100, 5: 200, 6: 320 };
 const BUDGET_LEVEL_TO_RANGE = {
   1: { max: 20 },
   2: { max: 30 },
   3: { min: 30, max: 60 },
   4: { min: 60, max: 100 },
-  5: { min: 100, max: 200 }
+  5: { min: 100, max: 200 },
+  6: { min: 200, max: 9999 }
 };
 const TAG_WEIGHTS = {
   light: 14,
@@ -367,7 +368,16 @@ function buildPreferenceProfile(answers) {
     applyAnswerEffect(answer, preferredTagIds, avoidedTagIds);
 
     if (answer.questionId === 'budget') {
-      budgetLevel = answer.value === 'under_30' ? 2 : answer.value === 'over_60' ? 4 : 3;
+      budgetLevel =
+        answer.value === 'under_30'
+          ? 2
+          : answer.value === '60_100' || answer.value === 'over_60'
+            ? 4
+            : answer.value === '100_200'
+              ? 5
+              : answer.value === 'over_200'
+                ? 6
+                : 3;
     }
 
     if (answer.questionId === 'distance') {
@@ -938,7 +948,15 @@ function getPriceScore(restaurant, preference) {
   if (estimatedCost === undefined) return 0;
   const range = getBudgetRange(preference);
   if (estimatedCost <= range.max && (range.min === undefined || estimatedCost >= range.min)) return 14;
-  if (range.min !== undefined && estimatedCost < range.min) return estimatedCost >= range.min * 0.75 ? 7 : 3;
+  if (range.min !== undefined && estimatedCost < range.min) {
+    if ((preference.budgetLevel || 3) >= 4) {
+      if (estimatedCost >= range.min * 0.85) return 4;
+      if (estimatedCost >= range.min * 0.65) return -8;
+      return -20;
+    }
+
+    return estimatedCost >= range.min * 0.75 ? 4 : -6;
+  }
   if (estimatedCost <= range.max * 1.1) return -10;
   if (estimatedCost <= range.max * 1.2) return -22;
   return -34;

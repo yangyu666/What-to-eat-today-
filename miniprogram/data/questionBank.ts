@@ -314,11 +314,11 @@ export const questionBank: QuestionBankItem[] = [
         }
       },
       {
-        id: 'budget_over_60',
-        label: '60 以上',
-        desc: '可以吃好一点，环境和菜品优先',
+        id: 'budget_60_100',
+        label: '60~100',
+        desc: '想吃好一点，环境和菜品都要在线',
         selected: false,
-        value: 'over_60',
+        value: '60_100',
         themeClass: 'theme-green',
         visual: '¥',
         icon: '¥',
@@ -326,6 +326,36 @@ export const questionBank: QuestionBankItem[] = [
         effect: {
           constraints: { budgetLevel: 4 },
           positiveTags: ['relaxed', 'slow']
+        }
+      },
+      {
+        id: 'budget_100_200',
+        label: '100~200',
+        desc: '品质、服务和环境优先，别用低价小店糊弄',
+        selected: false,
+        value: '100_200',
+        themeClass: 'theme-red',
+        visual: '¥',
+        icon: '¥',
+        imageUrl: QUESTION_OPTION_IMAGES.budgetHigh,
+        effect: {
+          constraints: { budgetLevel: 5 },
+          positiveTags: ['relaxed', 'slow', 'group']
+        }
+      },
+      {
+        id: 'budget_over_200',
+        label: '200 以上',
+        desc: '今天预算放开，优先体验感和高级一点的选择',
+        selected: false,
+        value: 'over_200',
+        themeClass: 'theme-red',
+        visual: '¥',
+        icon: '¥',
+        imageUrl: QUESTION_OPTION_IMAGES.budgetHigh,
+        effect: {
+          constraints: { budgetLevel: 6 },
+          positiveTags: ['relaxed', 'slow', 'group']
         }
       }
     ]
