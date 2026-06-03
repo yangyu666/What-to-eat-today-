@@ -9,12 +9,18 @@ export interface SelectQuestionsOptions {
 const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
-  ['avoidance', 'distance', 'budget', 'meal_intent', 'dietary_restriction', 'time_slot'],
+  ['meal_intent', 'dietary_restriction', 'distance', 'budget', 'time_slot', 'category_avoidance'],
   ['category_preference', 'budget', 'distance', 'dietary_restriction', 'temperature', 'speed'],
-  ['meal_intent', 'category_avoidance', 'health', 'distance', 'budget', 'time_slot'],
-  ['spice_tolerance', 'dietary_restriction', 'budget', 'meal_type', 'category_preference', 'distance'],
-  ['avoidance', 'time_slot', 'budget', 'satiety', 'category_avoidance', 'speed'],
-  ['meal_intent', 'flavor', 'dietary_restriction', 'distance', 'budget', 'mood']
+  ['meal_intent', 'category_avoidance', 'time_slot', 'distance', 'budget', 'mood'],
+  ['meal_intent', 'spice_tolerance', 'dietary_restriction', 'budget', 'category_preference', 'distance'],
+  ['meal_intent', 'flavor', 'time_slot', 'budget', 'distance', 'speed'],
+  ['meal_intent', 'category_preference', 'dietary_restriction', 'distance', 'budget', 'scene']
+];
+
+const CONFLICTING_QUESTION_GROUPS = [
+  ['avoidance', 'spice_tolerance'],
+  ['satiety', 'meal_type', 'meal_intent'],
+  ['avoidance', 'flavor', 'health']
 ];
 
 export function selectQuestionSet(options: SelectQuestionsOptions = {}): QuestionBankItem[] {
@@ -31,11 +37,19 @@ export function selectQuestionSet(options: SelectQuestionsOptions = {}): Questio
 
   if (selected.length < count) {
     const selectedIds = new Set(selected.map((question) => question.id));
-    const fallbackPool = selectableQuestions.filter((question) => !selectedIds.has(question.id));
+    const fallbackPool = selectableQuestions.filter((question) => {
+      return !selectedIds.has(question.id) && !conflictsWithSelected(question.id, selectedIds);
+    });
     selected.push(...shuffle(fallbackPool, random).slice(0, count - selected.length));
   }
 
   return selected;
+}
+
+function conflictsWithSelected(questionId: string, selectedIds: Set<string>): boolean {
+  return CONFLICTING_QUESTION_GROUPS.some((group) => {
+    return group.includes(questionId) && group.some((id) => selectedIds.has(id));
+  });
 }
 
 function isQuestion(question: QuestionBankItem | undefined): question is QuestionBankItem {

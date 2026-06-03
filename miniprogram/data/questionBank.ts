@@ -97,7 +97,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'avoidance',
     dimension: 'avoidance',
     title: '今天有什么不想吃？',
-    subtitle: '明确避开的内容会优先过滤，避免推荐踩雷',
+    subtitle: '生活已经够苦了，今天绝不踩雷',
     type: 'single',
     required: true,
     options: [
@@ -161,7 +161,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'spice_tolerance',
     dimension: 'flavor',
     title: '今天能接受辣吗？',
-    subtitle: '避辣会强影响高德关键词和最终排序',
+    subtitle: '保护弱小无助的肠胃，今天打算开几档火？',
     type: 'single',
     required: true,
     options: [
@@ -228,7 +228,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'distance',
     dimension: 'distance',
     title: '能接受多远？',
-    subtitle: '默认过滤超出距离的真实结果，候选不足才放宽',
+    subtitle: '摸着空空如也的肚子，你愿意为美食远征几步？',
     type: 'single',
     required: true,
     options: [
@@ -280,7 +280,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'budget',
     dimension: 'budget',
     title: '预算大概多少？',
-    subtitle: '明显超预算会被过滤，未知人均只给中性分',
+    subtitle: '今天咱们是奉旨豪奢，还是勤俭持家？',
     type: 'single',
     required: true,
     options: [
@@ -334,7 +334,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'flavor',
     dimension: 'flavor',
     title: '今天想清爽一点还是过瘾一点？',
-    subtitle: '口味会影响关键词、负向惩罚和最终排序',
+    subtitle: '舌头想修仙走清淡流，还是下凡来点刺激的？',
     type: 'single',
     options: [
       {
@@ -375,7 +375,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'health',
     dimension: 'health',
     title: '今天想轻负担吗？',
-    subtitle: '健康偏好会显著提高轻食、粥、沙拉权重',
+    subtitle: '自律仙人请上座，或者......今天快乐至上？',
     type: 'single',
     options: [
       {
@@ -414,7 +414,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'satiety',
     dimension: 'satiety',
     title: '需要多顶饱？',
-    subtitle: '饱腹感会辅助正餐、小吃和主食排序',
+    subtitle: '正儿八经坐下吃，还是边走边塞的解馋小品？',
     type: 'single',
     options: [
       {
@@ -453,7 +453,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'meal_type',
     dimension: 'meal_type',
     title: '正餐还是小吃？',
-    subtitle: '决定这一餐的饱腹方向',
+    subtitle: '正儿八经坐下吃，还是边走边塞的解馋小品？',
     type: 'single',
     options: [
       {
@@ -492,7 +492,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'temperature',
     dimension: 'temperature',
     title: '想吃热的还是凉的？',
-    subtitle: '入口温度会留给推荐算法细排',
+    subtitle: '冰火两重天，给你的胃安排哪种温度的拥抱？',
     type: 'single',
     options: [
       {
@@ -531,7 +531,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'speed',
     dimension: 'speed',
     title: '现在赶时间吗？',
-    subtitle: '速度会影响候选关键词和耗时排序',
+    subtitle: '这是一次特工级的速战速决，还是悠闲的持久战？',
     type: 'single',
     options: [
       {
@@ -571,7 +571,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'mood',
     dimension: 'mood',
     title: '今天什么心情？',
-    subtitle: '情绪偏好只参与推荐排序',
+    subtitle: '听说美食是治愈一切奇奇怪怪心情的终极解药',
     type: 'single',
     options: [
       {
@@ -610,7 +610,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'scene',
     dimension: 'scene',
     title: '这一餐和谁吃？',
-    subtitle: '场景会影响多人、一人食和环境排序',
+    subtitle: '一个人的狂欢，两个人的浪漫，还是一群人的孤单？',
     type: 'single',
     options: [
       {
@@ -649,7 +649,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'meal_intent',
     dimension: 'meal_intent',
     title: '这顿想吃正餐还是喝点/甜点？',
-    subtitle: '先区分正餐和非正餐，避免奶茶咖啡甜品与盖饭炒菜互相抢位',
+    subtitle: '是需要续命的坚实燃料，还是单纯馋奶茶甜品了？',
     type: 'single',
     options: [
       {
@@ -706,7 +706,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'dietary_restriction',
     dimension: 'dietary_restriction',
     title: '有没有饮食限制？',
-    subtitle: '素食、清真、控糖和高蛋白会进入强约束或高权重惩罚',
+    subtitle: '亮出你的美食通关文牒，忌口退散！',
     type: 'single',
     options: [
       {
@@ -770,6 +770,18 @@ export const questionBank: QuestionBankItem[] = [
         }
       },
       {
+        id: 'dietary_no_allergy',
+        label: '没有过敏忌口',
+        desc: '不用额外避开过敏原，按其他偏好推荐',
+        selected: false,
+        value: 'no_allergy',
+        themeClass: 'theme-red',
+        visual: 'open',
+        icon: 'ok',
+        imageUrl: QUESTION_OPTION_IMAGES.avoidanceNone,
+        effect: {}
+      },
+      {
         id: 'dietary_allergy_sensitive',
         label: '过敏/忌口',
         desc: '优先配料清楚、可定制，避开海鲜花生等常见高风险',
@@ -807,7 +819,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'time_slot',
     dimension: 'time_slot',
     title: '现在更像哪种时段？',
-    subtitle: '早餐、午晚餐、夜宵和下午茶会影响关键词与排序',
+    subtitle: '生物钟走到哪了？跟着太阳（或月亮）的指示走',
     type: 'single',
     options: [
       {
@@ -894,7 +906,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'category_avoidance',
     dimension: 'category_avoidance',
     title: '有没有特别想避开的品类？',
-    subtitle: '明确避开的品类不会主动进入高德关键词，也会影响最终排序',
+    subtitle: '把不喜欢的通通打入冷宫，今天谁也别想高攀',
     type: 'single',
     options: [
       {
@@ -963,7 +975,7 @@ export const questionBank: QuestionBankItem[] = [
     id: 'category_preference',
     dimension: 'category_preference',
     title: '有没有特别想要的品类？',
-    subtitle: '偏好品类会进入高德关键词和推荐排序，但仍受预算/距离/忌口限制',
+    subtitle: '直接翻牌子！今天看看是哪位正宫小主得宠',
     type: 'single',
     options: [
       {

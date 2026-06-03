@@ -160,6 +160,19 @@ assert(allergyProfile.preferredTagIds.includes('allergy_sensitive'), 'allergy op
 assert(allergyProfile.avoidedTagIds.includes('seafood'), 'allergy option should avoid seafood risk tags');
 assert(allergyProfile.avoidedTagIds.includes('peanut'), 'allergy option should avoid peanut risk tags');
 
+const noAllergyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'dietary_restriction',
+    type: 'single',
+    value: 'no_allergy',
+    optionIds: ['dietary_no_allergy'],
+    answeredAt: '2026-06-02T04:10:02.800Z'
+  }
+]);
+
+assert(!noAllergyProfile.avoidedTagIds.includes('seafood'), 'no allergy option should not add seafood risk tags');
+assert(!noAllergyProfile.avoidedTagIds.includes('peanut'), 'no allergy option should not add peanut risk tags');
+
 const avoidDrinksProfile = mapAnswersToPreferenceProfile([
   {
     questionId: 'category_avoidance',

@@ -522,12 +522,22 @@ assert(!/川菜|湘菜|麻辣烫|小面|冒菜|香锅/.test(noSpicyQuery.keyword
 const selectedQuestions = selectQuestionSet({ random: () => 0.1 });
 assert(selectedQuestions.length === 6, '题目选择应返回 6 题');
 assert(!selectedQuestions.some((question) => question.id === 'dining_mode'), '当前 6 题不应出现堂食/外卖');
-assert(selectedQuestions.some((question) => ['avoidance', 'spice_tolerance'].includes(question.id)), '6 题应覆盖负向偏好或辣度');
 assert(selectedQuestions.some((question) => question.id === 'distance'), '6 题应覆盖距离');
 assert(selectedQuestions.some((question) => question.id === 'budget'), '6 题应覆盖预算');
+assert(selectedQuestions.some((question) => question.id === 'meal_intent'), '6 questions should prioritize meal intent');
 assert(
   selectedQuestions.filter((question) => ['meal_intent', 'dietary_restriction', 'time_slot', 'category_avoidance', 'category_preference'].includes(question.id)).length >= 2,
   '6 题应覆盖至少两个口味/健康/饱腹相关维度'
+);
+const selectedQuestionIds = new Set(selectedQuestions.map((question) => question.id));
+assert(!(selectedQuestionIds.has('avoidance') && selectedQuestionIds.has('spice_tolerance')), 'avoidance and spice_tolerance should not appear together');
+assert(
+  ['satiety', 'meal_type', 'meal_intent'].filter((id) => selectedQuestionIds.has(id)).length <= 1,
+  'satiety, meal_type, and meal_intent should not appear together'
+);
+assert(
+  ['avoidance', 'flavor', 'health'].filter((id) => selectedQuestionIds.has(id)).length <= 1,
+  'avoidance, flavor, and health should not repeat the same light or healthy intent'
 );
 
 const optionWithoutEffect = questionBank.flatMap((question) => question.options).find((option) => !option.effect);
