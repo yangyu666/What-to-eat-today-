@@ -605,6 +605,8 @@ function toRecommendationCandidate(
       id: restaurant.id,
       name: restaurant.name,
       tags: restaurant.tags,
+      address: restaurant.address,
+      location: restaurant.location,
       distanceMeters: restaurant.distanceMeters,
       averageCostYuan: restaurant.averageCostYuan,
       openStatus: restaurant.openStatus,

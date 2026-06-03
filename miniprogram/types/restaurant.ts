@@ -71,6 +71,8 @@ export interface RestaurantSummary {
   id: RestaurantId;
   name: string;
   tags: string[];
+  address?: string;
+  location?: GeoPoint;
   distanceMeters?: number;
   averageCostYuan?: number;
   openStatus?: RestaurantOpenStatus;

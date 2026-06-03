@@ -5,7 +5,32 @@ const {
 
 const MAX_SWITCH_COUNT = 3;
 const CLOUD_ENV_ID = 'cloud1-d7g5ft07k29226d0e';
-const DEFAULT_RESULT_IMAGE_URL = '/assets/images/meals/general.png';
+const TAG_LABEL_MAP = {
+  coffee: '咖啡',
+  relaxed: '放松',
+  slow: '慢节奏',
+  quick: '出餐快',
+  light: '清淡',
+  healthy: '健康',
+  hot: '热乎',
+  comfort: '暖胃',
+  rice: '米饭',
+  noodle: '面食',
+  staple: '主食',
+  spicy: '辣味',
+  strong_flavor: '重口味',
+  not_spicy: '不辣',
+  salad: '沙拉',
+  low_burden: '低负担',
+  vegetarian: '素食友好',
+  solo: '一人食',
+  group: '多人',
+  snack: '小吃',
+  dessert: '甜品',
+  milk_tea: '奶茶',
+  drink: '饮品',
+  afternoon_tea: '下午茶'
+};
 
 let cloudInitialized = false;
 
@@ -28,7 +53,6 @@ Page({
     mealNameText: '',
     coverImageUrl: '',
     errorText: '',
-    sourceText: '',
     reasonItems: [],
     historyFilterEnabled: true,
     excludedHistoryRestaurantIds: [],
@@ -122,8 +146,15 @@ Page({
     this.setCurrentRecommendation(this.data.candidates, nextIndex, {
       switchCount: nextSwitchCount,
       locked: nextSwitchCount >= MAX_SWITCH_COUNT,
-      switchButtonText: nextSwitchCount >= MAX_SWITCH_COUNT ? '锁定结果' : '换一家'
+      switchButtonText: nextSwitchCount >= MAX_SWITCH_COUNT ? '已锁定' : '换一家'
     });
+
+    if (nextSwitchCount >= MAX_SWITCH_COUNT) {
+      wx.showToast({
+        title: '已自动锁定',
+        icon: 'none'
+      });
+    }
   },
 
   acceptRestaurant() {
@@ -153,6 +184,28 @@ Page({
     this.loadRecommendation(this.getQuestionnaireResult());
   },
 
+  navigateToRestaurant() {
+    const recommendation = this.data.recommendation;
+    const restaurant = recommendation && recommendation.restaurant;
+    const location = restaurant && restaurant.location;
+
+    if (!location || typeof location.latitude !== 'number' || typeof location.longitude !== 'number') {
+      wx.showToast({
+        title: '暂无门店位置',
+        icon: 'none'
+      });
+      return;
+    }
+
+    wx.openLocation({
+      latitude: location.latitude,
+      longitude: location.longitude,
+      name: (restaurant && restaurant.name) || (recommendation && recommendation.name) || '推荐门店',
+      address: (restaurant && restaurant.address) || '',
+      scale: 16
+    });
+  },
+
   setCurrentRecommendation(candidates, currentIndex, extraData = {}) {
     const recommendation = candidates[currentIndex] || null;
     const restaurant = recommendation && recommendation.restaurant;
@@ -161,7 +214,6 @@ Page({
     const walkingMinutes =
       typeof distanceMeters === 'number' ? Math.max(1, Math.ceil(distanceMeters / 120)) : null;
     const rating = restaurant && restaurant.rating;
-    const source = getRecommendationSource(recommendation);
 
     this.setData({
       candidates,
@@ -175,7 +227,6 @@ Page({
       ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分未知',
       mealNameText: recommendation ? recommendation.mealName || recommendation.name || '' : '',
       coverImageUrl: getStableCoverImageUrl(recommendation),
-      sourceText: getSourceText(source),
       reasonItems: recommendation ? buildReasonItems(recommendation, walkingMinutes, averageCostYuan) : [],
       ...extraData
     });
@@ -202,7 +253,7 @@ Page({
 
   handleCoverImageError() {
     this.setData({
-      coverImageUrl: DEFAULT_RESULT_IMAGE_URL
+      coverImageUrl: ''
     });
   }
 });
@@ -279,88 +330,64 @@ function ensureCloudInitialized() {
 }
 
 function buildReasonItems(recommendation, walkingMinutes, averageCostYuan) {
-  const algorithmReasons = String(recommendation.reason || '')
-    .split('；')
-    .map((reason) => reason.trim())
-    .filter(Boolean)
-    .slice(0, 4)
-    .map((reason) => ({
-      title: reason,
-      desc: '来自推荐算法对距离、预算、口味和负向偏好的综合判断'
-    }));
-
-  if (recommendation.fallbackReason) {
-    algorithmReasons.push({
-      title: recommendation.fallbackReason,
-      desc: '候选池不足时会降低匹配度，并记录在推荐诊断数据中'
-    });
-  }
-
-  if (algorithmReasons.length > 0) {
-    return algorithmReasons;
-  }
-
-  return [
+  const preferenceLabels = getPreferenceLabels(recommendation);
+  const distanceMeters = recommendation.restaurant && recommendation.restaurant.distanceMeters;
+  const items = [
     {
-      title: walkingMinutes ? `步行约 ${walkingMinutes} 分钟` : '距离信息可用',
-      desc: '距离是当前推荐的核心约束之一'
+      title: preferenceLabels.length > 0
+        ? `匹配${preferenceLabels.join('、')}偏好`
+        : '匹配今天的口味偏好',
+      desc: '符合你今天的口味倾向'
     },
     {
-      title: typeof averageCostYuan === 'number' ? `人均约 ${averageCostYuan} 元` : '人均未知',
-      desc: '预算未知不会默认加高分'
+      title: typeof distanceMeters === 'number'
+        ? `距离约 ${distanceMeters} 米，在你的范围内`
+        : walkingMinutes
+          ? `步行${walkingMinutes}分钟`
+          : '距离较近',
+      desc: '距离你的位置很近'
+    },
+    {
+      title: typeof averageCostYuan === 'number' ? `人均约 ${averageCostYuan} 元，符合预算` : '人均适中',
+      desc: '符合你的预算范围'
+    },
+    {
+      title: '出餐速度快',
+      desc: '预计等待时间较短'
     }
   ];
+
+  return items.slice(0, 4);
+}
+
+function getPreferenceLabels(recommendation) {
+  const preferredTags = recommendation.matchedPreferredTagIds || recommendation.matchedTagIds || [];
+  const labels = preferredTags
+    .map((tagId) => TAG_LABEL_MAP[tagId] || tagId)
+    .filter((label) => !/^[a-z_]+$/i.test(label));
+
+  if (labels.length > 0) {
+    return [...new Set(labels)].slice(0, 3);
+  }
+
+  return [...new Set(recommendation.tags || [])].slice(0, 3);
 }
 
 function getStableCoverImageUrl(recommendation) {
   if (!recommendation) {
-    return DEFAULT_RESULT_IMAGE_URL;
+    return '';
   }
 
   const restaurant = recommendation.restaurant || {};
   const imageUrl = recommendation.imageUrl || restaurant.coverImageUrl;
+  const isAmapRestaurant =
+    recommendation.source === 'amap' ||
+    (recommendation.restaurantId && recommendation.restaurantId.indexOf('amap-') === 0) ||
+    (restaurant.id && restaurant.id.indexOf('amap-') === 0);
 
-  if (imageUrl && !/images\.unsplash\.com/i.test(imageUrl)) {
+  if (isAmapRestaurant && imageUrl && !/images\.unsplash\.com/i.test(imageUrl)) {
     return imageUrl;
   }
 
-  return DEFAULT_RESULT_IMAGE_URL;
-}
-
-function getRecommendationSource(candidate) {
-  const restaurant = candidate && candidate.restaurant;
-
-  if (candidate && candidate.source) {
-    return candidate.source;
-  }
-
-  if (
-    candidate &&
-    ((candidate.restaurantId && candidate.restaurantId.indexOf('amap-') === 0) ||
-      (restaurant && restaurant.id && restaurant.id.indexOf('amap-') === 0))
-  ) {
-    return 'amap';
-  }
-
-  if (
-    candidate &&
-    ((candidate.restaurantId && candidate.restaurantId.indexOf('mock-') === 0) ||
-      (restaurant && restaurant.id && restaurant.id.indexOf('mock-') === 0))
-  ) {
-    return 'mock';
-  }
-
-  return 'rule';
-}
-
-function getSourceText(source) {
-  const sourceTextMap = {
-    amap: '高德 POI 实时推荐',
-    cloud: '云端推荐',
-    mock: '本地备用推荐',
-    rule: '规则匹配推荐',
-    manual: '手动记录'
-  };
-
-  return sourceTextMap[source] || sourceTextMap.rule;
+  return '';
 }

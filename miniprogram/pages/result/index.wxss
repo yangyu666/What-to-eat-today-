@@ -81,19 +81,17 @@
   line-height: 1.25;
 }
 
-.meal-name {
-  display: block;
+.navigate-link {
+  align-self: flex-start;
+  min-width: 0;
   margin: -8rpx 24rpx 0;
-  color: #6b7280;
-  font-size: 26rpx;
-}
-
-.source-text {
-  display: block;
-  margin: -8rpx 24rpx 0;
+  padding: 0;
   color: #22c55e;
-  font-size: 24rpx;
+  font-size: 26rpx;
   font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+  background: transparent;
 }
 
 .match-number {

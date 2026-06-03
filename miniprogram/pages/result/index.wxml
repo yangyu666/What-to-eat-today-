@@ -14,7 +14,7 @@
       />
       <view class="cover-placeholder" wx:else>
         <text class="placeholder-title">暂无门店图片</text>
-        <text class="placeholder-desc">优先使用高德 POI 或本地餐厅图片</text>
+        <text class="placeholder-desc">门店图片将优先使用高德返回的店铺照片</text>
       </view>
       <view class="match-badge">
         <text class="match-number">{{matchPercent}}<text class="percent">%</text></text>
@@ -23,9 +23,7 @@
     </view>
 
     <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
-    <text class="meal-name">推荐：{{mealNameText}}</text>
-
-    <text class="source-text">{{sourceText}}</text>
+    <button class="navigate-link" bindtap="navigateToRestaurant">导航到这家店</button>
 
     <view class="info-row">
       <view class="info-item">
@@ -62,8 +60,8 @@
     <view class="lock-card" wx:if="{{locked && !accepted}}">
       <view class="lock-icon">锁</view>
       <view>
-        <text class="lock-title">已为你锁定当前推荐</text>
-        <text class="lock-desc">多次刷新后，保留当前最匹配方案</text>
+        <text class="lock-title">已自动锁定当前推荐</text>
+        <text class="lock-desc">已换 3 次，先把这个靠谱选择留住</text>
       </view>
     </view>
 
