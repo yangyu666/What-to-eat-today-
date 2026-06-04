@@ -210,6 +210,7 @@ export type CloudFunctionName =
   | 'recommendRestaurant'
   | 'recommendMeal'
   | 'amapPoi'
+  | 'syncUserProfile'
   | 'saveRecommendationHistory'
   | 'savePreference'
   | 'listHistory';

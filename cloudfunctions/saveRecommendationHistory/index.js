@@ -48,6 +48,10 @@ function normalizeRecord(record, openid) {
     throw new Error('record is required.');
   }
 
+  if (!openid) {
+    throw new Error('OPENID is required.');
+  }
+
   if (!record.candidateId || !record.mealName) {
     throw new Error('candidateId and mealName are required.');
   }
@@ -87,6 +91,10 @@ function normalizeRecord(record, openid) {
     penaltyReasons: normalizeStringArray(record.penaltyReasons),
     fallbackReason: normalizeText(record.fallbackReason),
     candidatePoolStats: normalizeCandidatePoolStats(record.candidatePoolStats),
+    historyFilterEnabled:
+      typeof record.historyFilterEnabled === 'boolean' ? record.historyFilterEnabled : undefined,
+    excludedHistoryRestaurantIds: normalizeStringArray(record.excludedHistoryRestaurantIds),
+    historyPenaltyReasons: normalizeStringArray(record.historyPenaltyReasons),
     questionnaire: normalizeQuestionnaire(record.questionnaire)
   });
 }
@@ -119,9 +127,12 @@ function normalizeCandidatePoolStats(value) {
   return removeUndefined({
     totalFetched: normalizeNonNegativeInteger(value.totalFetched),
     afterHardFilter: normalizeNonNegativeInteger(value.afterHardFilter),
+    afterHistoryFilter: normalizeNonNegativeInteger(value.afterHistoryFilter),
     afterNegativeFilter: normalizeNonNegativeInteger(value.afterNegativeFilter),
     finalCandidateCount: normalizeNonNegativeInteger(value.finalCandidateCount),
-    fallbackUsed: typeof value.fallbackUsed === 'boolean' ? value.fallbackUsed : undefined
+    fallbackUsed: typeof value.fallbackUsed === 'boolean' ? value.fallbackUsed : undefined,
+    historyFallbackUsed:
+      typeof value.historyFallbackUsed === 'boolean' ? value.historyFallbackUsed : undefined
   });
 }
 
