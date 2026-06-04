@@ -470,6 +470,44 @@ const luxuryPriceOnlyResult = recommend(
 );
 assert(luxuryPriceOnlyResult.candidates[0]?.restaurantId === 'premium-by-price', '200+ budget should accept restaurants by averageCostYuan >= 200 even without a known brand keyword');
 
+const chainPreferenceNoIndependentResult = recommend(
+  profile({
+    selectedOptionIds: ['brand_chain', 'budget_100_200'],
+    preferredTagIds: ['meal', 'chain_brand', 'mid_chain'],
+    avoidedTagIds: ['independent_store', 'street_shop', 'low_chain'],
+    budgetLevel: 5,
+    maxDistanceMeters: 5000,
+    maxEstimatedMinutes: 120
+  }),
+  [
+    {
+      id: 'rough-independent',
+      name: '破旧家常小馆',
+      tags: ['家常菜'],
+      category: '中餐厅',
+      distanceMeters: 300,
+      averageCostYuan: 150,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    },
+    {
+      id: 'mid-brand-restaurant',
+      name: '费大厨辣椒炒肉',
+      tags: ['湘菜'],
+      tagIds: ['meal', 'chain_brand', 'mid_chain'],
+      category: '中餐厅',
+      distanceMeters: 1200,
+      averageCostYuan: 138,
+      openStatus: 'open',
+      rating: 4.4,
+      status: 'active'
+    }
+  ]
+);
+assert(!chainPreferenceNoIndependentResult.candidates.some((candidate) => candidate.restaurantId === 'rough-independent'), 'chain preference should hard-filter rough independent storefronts');
+assert(chainPreferenceNoIndependentResult.candidates[0]?.restaurantId === 'mid-brand-restaurant', 'chain preference should keep actual chain or brand restaurants');
+
 const mallPremiumResult = recommend(
   profile({
     selectedOptionIds: ['budget_over_200', 'brand_chain'],

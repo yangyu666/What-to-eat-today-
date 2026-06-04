@@ -146,7 +146,7 @@ const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
 const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
-const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
+const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
 
 const DEFAULT_PREFERENCE = {
   selectedOptionIds: ['quick', 'light'],
@@ -664,6 +664,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
 
   if (restaurant.status !== 'active') reasons.push('餐厅不可用');
   if (isNonRestaurantSalesCandidate(restaurantText)) reasons.push('非到店餐饮门店');
+  if (requiresBrandCandidate(preference) && !isAcceptableBrandCandidate(restaurant, preference)) reasons.push('品牌偏好下缺少连锁/品牌特征');
   if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') reasons.push('当前不在营业');
   if (excludeRestaurantIds.has(restaurant.id)) reasons.push('近期已推荐过');
   if (!allowDistanceFallback && preference && preference.maxDistanceMeters !== undefined && restaurant.distanceMeters !== undefined && restaurant.distanceMeters > preference.maxDistanceMeters) {
@@ -682,6 +683,18 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
 
 function isNonRestaurantSalesCandidate(text) {
   return NON_RESTAURANT_SALES_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function requiresBrandCandidate(preference) {
+  const selected = new Set((preference && preference.selectedOptionIds) || []);
+  return BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId));
+}
+
+function isAcceptableBrandCandidate(restaurant, preference) {
+  const tagIds = getRestaurantTagIds(restaurant);
+  const hasBrandTag = CHAIN_BRAND_TAGS.some((tag) => tagIds.includes(tag));
+  if (hasBrandTag) return true;
+  return ((preference && preference.budgetLevel) || 3) >= 6 && (getEstimatedCost(restaurant) || 0) >= 200;
 }
 
 function rankWithLightRandom(scored) {
@@ -1011,7 +1024,7 @@ function getNegativeConflict(restaurant, preference) {
       if (tagIds.includes(tag)) tags.add(tag);
     });
     labels.add('brand preference conflicts with independent store');
-    setSeverity('soft');
+    setSeverity('hard');
   }
 
   if (explicitIndependentStore && CHAIN_BRAND_TAGS.some((tag) => tagIds.includes(tag))) {

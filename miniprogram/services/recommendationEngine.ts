@@ -321,7 +321,24 @@ const PREMIUM_CHAIN_KEYWORDS = [
   '白天鹅',
   '黑珍珠'
 ];
-const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
+const INDEPENDENT_STORE_KEYWORDS = [
+  '街边',
+  '小店',
+  '老店',
+  '大排档',
+  '排档',
+  '小馆',
+  '家常',
+  '本地',
+  '路边摊',
+  '苍蝇馆',
+  '苍蝇小馆',
+  '简陋',
+  '破旧',
+  '破店',
+  '档口',
+  '摊档'
+];
 
 export function recommendRestaurants(options: RecommendationEngineOptions): RecommendationResult {
   const now = options.now ?? new Date();
@@ -591,6 +608,10 @@ export function applyHardFilters(
     reasons.push('非到店餐饮门店');
   }
 
+  if (requiresBrandCandidate(preference) && !isAcceptableBrandCandidate(restaurant, preference)) {
+    reasons.push('品牌偏好下缺少连锁/品牌特征');
+  }
+
   if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') {
     reasons.push('当前不在营业');
   }
@@ -643,6 +664,23 @@ export function applyHardFilters(
 
 function isNonRestaurantSalesCandidate(text: string): boolean {
   return NON_RESTAURANT_SALES_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function requiresBrandCandidate(preference?: UserPreferenceProfile): boolean {
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+
+  return BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId));
+}
+
+function isAcceptableBrandCandidate(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
+  const tagIds = getRestaurantTagIds(restaurant);
+  const hasBrandTag = CHAIN_BRAND_TAGS.some((tagId) => tagIds.includes(tagId));
+
+  if (hasBrandTag) {
+    return true;
+  }
+
+  return (preference?.budgetLevel ?? 3) >= 6 && (getEstimatedCost(restaurant) ?? 0) >= 200;
 }
 
 function rankWithLightRandom(scored: ScoredRestaurant[], random: () => number): ScoredRestaurant[] {
@@ -1160,7 +1198,7 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
       }
     });
     labels.add('brand preference conflicts with independent store');
-    setSeverity('soft');
+    setSeverity('hard');
   }
 
   if (explicitIndependentStore && CHAIN_BRAND_TAGS.some((tagId) => tagIds.includes(tagId))) {
