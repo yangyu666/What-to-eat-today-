@@ -4,6 +4,15 @@
 
 ## MVP 必需云函数
 
+### `setupDatabase`
+
+- 入口：`cloudfunctions/setupDatabase/index.js`
+- 入参：`{}`
+- 出参：`ApiResponse<{ collections, indexes }>`
+- 职责：创建 MVP 必需集合：`users`、`recommendation_history`。
+- 使用方式：部署后在微信开发者工具里测试调用一次；返回 `created` 表示新建成功，返回 `exists` 表示集合已存在。
+- 注意：索引和权限仍建议在云开发控制台确认配置。
+
 ### `amapPoi`
 
 - 入口：`cloudfunctions/amapPoi/index.js`
@@ -21,6 +30,15 @@
 - 职责：保存推荐展示、换一家、采纳等用户行为。
 - 数据库：写入 `recommendation_history` 集合。
 - 兜底：前端会先写本地 storage，再异步调用云函数；云同步失败不阻塞用户流程。
+
+### `listHistory`
+
+- 入口：`cloudfunctions/listHistory/index.js`
+- 入参：`{ pageSize?, cursor?, action? }`
+- 出参：`ApiResponse<ListHistoryResponse>`
+- 职责：按当前用户 OPENID 读取自己的推荐历史。
+- 数据库：读取 `recommendation_history` 集合，只返回 `_openid` 属于当前用户的数据。
+- 前端读取：历史页通过该云函数读取，不直接从小程序端查集合。
 
 ### `syncUserProfile`
 
@@ -123,12 +141,13 @@
 
 ## 上线前控制台操作
 
-1. 在微信云开发控制台创建集合：`users`、`recommendation_history`。
-2. 部署云函数：`amapPoi`、`saveRecommendationHistory`、`syncUserProfile`。
+1. 部署云函数：`setupDatabase`、`amapPoi`、`saveRecommendationHistory`、`listHistory`、`syncUserProfile`。
+2. 在微信开发者工具里测试调用 `setupDatabase`，创建 `users`、`recommendation_history`。
 3. 保留部署：`recommendRestaurant`。
 4. 给 `amapPoi` 配置环境变量：`AMAP_WEB_SERVICE_KEY` 或 `AMAP_KEY`。
 5. 配置集合权限，禁止全量公开读写。
-6. 真机验证头像昵称同步、推荐历史保存、历史页读取。
+6. 配置索引：`recommendation_history` 的 `_openid + createdAt`、`_openid + action + createdAt`。
+7. 真机验证头像昵称同步、推荐历史保存、历史页读取。
 
 ## 统一返回格式
 

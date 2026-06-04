@@ -5,9 +5,9 @@ import type {
   RecommendationAction,
   RecommendationHistoryRecord,
   RecommendationSource,
+  ListHistoryResponse,
   SaveRecommendationHistoryResponse
 } from '../types/recommendation';
-import { RECOMMENDATION_HISTORY_COLLECTION } from '../types/recommendation';
 import type { UserQuestionnaireResult } from '../types/userPreference';
 
 const HISTORY_STORAGE_KEY = 'meal_recommendation_history';
@@ -15,6 +15,7 @@ export const HISTORY_FILTER_STORAGE_KEY = 'meal_filter_recent_history';
 const MAX_LOCAL_HISTORY = 50;
 const DEFAULT_HISTORY_FILTER_LIMIT = 10;
 const SAVE_HISTORY_FUNCTION_NAME = 'saveRecommendationHistory';
+const LIST_HISTORY_FUNCTION_NAME = 'listHistory';
 const DEFAULT_RESTAURANT_IMAGES = {
   spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
   rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
@@ -255,15 +256,19 @@ async function saveHistoryRecordCloud(record: RecommendationHistoryRecord) {
 async function getCloudHistory(): Promise<RecommendationHistoryRecord[]> {
   ensureCloudInitialized();
 
-  const database = wx.cloud.database();
-  const response = await database
-    .collection(RECOMMENDATION_HISTORY_COLLECTION)
-    .orderBy('createdAt', 'desc')
-    .limit(MAX_LOCAL_HISTORY)
-    .get();
-  const data = response.data as CloudHistoryRecord[];
+  const response = await wx.cloud.callFunction({
+    name: LIST_HISTORY_FUNCTION_NAME,
+    data: {
+      pageSize: MAX_LOCAL_HISTORY
+    }
+  });
+  const payload = response.result as ApiResponse<ListHistoryResponse> | undefined;
 
-  return Array.isArray(data) ? data.map(normalizeHistoryRecord) : [];
+  if (!payload?.ok) {
+    throw new Error(payload?.ok === false ? payload.error.message : 'Cloud history query failed.');
+  }
+
+  return payload.data.items.map((record) => normalizeHistoryRecord(record as CloudHistoryRecord));
 }
 
 function normalizeHistoryRecord(record: CloudHistoryRecord): RecommendationHistoryRecord {

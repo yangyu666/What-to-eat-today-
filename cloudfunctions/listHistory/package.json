@@ -1,0 +1,9 @@
+{
+  "name": "listHistory",
+  "version": "1.0.0",
+  "description": "List current user's recommendation history.",
+  "main": "index.js",
+  "dependencies": {
+    "wx-server-sdk": "latest"
+  }
+}

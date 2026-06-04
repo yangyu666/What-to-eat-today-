@@ -207,6 +207,7 @@ export type ApiResponse<T> =
     };
 
 export type CloudFunctionName =
+  | 'setupDatabase'
   | 'recommendRestaurant'
   | 'recommendMeal'
   | 'amapPoi'
