@@ -573,6 +573,54 @@ const salesCenterResult = recommend(
 assert(!salesCenterResult.candidates.some((candidate) => candidate.restaurantId === 'sales-center'), 'sales, wholesale, group-buy, and mooncake centers should not be recommended as restaurants');
 assert(salesCenterResult.candidates[0]?.restaurantId === 'real-premium', 'real restaurant should remain after filtering sales centers');
 
+const imageFallbackResult = recommend(
+  profile({
+    preferredTagIds: ['rice', 'meal'],
+    budgetLevel: 3,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'no-image-rice',
+      name: '盖饭小店',
+      tags: ['盖饭'],
+      tagIds: ['rice', 'meal'],
+      category: '简餐',
+      distanceMeters: 100,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    }
+  ]
+);
+assert(Boolean(imageFallbackResult.candidates[0]?.imageUrl), 'recommendation candidate should provide a fallback image when POI has no photo');
+assert(/^https:\/\//.test(imageFallbackResult.candidates[0]?.imageUrl ?? ''), 'recommendation image should use HTTPS');
+
+const imageHttpsResult = recommend(
+  profile({
+    preferredTagIds: ['rice', 'meal'],
+    budgetLevel: 3,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'http-image-rice',
+      name: '盖饭门店',
+      tags: ['盖饭'],
+      tagIds: ['rice', 'meal'],
+      category: '简餐',
+      coverImageUrl: 'http://aos-cdn-image.amap.com/example.jpg',
+      distanceMeters: 100,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    }
+  ]
+);
+assert(imageHttpsResult.candidates[0]?.imageUrl === 'https://aos-cdn-image.amap.com/example.jpg', 'AMap http image URL should be upgraded to HTTPS');
+
 
 
 const unknownZeroCostScore = scoreRestaurant(

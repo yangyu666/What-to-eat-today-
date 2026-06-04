@@ -304,6 +304,7 @@ function convertPoiToRestaurant(poi) {
   const averageCostYuan = explicitAverageCostYuan || inferredAverageCostYuan;
   const photos = Array.isArray(poi.photos) ? poi.photos : [];
   const firstPhoto = photos.find((photo) => photo && photo.url);
+  const coverImageUrl = firstPhoto && normalizeImageUrl(firstPhoto.url);
 
   return {
     id: `amap-${poi.id}`,
@@ -320,11 +321,19 @@ function convertPoiToRestaurant(poi) {
     phone: normalizeAmapText(poi.tel),
     openStatus: 'unknown',
     signatureDishes: [],
-    coverImageUrl: firstPhoto && firstPhoto.url,
+    coverImageUrl,
     rating: parseNumber(poi.biz_ext && poi.biz_ext.rating),
     source: 'amap',
     status: 'active'
   };
+}
+
+function normalizeImageUrl(url) {
+  if (typeof url !== 'string') {
+    return undefined;
+  }
+
+  return url.replace(/^http:\/\//i, 'https://');
 }
 
 function isNonRestaurantSalesPoi(text) {

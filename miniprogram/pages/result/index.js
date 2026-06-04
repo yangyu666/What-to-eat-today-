@@ -54,6 +54,18 @@ const TAG_LABEL_MAP = {
   drink: '饮品',
   afternoon_tea: '下午茶'
 };
+const FALLBACK_COVER_IMAGES = {
+  premium: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80',
+  milkTea: 'https://images.unsplash.com/photo-1558857563-b371033873b8?auto=format&fit=crop&w=900&q=80',
+  coffee: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80',
+  dessert: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80',
+  spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=900&q=80',
+  light: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80',
+  noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80',
+  rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80',
+  snack: 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=900&q=80',
+  general: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80'
+};
 
 let cloudInitialized = false;
 
@@ -180,17 +192,16 @@ Page({
       return;
     }
 
-    this.trackCurrentRecommendation(
-      'skipped',
-      this.data.recommendation,
-      nextSwitchCount,
-      this.getQuestionnaireResult()
-    );
+    const questionnaire = this.getQuestionnaireResult();
+    const nextCandidate = this.data.candidates[nextIndex];
+
+    this.trackCurrentRecommendation('skipped', this.data.recommendation, nextSwitchCount, questionnaire);
     this.setCurrentRecommendation(this.data.candidates, nextIndex, {
       switchCount: nextSwitchCount,
       locked: nextSwitchCount >= MAX_SWITCH_COUNT,
       switchButtonText: nextSwitchCount >= MAX_SWITCH_COUNT ? '已锁定' : '换一家'
     });
+    this.trackCurrentRecommendation('shown', nextCandidate, nextSwitchCount, questionnaire);
 
     if (nextSwitchCount >= MAX_SWITCH_COUNT) {
       wx.showToast({
@@ -295,8 +306,10 @@ Page({
   },
 
   handleCoverImageError() {
+    const fallbackUrl = getFallbackCoverImageUrl(this.data.recommendation);
+
     this.setData({
-      coverImageUrl: ''
+      coverImageUrl: fallbackUrl && fallbackUrl !== this.data.coverImageUrl ? fallbackUrl : ''
     });
   }
 });
@@ -531,15 +544,76 @@ function getStableCoverImageUrl(recommendation) {
   }
 
   const restaurant = recommendation.restaurant || {};
-  const imageUrl = recommendation.imageUrl || restaurant.coverImageUrl;
+  const imageUrl = normalizeImageUrl(recommendation.imageUrl || restaurant.coverImageUrl);
   const isAmapRestaurant =
     recommendation.source === 'amap' ||
     (recommendation.restaurantId && recommendation.restaurantId.indexOf('amap-') === 0) ||
     (restaurant.id && restaurant.id.indexOf('amap-') === 0);
 
-  if (isAmapRestaurant && imageUrl && !/images\.unsplash\.com/i.test(imageUrl)) {
+  if (isAmapRestaurant && imageUrl) {
     return imageUrl;
   }
 
-  return '';
+  return imageUrl || getFallbackCoverImageUrl(recommendation);
+}
+
+function normalizeImageUrl(url) {
+  return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : '';
+}
+
+function getFallbackCoverImageUrl(recommendation) {
+  if (!recommendation) {
+    return '';
+  }
+
+  const restaurant = recommendation.restaurant || {};
+  const text = [
+    recommendation.name,
+    recommendation.mealName,
+    restaurant.name,
+    restaurant.category,
+    ...(recommendation.tags || []),
+    ...(recommendation.matchedPreferredTagIds || [])
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/premium|高端|黑珍珠|米其林|omakase|fine dining|法餐|日料|炳胜|利苑|premium_brand/.test(text)) {
+    return FALLBACK_COVER_IMAGES.premium;
+  }
+
+  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪/.test(text)) {
+    return FALLBACK_COVER_IMAGES.milkTea;
+  }
+
+  if (/咖啡|coffee|cafe/.test(text)) {
+    return FALLBACK_COVER_IMAGES.coffee;
+  }
+
+  if (/甜品|蛋糕|面包|dessert|bakery/.test(text)) {
+    return FALLBACK_COVER_IMAGES.dessert;
+  }
+
+  if (/辣|川|湘|火锅|麻辣|spicy|strong_flavor/.test(text)) {
+    return FALLBACK_COVER_IMAGES.spicy;
+  }
+
+  if (/轻食|沙拉|健康|清淡|light|healthy|salad/.test(text)) {
+    return FALLBACK_COVER_IMAGES.light;
+  }
+
+  if (/面|粉|粥|noodle|congee/.test(text)) {
+    return FALLBACK_COVER_IMAGES.noodle;
+  }
+
+  if (/饭|米|盖饭|rice/.test(text)) {
+    return FALLBACK_COVER_IMAGES.rice;
+  }
+
+  if (/小吃|包子|饺|snack|dim_sum/.test(text)) {
+    return FALLBACK_COVER_IMAGES.snack;
+  }
+
+  return FALLBACK_COVER_IMAGES.general;
 }

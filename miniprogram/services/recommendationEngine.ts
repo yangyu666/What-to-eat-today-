@@ -823,7 +823,7 @@ function toRecommendationCandidate(
     algorithmVersion: ALGORITHM_VERSION,
     weightProfileId: WEIGHT_PROFILE_ID,
     experimentId,
-    imageUrl: restaurant.coverImageUrl,
+    imageUrl: getCandidateImageUrl(restaurant, scored.matchedPreferredTagIds),
     source
   };
 }
@@ -1303,6 +1303,59 @@ function getRestaurantText(restaurant: Restaurant): string {
     .filter(Boolean)
     .join(' ')
     .toLowerCase();
+}
+
+function getCandidateImageUrl(restaurant: Restaurant, matchedPreferredTagIds: TagId[]): string | undefined {
+  return normalizeImageUrl(restaurant.coverImageUrl) || getFallbackImageUrl(restaurant, matchedPreferredTagIds);
+}
+
+function normalizeImageUrl(url: string | undefined): string | undefined {
+  return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : undefined;
+}
+
+function getFallbackImageUrl(restaurant: Restaurant, matchedPreferredTagIds: TagId[]): string {
+  const text = getRestaurantText({
+    ...restaurant,
+    tags: [...(restaurant.tags ?? []), ...matchedPreferredTagIds]
+  });
+
+  if (/premium|高端|黑珍珠|米其林|omakase|fine dining|法餐|日料|炳胜|利苑|premium_brand/.test(text)) {
+    return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪/.test(text)) {
+    return 'https://images.unsplash.com/photo-1558857563-b371033873b8?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/咖啡|coffee|cafe/.test(text)) {
+    return 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/甜品|蛋糕|面包|dessert|bakery/.test(text)) {
+    return 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/辣|川|湘|火锅|麻辣|spicy|strong_flavor/.test(text)) {
+    return 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/轻食|沙拉|健康|清淡|light|healthy|salad/.test(text)) {
+    return 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/面|粉|粥|noodle|congee/.test(text)) {
+    return 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/饭|米|盖饭|rice/.test(text)) {
+    return 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=900&q=80';
+  }
+
+  if (/小吃|包子|饺|snack|dim_sum/.test(text)) {
+    return 'https://images.unsplash.com/photo-1562967914-608f82629710?auto=format&fit=crop&w=900&q=80';
+  }
+
+  return 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=900&q=80';
 }
 
 function intersect(left: TagId[], right: TagId[]): TagId[] {
