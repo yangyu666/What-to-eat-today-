@@ -159,7 +159,27 @@ Page({
       return;
     }
 
-    const nextIndex = (this.data.currentIndex + 1) % this.data.candidates.length;
+    const nextIndex = this.data.currentIndex + 1;
+
+    if (nextIndex >= this.data.candidates.length) {
+      this.trackCurrentRecommendation(
+        'skipped',
+        this.data.recommendation,
+        nextSwitchCount,
+        this.getQuestionnaireResult()
+      );
+      this.setData({
+        switchCount: nextSwitchCount,
+        locked: true,
+        switchButtonText: '已锁定'
+      });
+      wx.showToast({
+        title: '没有更多新店',
+        icon: 'none'
+      });
+      return;
+    }
+
     this.trackCurrentRecommendation(
       'skipped',
       this.data.recommendation,

@@ -91,6 +91,7 @@ const BRAND_CHAIN_OPTION_IDS = ['brand_chain'];
 const BRAND_INDEPENDENT_OPTION_IDS = ['brand_independent'];
 const CHAIN_BRAND_TAGS = ['chain_brand', 'low_chain', 'mid_chain', 'premium_brand'];
 const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
+const NON_RESTAURANT_SALES_KEYWORDS = ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销'];
 const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
 const HALAL_CONFLICT_TAGS = ['pork'];
 const LOW_SUGAR_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drink'];
@@ -659,8 +660,10 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
   const reasons = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
+  const restaurantText = getRestaurantText(restaurant);
 
   if (restaurant.status !== 'active') reasons.push('餐厅不可用');
+  if (isNonRestaurantSalesCandidate(restaurantText)) reasons.push('非到店餐饮门店');
   if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') reasons.push('当前不在营业');
   if (excludeRestaurantIds.has(restaurant.id)) reasons.push('近期已推荐过');
   if (!allowDistanceFallback && preference && preference.maxDistanceMeters !== undefined && restaurant.distanceMeters !== undefined && restaurant.distanceMeters > preference.maxDistanceMeters) {
@@ -675,6 +678,10 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
   if (!allowNegativeFallback && temperatureConflict.severity === 'soft') reasons.push(`temperature preference conflict: ${temperatureConflict.label}`);
 
   return { passed: reasons.length === 0, reasons };
+}
+
+function isNonRestaurantSalesCandidate(text) {
+  return NON_RESTAURANT_SALES_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 }
 
 function rankWithLightRandom(scored) {

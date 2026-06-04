@@ -89,6 +89,7 @@ const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底�
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
 const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
+const NON_RESTAURANT_SALES_KEYWORDS = ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销'];
 
 const TAG_RULES = [
   { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
@@ -292,6 +293,11 @@ function convertPoiToRestaurant(poi) {
 
   const location = parseAmapLocation(poi.location);
   const text = [poi.type, poi.typecode, poi.name, poi.address, poi.pname, poi.cityname, poi.adname].filter(Boolean).join(';');
+
+  if (isNonRestaurantSalesPoi(text)) {
+    return null;
+  }
+
   const explicitAverageCostYuan = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
   const tagIds = mapCategoryToTagIds(text);
   const inferredAverageCostYuan = inferAverageCostYuan(text, tagIds);
@@ -319,6 +325,12 @@ function convertPoiToRestaurant(poi) {
     source: 'amap',
     status: 'active'
   };
+}
+
+function isNonRestaurantSalesPoi(text) {
+  const normalizedText = String(text || '').toLowerCase();
+
+  return NON_RESTAURANT_SALES_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()));
 }
 
 function buildKeywordPattern(keywords) {

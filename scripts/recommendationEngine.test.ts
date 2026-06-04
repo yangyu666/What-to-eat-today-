@@ -496,6 +496,45 @@ const mallPremiumResult = recommend(
 );
 assert(Boolean(mallPremiumResult.candidates[0]?.matchedPreferredTagIds?.includes('mall_store')), 'mall restaurant address should infer mall_store and remain recommendable');
 
+const salesCenterResult = recommend(
+  profile({
+    selectedOptionIds: ['budget_over_200', 'brand_chain'],
+    preferredTagIds: ['meal', 'chain_brand', 'premium_brand'],
+    avoidedTagIds: ['low_chain', 'mid_chain'],
+    budgetLevel: 6,
+    maxDistanceMeters: 15000,
+    maxEstimatedMinutes: 140
+  }),
+  [
+    {
+      id: 'sales-center',
+      name: '广州酒家月饼批发团购销售中心',
+      tags: ['酒家'],
+      category: '餐饮相关场所',
+      address: '广州酒家旁',
+      distanceMeters: 1521,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.1,
+      status: 'active'
+    },
+    {
+      id: 'real-premium',
+      name: '真实高端餐厅',
+      tags: ['fine dining'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: '餐厅',
+      distanceMeters: 2500,
+      averageCostYuan: 300,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    }
+  ]
+);
+assert(!salesCenterResult.candidates.some((candidate) => candidate.restaurantId === 'sales-center'), 'sales, wholesale, group-buy, and mooncake centers should not be recommended as restaurants');
+assert(salesCenterResult.candidates[0]?.restaurantId === 'real-premium', 'real restaurant should remain after filtering sales centers');
+
 
 
 const unknownZeroCostScore = scoreRestaurant(
