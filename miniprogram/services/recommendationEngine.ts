@@ -138,7 +138,8 @@ const TAG_WEIGHTS: Record<string, number> = {
   premium_brand: 15,
   independent_store: 10,
   street_shop: 9,
-  dim_sum: 9
+  dim_sum: 9,
+  mall_store: 8
 };
 
 const HOT_FOOD_TAGS = ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'];
@@ -166,6 +167,7 @@ const DESSERT_ONLY_OPTION_IDS = ['intent_dessert', 'prefer_bakery_dessert'];
 const BRAND_CHAIN_OPTION_IDS = ['brand_chain'];
 const BRAND_INDEPENDENT_OPTION_IDS = ['brand_independent'];
 const CHAIN_BRAND_TAGS = ['chain_brand', 'low_chain', 'mid_chain', 'premium_brand'];
+const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
 const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
 const HALAL_CONFLICT_TAGS = ['pork'];
 const LOW_SUGAR_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drink'];
@@ -317,8 +319,6 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const excludedHistoryRestaurantIds =
     options.context?.excludedHistoryRestaurantIds ?? options.context?.excludeRestaurantIds ?? [];
   const excludeRestaurantIds = new Set(excludedHistoryRestaurantIds);
-  const historyFilterEnabled =
-    options.context?.historyFilterEnabled === true && excludedHistoryRestaurantIds.length > 0;
   const historyPenaltyRestaurantIds = options.context?.historyPenaltyRestaurantIds ?? [];
   const historyPenaltyReasons = options.context?.historyPenaltyReasons ?? [];
   const experimentId = options.context?.experimentId ?? DEFAULT_EXPERIMENT_ID;
@@ -347,35 +347,15 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const afterNegativeFilter = primaryHardFiltered.length;
 
   let fallbackReason: string | undefined;
-  let historyFallbackUsed = false;
   let scored = primaryHardFiltered.map((restaurant) =>
     scoreRestaurant(restaurant, preference, scoreOptionsBase)
   );
-
-  if (historyFilterEnabled && scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
-    fallbackReason = '附近新选择较少，已放宽历史过滤';
-    historyFallbackUsed = true;
-    scored = candidateRestaurants
-      .filter((restaurant) => {
-        return applyHardFilters(restaurant, preference, new Set(), {
-          allowDistanceFallback: false,
-          allowNegativeFallback: false,
-          allowPriceFallback: false
-        }).passed;
-      })
-      .map((restaurant) =>
-        scoreRestaurant(restaurant, preference, {
-          ...scoreOptionsBase,
-          fallbackReason
-        })
-      );
-  }
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = candidateRestaurants
       .filter((restaurant) => {
-        return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
+        return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: false,
           allowPriceFallback: (preference?.budgetLevel ?? 3) < 5
@@ -393,7 +373,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = candidateRestaurants
       .filter((restaurant) => {
-        return applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, {
+        return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: true,
           allowPriceFallback: (preference?.budgetLevel ?? 3) < 5
@@ -414,7 +394,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
     afterNegativeFilter,
     finalCandidateCount: Math.min(limit, scored.length),
     fallbackUsed: fallbackReason !== undefined,
-    historyFallbackUsed
+    historyFallbackUsed: false
   };
   const ranked = selectDiverseRanked(rankWithLightRandom(scored, random), limit);
   const candidates = ranked.slice(0, limit).map((scoredRestaurant, index) => {
@@ -1240,6 +1220,10 @@ function inferTagIdsFromRestaurantText(restaurant: Restaurant, explicitTagIds: T
     ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((tagId) => inferred.add(tagId));
   }
 
+  if (MALL_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    inferred.add('mall_store');
+  }
+
   if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
     ['independent_store', 'street_shop'].forEach((tagId) => inferred.add(tagId));
   }
@@ -1252,6 +1236,7 @@ function getRestaurantText(restaurant: Restaurant): string {
     restaurant.name,
     restaurant.category,
     restaurant.description,
+    restaurant.address,
     ...(restaurant.tags ?? []),
     ...(restaurant.signatureDishes ?? [])
   ]

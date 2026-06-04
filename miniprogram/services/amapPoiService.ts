@@ -168,5 +168,10 @@ function toRadians(value: number): number {
 }
 
 function buildQueryKey(options: NearbyRestaurantOptions): string {
-  return [options.keyword?.trim() ?? '', options.types?.trim() ?? ''].join('|');
+  return [
+    options.radiusMeters ?? DEFAULT_RADIUS_METERS,
+    options.pageSize ?? DEFAULT_PAGE_SIZE,
+    options.keyword?.trim() ?? '',
+    options.types?.trim() ?? ''
+  ].join('|');
 }

@@ -65,7 +65,8 @@ const TAG_WEIGHTS = {
   premium_brand: 15,
   independent_store: 10,
   street_shop: 9,
-  dim_sum: 9
+  dim_sum: 9,
+  mall_store: 8
 };
 const SPICY_CONFLICT_TAGS = [
   'spicy',
@@ -89,6 +90,7 @@ const DESSERT_ONLY_OPTION_IDS = ['intent_dessert', 'prefer_bakery_dessert'];
 const BRAND_CHAIN_OPTION_IDS = ['brand_chain'];
 const BRAND_INDEPENDENT_OPTION_IDS = ['brand_independent'];
 const CHAIN_BRAND_TAGS = ['chain_brand', 'low_chain', 'mid_chain', 'premium_brand'];
+const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
 const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
 const HALAL_CONFLICT_TAGS = ['pork'];
 const LOW_SUGAR_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drink'];
@@ -490,27 +492,13 @@ function recommendRestaurants(options) {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, false, false).passed;
   });
   let fallbackReason;
-  let historyFallbackUsed = false;
   let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference, scoreOptionsBase));
-
-  if (historyFilterEnabled && scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
-    fallbackReason = '附近新选择较少，已放宽历史过滤';
-    historyFallbackUsed = true;
-    scored = candidateRestaurants
-      .filter((restaurant) => applyHardFilters(restaurant, preference, new Set(), false, false, false).passed)
-      .map((restaurant) =>
-        scoreRestaurant(restaurant, preference, {
-          ...scoreOptionsBase,
-          fallbackReason
-        })
-      );
-  }
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
     fallbackReason = '附近符合条件较少，已放宽部分距离条件';
     scored = candidateRestaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, false, !preference || (preference.budgetLevel || 3) < 5).passed
+        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, !preference || (preference.budgetLevel || 3) < 5).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -524,7 +512,7 @@ function recommendRestaurants(options) {
     fallbackReason = '附近符合条件较少，已放宽部分负向条件';
     scored = candidateRestaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, historyFallbackUsed ? new Set() : excludeRestaurantIds, true, true, !preference || (preference.budgetLevel || 3) < 5).passed
+        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, !preference || (preference.budgetLevel || 3) < 5).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -541,7 +529,7 @@ function recommendRestaurants(options) {
     afterNegativeFilter: primaryHardFiltered.length,
     finalCandidateCount: Math.min(limit, scored.length),
     fallbackUsed: fallbackReason !== undefined,
-    historyFallbackUsed
+    historyFallbackUsed: false
   };
   const ranked = selectDiverseRanked(rankWithLightRandom(scored), limit);
   const candidates = ranked.slice(0, limit).map((item, index) => {
@@ -1069,6 +1057,10 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((tag) => inferred.add(tag));
   }
 
+  if (MALL_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    inferred.add('mall_store');
+  }
+
   if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
     ['independent_store', 'street_shop'].forEach((tag) => inferred.add(tag));
   }
@@ -1091,7 +1083,7 @@ function getTemperatureConflict(restaurant, preference) {
 }
 
 function getRestaurantText(restaurant) {
-  return [restaurant.name, restaurant.category, restaurant.description, ...(restaurant.tags || []), ...(restaurant.signatureDishes || [])].filter(Boolean).join(' ').toLowerCase();
+  return [restaurant.name, restaurant.category, restaurant.description, restaurant.address, ...(restaurant.tags || []), ...(restaurant.signatureDishes || [])].filter(Boolean).join(' ').toLowerCase();
 }
 
 function intersect(left, right) {

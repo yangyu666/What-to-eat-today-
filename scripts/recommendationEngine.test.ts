@@ -376,6 +376,125 @@ const dedupeResult = recommend(
 );
 assert(new Set(dedupeResult.candidates.map((candidate) => candidate.restaurant?.name)).size === dedupeResult.candidates.length, 'Top recommendations should not contain duplicate restaurant names');
 
+const historyNoRepeatResult = recommendRestaurants({
+  restaurants: [
+    {
+      id: 'history-old',
+      name: 'shown before premium',
+      tags: ['omakase'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'high end',
+      distanceMeters: 500,
+      averageCostYuan: 380,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    },
+    {
+      id: 'history-new-a',
+      name: 'new premium a',
+      tags: ['omakase'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'high end',
+      distanceMeters: 900,
+      averageCostYuan: 320,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'history-new-b',
+      name: 'new premium b',
+      tags: ['fine dining'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'high end',
+      distanceMeters: 1200,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    }
+  ],
+  context: {
+    preferenceSnapshot: profile({
+      selectedOptionIds: ['budget_over_200', 'brand_chain'],
+      preferredTagIds: ['meal', 'chain_brand', 'premium_brand'],
+      avoidedTagIds: ['low_chain', 'mid_chain'],
+      budgetLevel: 6,
+      maxDistanceMeters: 10000
+    }),
+    historyFilterEnabled: true,
+    excludedHistoryRestaurantIds: ['history-old']
+  },
+  limit: 3,
+  now: new Date('2026-06-02T04:00:00.000Z'),
+  random: () => 0
+});
+assert(historyNoRepeatResult.candidates.length === 2, 'history filter should return fewer fresh candidates instead of repeating shown restaurants');
+assert(!historyNoRepeatResult.candidates.some((candidate) => candidate.restaurantId === 'history-old'), 'shown restaurants should not be repeated when fresh candidates exist');
+
+const luxuryPriceOnlyResult = recommend(
+  profile({
+    selectedOptionIds: ['budget_over_200', 'brand_chain'],
+    preferredTagIds: ['meal', 'chain_brand', 'premium_brand'],
+    avoidedTagIds: ['low_chain', 'mid_chain'],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'premium-by-price',
+      name: '人均两百以上餐厅',
+      tags: ['fine dining'],
+      tagIds: ['meal'],
+      category: '餐厅',
+      distanceMeters: 1500,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'cheap-brand',
+      name: '低价连锁',
+      tags: ['fast food'],
+      tagIds: ['meal', 'chain_brand', 'low_chain'],
+      category: '快餐',
+      distanceMeters: 300,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryPriceOnlyResult.candidates[0]?.restaurantId === 'premium-by-price', '200+ budget should accept restaurants by averageCostYuan >= 200 even without a known brand keyword');
+
+const mallPremiumResult = recommend(
+  profile({
+    selectedOptionIds: ['budget_over_200', 'brand_chain'],
+    preferredTagIds: ['meal', 'chain_brand', 'premium_brand', 'mall_store'],
+    avoidedTagIds: ['low_chain', 'mid_chain'],
+    budgetLevel: 6,
+    maxDistanceMeters: 15000,
+    maxEstimatedMinutes: 140
+  }),
+  [
+    {
+      id: 'mall-premium',
+      name: '商场高端日料',
+      tags: ['日料'],
+      category: '日本料理',
+      address: '天河城购物中心 6 层',
+      distanceMeters: 6800,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    }
+  ]
+);
+assert(Boolean(mallPremiumResult.candidates[0]?.matchedPreferredTagIds?.includes('mall_store')), 'mall restaurant address should infer mall_store and remain recommendable');
 
 
 

@@ -80,13 +80,15 @@ Object.assign(TAG_LABELS, {
   premium_brand: '高端品牌',
   independent_store: '街边小店',
   street_shop: '本地小店',
-  dim_sum: '点心'
+  dim_sum: '点心',
+  mall_store: '商场店'
 });
 
 const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
+const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
 
 const TAG_RULES = [
   { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
@@ -166,7 +168,7 @@ exports.main = async (event = {}, context = {}) => {
       };
     }
 
-    const radius = clampInteger(event.radiusMeters, 300, 10000, DEFAULT_RADIUS_METERS);
+    const radius = clampInteger(event.radiusMeters, 300, 15000, DEFAULT_RADIUS_METERS);
     const pageSize = clampInteger(event.pageSize, 1, 25, DEFAULT_PAGE_SIZE);
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
     const types = typeof event.types === 'string' && event.types.trim() ? event.types.trim() : AMAP_FOOD_TYPE;
@@ -289,7 +291,7 @@ function convertPoiToRestaurant(poi) {
   }
 
   const location = parseAmapLocation(poi.location);
-  const text = [poi.type, poi.typecode, poi.name].filter(Boolean).join(';');
+  const text = [poi.type, poi.typecode, poi.name, poi.address, poi.pname, poi.cityname, poi.adname].filter(Boolean).join(';');
   const explicitAverageCostYuan = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
   const tagIds = mapCategoryToTagIds(text);
   const inferredAverageCostYuan = inferAverageCostYuan(text, tagIds);
@@ -387,6 +389,10 @@ function addBrandTags(ids, text) {
 
   if (PREMIUM_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
     ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((id) => ids.add(id));
+  }
+
+  if (MALL_STORE_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    ids.add('mall_store');
   }
 
   if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {

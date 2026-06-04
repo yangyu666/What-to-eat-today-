@@ -25,7 +25,8 @@ const DESSERT_SEARCH_ATTEMPTS = [
 const PREMIUM_AMAP_SEARCH_ATTEMPTS = [
   { radiusMeters: 3000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' },
   { radiusMeters: 5000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' },
-  { radiusMeters: 10000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' }
+  { radiusMeters: 10000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' },
+  { radiusMeters: 15000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' }
 ];
 const TAG_LABEL_MAP = {
   coffee: '咖啡',

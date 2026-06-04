@@ -46,6 +46,7 @@ async function getAmapRecommendations(
   const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
   const attempts = buildAmapQueryAttempts(amapQuery);
+  const restaurantPool = new Map<string, Awaited<ReturnType<typeof getNearbyRestaurants>>[number]>();
 
   for (const attempt of attempts) {
     const restaurants = await getNearbyRestaurants({
@@ -62,19 +63,24 @@ async function getAmapRecommendations(
       continue;
     }
 
-    const result = recommendRestaurants({
-      restaurants,
-      context: recommendationContext,
-      limit,
-      source: 'amap'
+    restaurants.forEach((restaurant) => {
+      const key = normalizeRestaurantPoolKey(restaurant);
+      restaurantPool.set(key, restaurant);
     });
-
-    if (result.candidates.length > 0) {
-      return result.candidates;
-    }
   }
 
-  return [];
+  if (restaurantPool.size === 0) {
+    return [];
+  }
+
+  const result = recommendRestaurants({
+    restaurants: [...restaurantPool.values()],
+    context: recommendationContext,
+    limit,
+    source: 'amap'
+  });
+
+  return result.candidates;
 }
 
 function buildAmapQueryAttempts(
@@ -82,9 +88,11 @@ function buildAmapQueryAttempts(
 ): Array<{ radiusMeters: number; keyword: string; types: string }> {
   const baseRadius = amapQuery.radiusMeters;
   const wideRadius = Math.max(baseRadius, 3000);
-  const maxRadius = Math.max(baseRadius, 10000);
   const baseKeyword = amapQuery.keywords ?? '';
   const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
+  const premiumKeywords = getPremiumKeywordAttempts(baseKeyword);
+  const premiumSearch = premiumKeywords.length > 0;
+  const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
 
   return [
     {
@@ -101,12 +109,52 @@ function buildAmapQueryAttempts(
       radiusMeters: maxRadius,
       keyword: relaxedKeyword,
       types: amapQuery.types
-    }
+    },
+    ...premiumKeywords.flatMap((keyword) => [
+      {
+        radiusMeters: wideRadius,
+        keyword,
+        types: amapQuery.types
+      },
+      {
+        radiusMeters: 10000,
+        keyword,
+        types: amapQuery.types
+      },
+      {
+        radiusMeters: maxRadius,
+        keyword,
+        types: amapQuery.types
+      }
+    ])
   ].filter((attempt, index, attempts) => {
     return attempts.findIndex((item) => {
       return item.radiusMeters === attempt.radiusMeters && item.keyword === attempt.keyword && item.types === attempt.types;
     }) === index;
   });
+}
+
+function normalizeRestaurantPoolKey(restaurant: Awaited<ReturnType<typeof getNearbyRestaurants>>[number]): string {
+  const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');
+  const location = restaurant.location;
+  const locationKey =
+    location && typeof location.latitude === 'number' && typeof location.longitude === 'number'
+      ? `${location.latitude.toFixed(5)},${location.longitude.toFixed(5)}`
+      : '';
+
+  return restaurant.id || `${name}|${locationKey}`;
+}
+
+function getPremiumKeywordAttempts(keyword: string): string[] {
+  if (!/高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑/.test(keyword)) {
+    return [];
+  }
+
+  return [
+    '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining',
+    '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
+    '高端餐厅|私房菜'
+  ];
 }
 
 function getStrictCategoryKeyword(keyword: string): string | undefined {
