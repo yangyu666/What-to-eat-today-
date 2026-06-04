@@ -288,6 +288,13 @@ const MID_CHAIN_KEYWORDS = [
   '陶陶居'
 ];
 const PREMIUM_CHAIN_KEYWORDS = [
+  '高端餐厅',
+  '高端日料',
+  '米其林',
+  'omakase',
+  'fine dining',
+  '法餐',
+  '私房菜',
   '炳胜',
   '利苑',
   '大董',
@@ -299,7 +306,7 @@ const PREMIUM_CHAIN_KEYWORDS = [
   '白天鹅',
   '黑珍珠'
 ];
-const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '私房', '大排档', '排档', '小馆', '家常', '本地'];
+const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
 
 export function recommendRestaurants(options: RecommendationEngineOptions): RecommendationResult {
   const now = options.now ?? new Date();

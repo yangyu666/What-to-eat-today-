@@ -142,8 +142,8 @@ const SWEET_KEYWORDS = ['甜品', '蛋糕', '奶茶', '茶饮', '糖水'];
 const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
 const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居'];
-const PREMIUM_CHAIN_KEYWORDS = ['炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
-const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '私房', '大排档', '排档', '小馆', '家常', '本地'];
+const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
+const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地'];
 
 const DEFAULT_PREFERENCE = {
   selectedOptionIds: ['quick', 'light'],

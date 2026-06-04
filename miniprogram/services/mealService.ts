@@ -82,6 +82,7 @@ function buildAmapQueryAttempts(
 ): Array<{ radiusMeters: number; keyword: string; types: string }> {
   const baseRadius = amapQuery.radiusMeters;
   const wideRadius = Math.max(baseRadius, 3000);
+  const maxRadius = Math.max(baseRadius, 10000);
   const baseKeyword = amapQuery.keywords ?? '';
   const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
 
@@ -97,7 +98,7 @@ function buildAmapQueryAttempts(
       types: amapQuery.types
     },
     {
-      radiusMeters: 5000,
+      radiusMeters: maxRadius,
       keyword: relaxedKeyword,
       types: amapQuery.types
     }
@@ -110,7 +111,7 @@ function buildAmapQueryAttempts(
 
 function getStrictCategoryKeyword(keyword: string): string | undefined {
   if (/奶茶|茶饮|饮品|霸王茶姬|喜茶|奈雪|一点点/.test(keyword)) {
-    return '奶茶|茶饮|饮品|霸王茶姬|喜茶|奈雪|一点点';
+    return '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点';
   }
 
   if (/咖啡|cafe|coffee|下午茶/.test(keyword)) {
@@ -121,8 +122,8 @@ function getStrictCategoryKeyword(keyword: string): string | undefined {
     return '甜品|蛋糕|面包|烘焙|西点';
   }
 
-  if (/炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家/.test(keyword)) {
-    return '炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家';
+  if (/高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑/.test(keyword)) {
+    return '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑';
   }
 
   return undefined;

@@ -264,7 +264,7 @@ export const questionBank: QuestionBankItem[] = [
       {
         id: 'distance_any',
         label: '远点也行',
-        desc: '好吃更重要，距离放宽',
+        desc: '好吃更重要，10 公里内都行',
         selected: false,
         value: 'any',
         themeClass: 'theme-green',
@@ -272,7 +272,7 @@ export const questionBank: QuestionBankItem[] = [
         icon: '远',
         imageUrl: QUESTION_OPTION_IMAGES.distanceAny,
         effect: {
-          constraints: { maxDistanceMeters: 5000, maxEstimatedMinutes: 90 }
+          constraints: { maxDistanceMeters: 10000, maxEstimatedMinutes: 120 }
         }
       }
     ]

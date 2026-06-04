@@ -11,9 +11,27 @@ export interface AmapRestaurantQuery {
 const DEFAULT_RADIUS_METERS = 1500;
 const AMAP_FOOD_TYPE = '050000';
 const SAFE_FALLBACK_KEYWORDS = ['简餐', '盖饭', '粥', '轻食', '日式'];
-const PREMIUM_FALLBACK_KEYWORDS = ['炳胜', '利苑', '黑珍珠', '高端餐厅', '私房菜', '酒家'];
+const PREMIUM_FALLBACK_KEYWORDS = ['高端餐厅', '私房菜', '黑珍珠', '米其林', 'omakase', '法餐', '高端日料', 'Fine Dining'];
 const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
-const PREMIUM_CHAIN_KEYWORDS = ['炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠', '高端餐厅', '私房菜', '酒家'];
+const PREMIUM_CHAIN_KEYWORDS = [
+  '高端餐厅',
+  '私房菜',
+  '黑珍珠',
+  '米其林',
+  'omakase',
+  '法餐',
+  '高端日料',
+  'Fine Dining',
+  '炳胜',
+  '利苑',
+  '大董',
+  '新荣记',
+  '甬府',
+  '莆田',
+  '松鹤楼',
+  '广州酒家',
+  '白天鹅'
+];
 const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[] }> = [
   {
     optionIds: ['prefer_milk_tea'],
@@ -139,7 +157,7 @@ export function buildAmapRestaurantQuery(
 
 function normalizeRadius(maxDistanceMeters: number | undefined): number {
   const radius = maxDistanceMeters ?? DEFAULT_RADIUS_METERS;
-  return Math.max(300, Math.min(5000, Math.round(radius)));
+  return Math.max(300, Math.min(10000, Math.round(radius)));
 }
 
 function buildKeywords(preference: UserPreferenceProfile) {
@@ -174,7 +192,7 @@ function buildKeywords(preference: UserPreferenceProfile) {
     fallbackKeywordsUsed = true;
   }
 
-  const rankedKeywords = [...keywords].slice(0, 5);
+  const rankedKeywords = [...keywords];
 
   return {
     keywords: rankedKeywords.length > 0 ? rankedKeywords.join('|') : undefined,

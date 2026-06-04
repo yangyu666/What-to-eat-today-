@@ -119,13 +119,26 @@ const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
 assert(luxuryBudgetProfile.budgetLevel === 6, '200+ budget should map to luxury budget level');
 const luxuryAmapQuery = buildAmapRestaurantQuery(luxuryBudgetProfile);
 assert(
-  /炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家/.test(luxuryAmapQuery.keywords ?? ''),
-  '200+ budget should search premium restaurant keywords'
+  /高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should search broad premium restaurant keywords'
 );
+assert(/炳胜|利苑/.test(luxuryAmapQuery.keywords ?? ''), '200+ budget should keep known premium brand keywords as supplements');
 assert(
   !/肯德基|麦当劳|费大厨|霸王茶姬/.test(luxuryAmapQuery.keywords ?? ''),
   '200+ budget should not search low or mid chain keywords'
 );
+
+const wideDistanceProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'distance',
+    type: 'single',
+    value: 'any',
+    optionIds: ['distance_any'],
+    answeredAt: '2026-06-02T04:00:07.500Z'
+  }
+]);
+assert(wideDistanceProfile.maxDistanceMeters === 10000, 'distance_any should expand max distance to 10km');
+assert(buildAmapRestaurantQuery(wideDistanceProfile).radiusMeters === 10000, 'AMap query should allow 10km for wide distance');
 
 const brandLuxuryProfile = mapAnswersToPreferenceProfile([
   {

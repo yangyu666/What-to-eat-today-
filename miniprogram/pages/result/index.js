@@ -23,8 +23,9 @@ const DESSERT_SEARCH_ATTEMPTS = [
   { radiusMeters: 5000, keyword: '甜品|蛋糕|面包|烘焙|西点' }
 ];
 const PREMIUM_AMAP_SEARCH_ATTEMPTS = [
-  { radiusMeters: 3000, keyword: '炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家' },
-  { radiusMeters: 5000, keyword: '炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家' }
+  { radiusMeters: 3000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' },
+  { radiusMeters: 5000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' },
+  { radiusMeters: 10000, keyword: '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑' }
 ];
 const TAG_LABEL_MAP = {
   coffee: '咖啡',
@@ -375,28 +376,43 @@ async function getNearbyAmapRestaurants(questionnaire) {
 
 function getAmapSearchAttempts(questionnaire) {
   const optionIds = getQuestionnaireOptionIds(questionnaire);
+  const allowsWideDistance = optionIds.has('distance_any');
 
   if (optionIds.has('prefer_milk_tea') || optionIds.has('intent_drink')) {
-    return MILK_TEA_SEARCH_ATTEMPTS;
+    return expandSearchAttemptsForDistance(MILK_TEA_SEARCH_ATTEMPTS, allowsWideDistance);
   }
 
   if (optionIds.has('prefer_coffee')) {
-    return COFFEE_SEARCH_ATTEMPTS;
+    return expandSearchAttemptsForDistance(COFFEE_SEARCH_ATTEMPTS, allowsWideDistance);
   }
 
   if (optionIds.has('prefer_bakery_dessert') || optionIds.has('intent_dessert')) {
-    return DESSERT_SEARCH_ATTEMPTS;
+    return expandSearchAttemptsForDistance(DESSERT_SEARCH_ATTEMPTS, allowsWideDistance);
   }
 
   if (optionIds.has('budget_over_200')) {
     return PREMIUM_AMAP_SEARCH_ATTEMPTS;
   }
 
-  return AMAP_SEARCH_ATTEMPTS;
+  return expandSearchAttemptsForDistance(AMAP_SEARCH_ATTEMPTS, allowsWideDistance);
 }
 
-function isPremiumBudgetQuestionnaire(questionnaire) {
-  return getQuestionnaireOptionIds(questionnaire).has('budget_over_200');
+function expandSearchAttemptsForDistance(attempts, allowsWideDistance) {
+  if (!allowsWideDistance) {
+    return attempts;
+  }
+
+  const lastAttempt = attempts[attempts.length - 1];
+  const wideAttempt = {
+    radiusMeters: 10000,
+    keyword: lastAttempt ? lastAttempt.keyword : ''
+  };
+
+  return [...attempts, wideAttempt].filter((attempt, index, allAttempts) => {
+    return allAttempts.findIndex((item) => {
+      return item.radiusMeters === attempt.radiusMeters && item.keyword === attempt.keyword;
+    }) === index;
+  });
 }
 
 function getQuestionnaireOptionIds(questionnaire) {
