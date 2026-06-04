@@ -11,11 +11,11 @@ export interface SelectQuestionsOptions {
 const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
-  ['meal_intent', 'budget', 'distance', 'dietary_restriction', 'nutrition_goal', 'time_slot'],
-  ['meal_intent', 'budget', 'distance', 'category_preference', 'temperature', 'speed'],
-  ['meal_intent', 'budget', 'distance', 'category_avoidance', 'dietary_restriction', 'mood'],
-  ['meal_intent', 'budget', 'distance', 'spice_tolerance', 'nutrition_goal', 'scene'],
-  ['meal_intent', 'budget', 'distance', 'flavor', 'time_slot', 'speed']
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'dietary_restriction', 'time_slot'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'category_preference', 'speed'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'category_avoidance', 'dietary_restriction'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'spice_tolerance', 'nutrition_goal'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'flavor', 'time_slot']
 ];
 
 const CONFLICTING_QUESTION_GROUPS = [

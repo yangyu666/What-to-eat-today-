@@ -11,6 +11,27 @@ export interface AmapRestaurantQuery {
 const DEFAULT_RADIUS_METERS = 1500;
 const AMAP_FOOD_TYPE = '050000';
 const SAFE_FALLBACK_KEYWORDS = ['简餐', '盖饭', '粥', '轻食', '日式'];
+const PREMIUM_FALLBACK_KEYWORDS = ['炳胜', '利苑', '黑珍珠', '高端餐厅', '私房菜', '酒家'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
+const PREMIUM_CHAIN_KEYWORDS = ['炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠', '高端餐厅', '私房菜', '酒家'];
+const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[] }> = [
+  {
+    optionIds: ['prefer_milk_tea'],
+    keywords: ['奶茶', '茶饮', '霸王茶姬', '喜茶', '奈雪', '一点点']
+  },
+  {
+    optionIds: ['prefer_coffee'],
+    keywords: ['咖啡', 'cafe', 'coffee', '下午茶']
+  },
+  {
+    optionIds: ['prefer_bakery_dessert', 'intent_dessert'],
+    keywords: ['甜品', '蛋糕', '面包', '烘焙', '西点']
+  },
+  {
+    optionIds: ['intent_drink'],
+    keywords: ['饮品', '奶茶', '茶饮', '咖啡']
+  }
+];
 const TAG_KEYWORDS: Record<string, string[]> = {
   quick: ['快餐', '简餐'],
   staple: ['盖饭', '面', '套餐'],
@@ -137,12 +158,18 @@ function buildKeywords(preference: UserPreferenceProfile) {
     TAG_KEYWORDS[tagId]?.forEach((keyword) => keywords.add(keyword));
   });
 
+  applyBudgetKeywordCalibration(keywords, preference);
+  applyExplicitCategoryKeywords(keywords, preference);
+
   const beforeRemovalCount = keywords.size;
   const removedKeywords = removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
   let fallbackKeywordsUsed = false;
 
   if (keywords.size === 0 || removedKeywords.length >= Math.max(2, beforeRemovalCount / 2)) {
-    SAFE_FALLBACK_KEYWORDS.forEach((keyword) => keywords.add(keyword));
+    const fallbackKeywords =
+      (preference.budgetLevel ?? 3) >= 6 ? PREMIUM_FALLBACK_KEYWORDS : SAFE_FALLBACK_KEYWORDS;
+
+    fallbackKeywords.forEach((keyword) => keywords.add(keyword));
     removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
     fallbackKeywordsUsed = true;
   }
@@ -154,6 +181,39 @@ function buildKeywords(preference: UserPreferenceProfile) {
     removedKeywords,
     fallbackKeywordsUsed
   };
+}
+
+function applyExplicitCategoryKeywords(keywords: Set<string>, preference: UserPreferenceProfile) {
+  const selectedOptionIds = new Set(preference.selectedOptionIds ?? []);
+  const categoryRule = EXPLICIT_CATEGORY_KEYWORDS.find((rule) =>
+    rule.optionIds.some((optionId) => selectedOptionIds.has(optionId))
+  );
+
+  if (!categoryRule) {
+    return;
+  }
+
+  keywords.clear();
+  categoryRule.keywords.forEach((keyword) => keywords.add(keyword));
+}
+
+function applyBudgetKeywordCalibration(keywords: Set<string>, preference: UserPreferenceProfile) {
+  const budgetLevel = preference.budgetLevel ?? 3;
+
+  if (budgetLevel >= 6) {
+    keywords.clear();
+    PREMIUM_CHAIN_KEYWORDS.forEach((keyword) => keywords.add(keyword));
+    return;
+  }
+
+  if (budgetLevel >= 5) {
+    LOW_CHAIN_KEYWORDS.forEach((keyword) => keywords.delete(keyword));
+    return;
+  }
+
+  if (budgetLevel <= 3) {
+    PREMIUM_CHAIN_KEYWORDS.forEach((keyword) => keywords.delete(keyword));
+  }
 }
 
 function removeNegativeConflictKeywords(keywords: Set<string>, avoidedTagIds: string[]): string[] {

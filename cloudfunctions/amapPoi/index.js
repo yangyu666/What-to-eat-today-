@@ -6,6 +6,7 @@ cloud.init({
 });
 
 const AMAP_PLACE_AROUND_URL = 'https://restapi.amap.com/v3/place/around';
+const AMAP_REGEOCODE_URL = 'https://restapi.amap.com/v3/geocode/regeo';
 const DEFAULT_RADIUS_METERS = 1500;
 const DEFAULT_PAGE_SIZE = 20;
 const AMAP_FOOD_TYPE = '050000';
@@ -72,6 +73,21 @@ Object.assign(TAG_LABELS, {
   sugary_drink: '含糖饮品'
 });
 
+Object.assign(TAG_LABELS, {
+  chain_brand: '品牌连锁',
+  low_chain: '平价连锁',
+  mid_chain: '中档品牌',
+  premium_brand: '高端品牌',
+  independent_store: '街边小店',
+  street_shop: '本地小店',
+  dim_sum: '点心'
+});
+
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
+const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居'];
+const PREMIUM_CHAIN_KEYWORDS = ['炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
+const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '私房', '大排档', '排档', '小馆', '家常', '本地'];
+
 const TAG_RULES = [
   { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
   { pattern: /麻辣烫|麻辣拌/, ids: ['spicy', 'strong_flavor', 'heavy', 'malatang', 'hot', 'quick'] },
@@ -123,6 +139,31 @@ exports.main = async (event = {}, context = {}) => {
 
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
       return fail(requestId, 'INVALID_LOCATION', 'latitude and longitude are required.');
+    }
+
+    if (event.action === 'reverseGeocode') {
+      const amapResponse = await requestAmapRegeo({ key, latitude, longitude });
+
+      if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
+        return fail(requestId, 'AMAP_REGEOCODE_FAILED', amapResponse.info || 'AMap reverse geocode failed.', {
+          infocode: amapResponse.infocode,
+          status: amapResponse.status
+        });
+      }
+
+      const addressComponent = amapResponse.regeocode && amapResponse.regeocode.addressComponent;
+
+      return {
+        ok: true,
+        data: {
+          location: { latitude, longitude },
+          province: normalizeAmapText(addressComponent && addressComponent.province),
+          city: normalizeAmapText(addressComponent && addressComponent.city),
+          district: normalizeAmapText(addressComponent && addressComponent.district),
+          address: normalizeAmapText(amapResponse.regeocode && amapResponse.regeocode.formatted_address)
+        },
+        requestId
+      };
     }
 
     const radius = clampInteger(event.radiusMeters, 300, 5000, DEFAULT_RADIUS_METERS);
@@ -205,6 +246,22 @@ function requestAmap({ key, latitude, longitude, radius, pageSize, keyword, type
 
   const url = `${AMAP_PLACE_AROUND_URL}?${params.toString()}`;
 
+  return requestJson(url);
+}
+
+function requestAmapRegeo({ key, latitude, longitude }) {
+  const params = new URLSearchParams({
+    key,
+    location: `${longitude},${latitude}`,
+    extensions: 'base',
+    output: 'json'
+  });
+  const url = `${AMAP_REGEOCODE_URL}?${params.toString()}`;
+
+  return requestJson(url);
+}
+
+function requestJson(url) {
   return new Promise((resolve, reject) => {
     https
       .get(url, (response) => {
@@ -232,8 +289,11 @@ function convertPoiToRestaurant(poi) {
   }
 
   const location = parseAmapLocation(poi.location);
-  const averageCostYuan = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
-  const tagIds = mapCategoryToTagIds([poi.type, poi.typecode, poi.name].filter(Boolean).join(';'));
+  const text = [poi.type, poi.typecode, poi.name].filter(Boolean).join(';');
+  const explicitAverageCostYuan = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
+  const tagIds = mapCategoryToTagIds(text);
+  const inferredAverageCostYuan = inferAverageCostYuan(text, tagIds);
+  const averageCostYuan = explicitAverageCostYuan || inferredAverageCostYuan;
   const photos = Array.isArray(poi.photos) ? poi.photos : [];
   const firstPhoto = photos.find((photo) => photo && photo.url);
 
@@ -259,6 +319,32 @@ function convertPoiToRestaurant(poi) {
   };
 }
 
+function buildKeywordPattern(keywords) {
+  return new RegExp(keywords.map(escapeRegExp).join('|'), 'i');
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function inferAverageCostYuan(text, tagIds) {
+  const normalizedText = String(text || '').toLowerCase();
+
+  if (PREMIUM_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    return 260;
+  }
+
+  if (MID_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    return 140;
+  }
+
+  if (LOW_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    return tagIds.includes('milk_tea') || tagIds.includes('drink') ? 25 : 45;
+  }
+
+  return undefined;
+}
+
 function mapCategoryToTagIds(text) {
   const ids = new Set();
   const explicitlyNotSpicy = /不辣|清淡|白汤|原味|广式|粥|沙拉|轻食/.test(text);
@@ -268,6 +354,8 @@ function mapCategoryToTagIds(text) {
       rule.ids.forEach((id) => ids.add(id));
     }
   });
+
+  addBrandTags(ids, text);
 
   if (explicitlyNotSpicy) {
     ['spicy', 'strong_flavor', 'heavy', 'sichuan', 'hunan', 'malatang', 'maocai', 'dry_pot', 'hotpot'].forEach((id) => ids.delete(id));
@@ -280,6 +368,30 @@ function mapCategoryToTagIds(text) {
   }
 
   return [...ids];
+}
+
+function addBrandTags(ids, text) {
+  const normalizedText = String(text || '').toLowerCase();
+
+  if (['虾饺', '烧卖', '烧麦', '茶点', '早茶', '点心'].some((keyword) => normalizedText.includes(keyword))) {
+    ['dim_sum', 'meal', 'snack'].forEach((id) => ids.add(id));
+  }
+
+  if (LOW_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'low_chain'].forEach((id) => ids.add(id));
+  }
+
+  if (MID_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'mid_chain', 'relaxed'].forEach((id) => ids.add(id));
+  }
+
+  if (PREMIUM_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((id) => ids.add(id));
+  }
+
+  if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
+    ['independent_store', 'street_shop'].forEach((id) => ids.add(id));
+  }
 }
 
 function parseAmapLocation(value) {

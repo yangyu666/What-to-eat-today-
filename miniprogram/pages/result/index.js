@@ -10,6 +10,22 @@ const AMAP_SEARCH_ATTEMPTS = [
   { radiusMeters: 3000, keyword: '' },
   { radiusMeters: 5000, keyword: '' }
 ];
+const MILK_TEA_SEARCH_ATTEMPTS = [
+  { radiusMeters: 3000, keyword: '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点' },
+  { radiusMeters: 5000, keyword: '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点' }
+];
+const COFFEE_SEARCH_ATTEMPTS = [
+  { radiusMeters: 3000, keyword: '咖啡|cafe|coffee|下午茶' },
+  { radiusMeters: 5000, keyword: '咖啡|cafe|coffee|下午茶' }
+];
+const DESSERT_SEARCH_ATTEMPTS = [
+  { radiusMeters: 3000, keyword: '甜品|蛋糕|面包|烘焙|西点' },
+  { radiusMeters: 5000, keyword: '甜品|蛋糕|面包|烘焙|西点' }
+];
+const PREMIUM_AMAP_SEARCH_ATTEMPTS = [
+  { radiusMeters: 3000, keyword: '炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家' },
+  { radiusMeters: 5000, keyword: '炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家' }
+];
 const TAG_LABEL_MAP = {
   coffee: '咖啡',
   relaxed: '放松',
@@ -227,7 +243,7 @@ Page({
       matchPercent: recommendation ? Math.round(recommendation.confidenceScore || 0) : 0,
       distanceText:
         typeof distanceMeters === 'number' ? `${(distanceMeters / 1000).toFixed(1)} km` : '距离未知',
-      averageCostText: typeof averageCostYuan === 'number' ? `¥${averageCostYuan}/人` : '人均未知',
+      averageCostText: typeof averageCostYuan === 'number' ? `¥ ${averageCostYuan}/人` : '人均未知',
       walkText: walkingMinutes ? `步行${walkingMinutes}分钟` : '步行时间未知',
       ratingText: typeof rating === 'number' ? `${rating.toFixed(1)}评分` : '评分未知',
       mealNameText: recommendation ? recommendation.mealName || recommendation.name || '' : '',
@@ -266,7 +282,7 @@ Page({
 async function getRecommendations(questionnaire, historyFilterContext = getRecentHistoryFilterContext()) {
   ensureCloudInitialized();
   const historyFilterEnabled = historyFilterContext.historyFilterEnabled === true;
-  const restaurants = await getNearbyAmapRestaurants();
+  const restaurants = await getNearbyAmapRestaurants(questionnaire);
 
   if (restaurants.length === 0) {
     throw new Error('No real nearby restaurant candidates available from AMap.');
@@ -324,10 +340,11 @@ async function getRecommendations(questionnaire, historyFilterContext = getRecen
   }));
 }
 
-async function getNearbyAmapRestaurants() {
+async function getNearbyAmapRestaurants(questionnaire) {
   const location = await getUserLocation();
+  const attempts = getAmapSearchAttempts(questionnaire);
 
-  for (const attempt of AMAP_SEARCH_ATTEMPTS) {
+  for (const attempt of attempts) {
     const response = await wx.cloud.callFunction({
       name: AMAP_POI_FUNCTION_NAME,
       data: {
@@ -354,6 +371,45 @@ async function getNearbyAmapRestaurants() {
   }
 
   return [];
+}
+
+function getAmapSearchAttempts(questionnaire) {
+  const optionIds = getQuestionnaireOptionIds(questionnaire);
+
+  if (optionIds.has('prefer_milk_tea') || optionIds.has('intent_drink')) {
+    return MILK_TEA_SEARCH_ATTEMPTS;
+  }
+
+  if (optionIds.has('prefer_coffee')) {
+    return COFFEE_SEARCH_ATTEMPTS;
+  }
+
+  if (optionIds.has('prefer_bakery_dessert') || optionIds.has('intent_dessert')) {
+    return DESSERT_SEARCH_ATTEMPTS;
+  }
+
+  if (optionIds.has('budget_over_200')) {
+    return PREMIUM_AMAP_SEARCH_ATTEMPTS;
+  }
+
+  return AMAP_SEARCH_ATTEMPTS;
+}
+
+function isPremiumBudgetQuestionnaire(questionnaire) {
+  return getQuestionnaireOptionIds(questionnaire).has('budget_over_200');
+}
+
+function getQuestionnaireOptionIds(questionnaire) {
+  const answers = questionnaire && Array.isArray(questionnaire.answers) ? questionnaire.answers : [];
+  const optionIds = new Set();
+
+  answers.forEach((answer) => {
+    if (Array.isArray(answer.optionIds)) {
+      answer.optionIds.forEach((optionId) => optionIds.add(optionId));
+    }
+  });
+
+  return optionIds;
 }
 
 function getUserLocation() {

@@ -24,7 +24,8 @@ export type PreferenceDimension =
   | 'nutrition_goal'
   | 'time_slot'
   | 'category_avoidance'
-  | 'category_preference';
+  | 'category_preference'
+  | 'brand_preference';
 
 export interface PreferenceOption {
   id: PreferenceOptionId;

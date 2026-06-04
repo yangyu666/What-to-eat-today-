@@ -19,6 +19,7 @@ export interface PreferenceOptionEffect {
     mealWeight?: 'light' | 'normal' | 'filling';
     mood?: string;
     scene?: string;
+    brandPreference?: 'chain' | 'independent' | 'none';
     amapKeywords?: string[];
   };
   removeNegativeTags?: TagId[];
@@ -1083,6 +1084,64 @@ export const questionBank: QuestionBankItem[] = [
         }
       },
 
+    ]
+  },
+  {
+    id: 'brand_preference',
+    dimension: 'brand_preference',
+    title: '今天想吃连锁品牌还是街边小店？',
+    subtitle: '品牌店更稳定，小店更有烟火气，预算也会跟着一起校准',
+    type: 'single',
+    options: [
+      {
+        id: 'brand_any',
+        label: '都可以',
+        desc: '不限制品牌或小店，按口味、预算和距离综合推荐',
+        selected: false,
+        value: 'any',
+        themeClass: 'theme-red',
+        visual: 'open',
+        icon: 'ok',
+        imageUrl: QUESTION_OPTION_IMAGES.avoidanceNone,
+        effect: {
+          softPreferences: { brandPreference: 'none' }
+        }
+      },
+      {
+        id: 'brand_chain',
+        label: '连锁/品牌',
+        desc: '优先品牌稳定、门店信息清晰的餐厅，并按预算区分档次',
+        selected: false,
+        value: 'chain',
+        themeClass: 'theme-green',
+        visual: 'brand',
+        icon: 'brand',
+        imageUrl: QUESTION_OPTION_IMAGES.budgetHigh,
+        effect: {
+          positiveTags: ['chain_brand'],
+          negativeTags: ['independent_store', 'street_shop'],
+          softPreferences: {
+            brandPreference: 'chain',
+            amapKeywords: ['肯德基', '麦当劳', '费大厨', '炳胜']
+          }
+        }
+      },
+      {
+        id: 'brand_independent',
+        label: '街边小店',
+        desc: '优先本地小店、老店和烟火气，弱化大连锁品牌',
+        selected: false,
+        value: 'independent',
+        themeClass: 'theme-green',
+        visual: 'street',
+        icon: 'store',
+        imageUrl: QUESTION_OPTION_IMAGES.sceneSolo,
+        effect: {
+          positiveTags: ['independent_store', 'street_shop'],
+          negativeTags: ['chain_brand', 'low_chain', 'mid_chain', 'premium_brand'],
+          softPreferences: { brandPreference: 'independent' }
+        }
+      }
     ]
   },
   {

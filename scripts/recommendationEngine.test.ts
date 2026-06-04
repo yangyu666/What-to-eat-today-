@@ -284,6 +284,98 @@ const luxuryLowOnlyResult = recommend(
 );
 assert(luxuryLowOnlyResult.candidates.length === 0, '200+ budget should not fallback to clearly low-price candidates');
 
+const luxuryUnknownOnlyResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'slow', 'group'],
+    budgetLevel: 6,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'luxury-unknown-price',
+      name: 'unknown price restaurant',
+      tags: ['restaurant'],
+      tagIds: ['meal', 'relaxed', 'slow'],
+      category: 'restaurant',
+      distanceMeters: 120,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryUnknownOnlyResult.candidates.length === 0, '200+ budget should not recommend price unknown candidates');
+
+const premiumLowOnlyResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'group'],
+    budgetLevel: 5,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'premium-low-only',
+      name: 'cheap set meal',
+      tags: ['set meal'],
+      tagIds: ['meal', 'set_meal', 'quick'],
+      category: 'set meal',
+      distanceMeters: 120,
+      averageCostYuan: 55,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(premiumLowOnlyResult.candidates.length === 0, '100-200 budget should not recommend dozens-yuan restaurants');
+
+const dedupeResult = recommend(
+  profile({
+    preferredTagIds: ['meal', 'rice'],
+    budgetLevel: 3,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'same-store-1',
+      name: 'same rice shop',
+      tags: ['rice'],
+      tagIds: ['meal', 'rice'],
+      category: 'rice',
+      distanceMeters: 100,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'same-store-2',
+      name: 'same rice shop',
+      tags: ['rice'],
+      tagIds: ['meal', 'rice'],
+      category: 'rice',
+      distanceMeters: 120,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'other-store',
+      name: 'other rice shop',
+      tags: ['rice'],
+      tagIds: ['meal', 'rice'],
+      category: 'rice',
+      distanceMeters: 200,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    }
+  ]
+);
+assert(new Set(dedupeResult.candidates.map((candidate) => candidate.restaurant?.name)).size === dedupeResult.candidates.length, 'Top recommendations should not contain duplicate restaurant names');
+
 
 
 
@@ -302,7 +394,7 @@ const unknownZeroCostScore = scoreRestaurant(
   },
   budgetRangePreference
 );
-assert(unknownZeroCostScore.breakdown.priceScore === 0, '高德 cost=0 应按价格未知处理，不能当作 0 元加分');
+assert(unknownZeroCostScore.breakdown.priceScore < 0, '高德 cost=0 应按价格未知处理并降权，不能当作 0 元加分');
 
 const light = profile({
   preferredTagIds: ['light', 'healthy', 'low_burden', 'not_spicy'],
@@ -887,6 +979,74 @@ const drinkPreference = profile({
 });
 const drinkResult = recommend(drinkPreference, breadthRestaurants);
 assert(['breadth-milk-tea', 'breadth-coffee'].includes(drinkResult.candidates[0]?.restaurantId ?? ''), 'when user wants milk tea or coffee, Top1 should not be a meal');
+
+const drinkVsDimSumResult = recommend(
+  profile({
+    selectedOptionIds: ['prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'milk-tea-real',
+      name: '霸王茶姬',
+      tags: ['milk tea'],
+      category: '奶茶饮品',
+      distanceMeters: 400,
+      averageCostYuan: 25,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    },
+    {
+      id: 'dim-sum-close',
+      name: '虾饺点心铺',
+      tags: ['dim sum'],
+      category: '广式点心',
+      distanceMeters: 80,
+      averageCostYuan: 32,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(drinkVsDimSumResult.candidates[0]?.restaurantId === 'milk-tea-real', 'milk tea preference should not rank dim sum or shrimp dumpling above drinks');
+
+const milkTeaVsCoffeeResult = recommend(
+  profile({
+    selectedOptionIds: ['prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal'],
+    avoidedTagIds: ['meal', 'coffee', 'dessert'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'milk-tea-brand',
+      name: '霸王茶姬',
+      tags: ['奶茶', '茶饮'],
+      category: '奶茶饮品',
+      distanceMeters: 500,
+      averageCostYuan: 24,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    },
+    {
+      id: 'coffee-nearby',
+      name: '精品咖啡',
+      tags: ['coffee'],
+      category: '咖啡馆',
+      distanceMeters: 120,
+      averageCostYuan: 36,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(milkTeaVsCoffeeResult.candidates[0]?.restaurantId === 'milk-tea-brand', 'explicit milk tea preference should rank milk tea above nearby coffee');
 
 const dessertPreference = profile({
   selectedOptionIds: ['intent_dessert'],

@@ -117,6 +117,37 @@ const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
 ]);
 
 assert(luxuryBudgetProfile.budgetLevel === 6, '200+ budget should map to luxury budget level');
+const luxuryAmapQuery = buildAmapRestaurantQuery(luxuryBudgetProfile);
+assert(
+  /炳胜|利苑|黑珍珠|高端餐厅|私房菜|酒家/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should search premium restaurant keywords'
+);
+assert(
+  !/肯德基|麦当劳|费大厨|霸王茶姬/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should not search low or mid chain keywords'
+);
+
+const brandLuxuryProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: 'over_200',
+    optionIds: ['budget_over_200'],
+    answeredAt: '2026-06-02T04:00:07.000Z'
+  },
+  {
+    questionId: 'brand_preference',
+    type: 'single',
+    value: 'chain',
+    optionIds: ['brand_chain'],
+    answeredAt: '2026-06-02T04:00:08.000Z'
+  }
+]);
+const brandLuxuryQuery = buildAmapRestaurantQuery(brandLuxuryProfile);
+assert(
+  !/肯德基|麦当劳|费大厨|霸王茶姬/.test(brandLuxuryQuery.keywords ?? ''),
+  '200+ chain preference should still avoid low and mid chain keywords'
+);
 
 const milkTeaProfile = mapAnswersToPreferenceProfile([
   {
@@ -137,6 +168,22 @@ assert(
     milkTeaKeywords.some((keyword) => keyword === '奶茶'),
   'milk tea preference should add AMap milk tea keyword'
 );
+const milkTeaQuery = buildAmapRestaurantQuery(milkTeaProfile);
+assert(/奶茶|茶饮|霸王茶姬/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should keep milk tea recall keywords');
+assert(!/咖啡|甜品|蛋糕|面包|盖饭|虾饺/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should not drift into coffee, dessert, or meal keywords');
+
+const dessertProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'meal_intent',
+    type: 'single',
+    value: 'dessert',
+    optionIds: ['intent_dessert'],
+    answeredAt: '2026-06-02T04:10:00.500Z'
+  }
+]);
+const dessertQuery = buildAmapRestaurantQuery(dessertProfile);
+assert(/甜品|蛋糕|面包|烘焙|西点/.test(dessertQuery.keywords ?? ''), 'dessert query should keep dessert recall keywords');
+assert(!/盖饭|套餐|简餐/.test(dessertQuery.keywords ?? ''), 'dessert query should not drift into meal keywords');
 
 const halalProfile = mapAnswersToPreferenceProfile([
   {
