@@ -273,6 +273,7 @@
   width: 100%;
   max-height: 78vh;
   overflow: hidden;
+  box-sizing: border-box;
   border-radius: 28rpx;
   background: #ffffff;
   box-shadow: 0 28rpx 70rpx rgba(16, 45, 32, 0.18);
@@ -291,12 +292,15 @@
 }
 
 .guide-body {
+  width: 100%;
   max-height: 58vh;
   padding: 0 34rpx 20rpx;
+  box-sizing: border-box;
 }
 
 .guide-section {
   padding: 22rpx 0;
+  box-sizing: border-box;
   border-top: 1rpx solid rgba(56, 45, 35, 0.08);
 }
 
@@ -314,11 +318,17 @@
 
 .guide-section-content {
   display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   margin-top: 10rpx;
   color: rgba(56, 45, 35, 0.72);
   font-size: 27rpx;
   line-height: 1.7;
   text-align: left;
+  white-space: normal;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .guide-confirm {
