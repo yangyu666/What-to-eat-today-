@@ -34,7 +34,7 @@
             <text class="date">{{item.dateText}}</text>
           </view>
         </view>
-        <text class="dish-name">{{item.subtitleText}}</text>
+        <text class="dish-name" wx:if="{{item.subtitleText}}">{{item.subtitleText}}</text>
         <text class="note">{{item.reasonText}}</text>
         <view class="meta-row">
           <text>{{item.matchText}}</text>

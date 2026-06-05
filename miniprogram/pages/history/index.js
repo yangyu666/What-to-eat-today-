@@ -143,7 +143,7 @@ function toHistoryViewItem(item) {
     subtitleText:
       item.restaurantName && item.mealName !== item.restaurantName
         ? `推荐菜：${item.mealName}`
-        : '推荐菜待补充',
+        : '',
     actionText: getActionText(item.action),
     sourceText: getSourceText(item.source),
     matchText:
