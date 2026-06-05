@@ -185,6 +185,26 @@ const milkTeaQuery = buildAmapRestaurantQuery(milkTeaProfile);
 assert(/奶茶|茶饮|霸王茶姬/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should keep milk tea recall keywords');
 assert(!/咖啡|甜品|蛋糕|面包|盖饭|虾饺/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should not drift into coffee, dessert, or meal keywords');
 
+const luxuryDrinkProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'meal_intent',
+    type: 'single',
+    value: 'drink',
+    optionIds: ['intent_drink'],
+    answeredAt: '2026-06-02T04:10:00.100Z'
+  },
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: 'over_200',
+    optionIds: ['budget_over_200'],
+    answeredAt: '2026-06-02T04:10:00.200Z'
+  }
+]);
+const luxuryDrinkQuery = buildAmapRestaurantQuery(luxuryDrinkProfile);
+assert(/饮品|奶茶|茶饮|咖啡/.test(luxuryDrinkQuery.keywords ?? ''), '200+ drink intent should still search drink keywords');
+assert(!/omakase|Fine Dining|高端餐厅|私房菜/.test(luxuryDrinkQuery.keywords ?? ''), '200+ drink intent should not drift into premium meal keywords');
+
 const dessertProfile = mapAnswersToPreferenceProfile([
   {
     questionId: 'meal_intent',
@@ -270,6 +290,34 @@ const avoidDrinksQuery = buildAmapRestaurantQuery(avoidDrinksProfile);
 
 assert(avoidDrinksProfile.avoidedTagIds.includes('milk_tea'), 'avoid drinks should map milk_tea to avoided tags');
 assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinksQuery.keywords ?? ''), 'avoid drinks should remove conflicting AMap keywords');
+
+const premiumBrandMealProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'meal_intent',
+    type: 'single',
+    value: 'meal',
+    optionIds: ['intent_meal'],
+    answeredAt: '2026-06-02T04:10:03.100Z'
+  },
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: 6,
+    optionIds: ['budget_over_200'],
+    answeredAt: '2026-06-02T04:10:03.200Z'
+  },
+  {
+    questionId: 'brand_preference',
+    type: 'single',
+    value: 'chain',
+    optionIds: ['brand_chain'],
+    answeredAt: '2026-06-02T04:10:03.300Z'
+  }
+]);
+const premiumBrandMealQuery = buildAmapRestaurantQuery(premiumBrandMealProfile);
+
+assert(/高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑/.test(premiumBrandMealQuery.keywords ?? ''), 'premium brand meal query should include high-end brand recall keywords');
+assert(!/奶茶|咖啡|甜品/.test(premiumBrandMealQuery.keywords ?? ''), 'premium brand meal query should not drift into non-meal keywords');
 
 const allOptions = questions.flatMap((question) => question.options ?? []);
 assert(allOptions.every((option) => Boolean(option.imageUrl || option.icon)), 'selected questions should expose imageUrl or icon on every option');

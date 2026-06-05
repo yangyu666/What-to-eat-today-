@@ -10,6 +10,9 @@ coverage/
 miniprogram/**/*.js
 !miniprogram/app.js
 !miniprogram/pages/**/index.js
+!miniprogram/config/**/*.js
+!miniprogram/data/**/*.js
+!miniprogram/services/**/*.js
 
 # WeChat DevTools
 .idea/

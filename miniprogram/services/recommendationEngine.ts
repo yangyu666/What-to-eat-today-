@@ -179,7 +179,8 @@ const NON_RESTAURANT_SALES_KEYWORDS = [
   '食品销售',
   '商贸',
   '展销',
-  '经销'
+  '经销',
+  '有礼'
 ];
 const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
 const HALAL_CONFLICT_TAGS = ['pork'];
@@ -222,14 +223,17 @@ const INFERRED_TAG_RULES: Array<{ keywords: string[]; tags: TagId[]; skipWhenNot
   { keywords: ['炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
   { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group'] },
   { keywords: ['粥', '粉面', '云吞', '馄饨', '广式', '茶餐厅'], tags: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
+  { keywords: ['茶楼', '早茶'], tags: ['dim_sum', 'meal', 'snack', 'light', 'not_spicy'] },
   { keywords: ['轻食', '沙拉', '健康', '低卡', '减脂'], tags: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
   { keywords: ['盖饭', '便当', '简餐', '套餐'], tags: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
   { keywords: ['包子', '饺子', '煎饼', '烧麦', '小吃'], tags: ['quick', 'snack', 'solo', 'hot'] },
+  { keywords: ['热卤', '卤味', '盛香亭'], tags: ['snack', 'meal', 'hot', 'heavy', 'strong_flavor'] },
+  { keywords: ['料理', '南洋料理'], tags: ['meal', 'rice', 'relaxed', 'stable'] },
   { keywords: ['日式', '日本', '寿司', '咖喱'], tags: ['rice', 'not_spicy', 'stable', 'solo'] }
-  , { keywords: ['咖啡', 'cafe', 'coffee'], tags: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '霸王茶姬'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { keywords: ['饮品', '果茶', '糖水'], tags: ['drink', 'non_meal', 'sweet', 'sugary_drink'] },
-  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  , { keywords: ['咖啡', 'cafe', 'coffee', '星巴克', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons', 'm stand', 'seesaw', 'arabica'], tags: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
+  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '1点点', '霸王茶姬', '蜜雪冰城', '柠檬茶', 'linlee', '麒麟大口茶', '大口茶', 'koi', 'koi thé', 'koi the', 'thé', '阿嬷手作', '去茶山', '古茗'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['饮品', '果茶', '糖水', '手打柠檬茶', '麒麟大口茶', '大口茶', 'koi', 'thé', '混果汁'], tags: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点', 'gelato', 'pinvita', 'butterful', 'creamorous', '珞珞', 'bakery', '冰淇淋', 'paper stone'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { keywords: ['早餐', '包子', '豆浆', '油条'], tags: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { keywords: ['夜宵', '宵夜'], tags: ['late_night', 'quick', 'hot', 'snack'] },
   { keywords: ['清真', '兰州拉面', '牛肉面'], tags: ['halal', 'noodle', 'hot', 'high_protein'] },
@@ -257,8 +261,23 @@ const SPICY_KEYWORDS = [
 ];
 const GREASY_KEYWORDS = ['炸', '炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '烧烤', '烤肉', '汉堡', '薯条', '油炸'];
 
-const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶'];
-const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭'];
+const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '混果汁', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋'];
+const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭', '徽菜', '新徽菜', '小菜园', '茶楼', '早茶', '热卤', '卤味', '料理'];
+const BROAD_MEAL_KEYWORDS = [
+  '餐厅',
+  '餐馆',
+  '饭店',
+  '私厨',
+  '酒家',
+  '食堂',
+  'restaurant',
+  'omakase',
+  'fine dining',
+  'bistro',
+  'chateau',
+  'chef',
+  'hotpot'
+];
 const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
 const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
 const SWEET_KEYWORDS = ['甜品', '蛋糕', '奶茶', '茶饮', '糖水'];
@@ -281,7 +300,24 @@ const LOW_CHAIN_KEYWORDS = [
   '霸王茶姬',
   '喜茶',
   '奈雪',
-  '一点点'
+  '一点点',
+  '蜜雪冰城',
+  'linlee',
+  '麒麟大口茶',
+  '大口茶',
+  'koi',
+  '阿嬷手作',
+  '去茶山',
+  '古茗',
+  '星巴克',
+  'starbucks',
+  '瑞幸',
+  'luckin',
+  'manner',
+  'peet',
+  'costa',
+  'tims',
+  'tim hortons'
 ];
 const MID_CHAIN_KEYWORDS = [
   '费大厨',
@@ -300,7 +336,9 @@ const MID_CHAIN_KEYWORDS = [
   '怂火锅',
   '大龙燚',
   '点都德',
-  '陶陶居'
+  '陶陶居',
+  '小菜园',
+  '小菜园新徽菜'
 ];
 const PREMIUM_CHAIN_KEYWORDS = [
   '高端餐厅',
@@ -606,6 +644,16 @@ export function applyHardFilters(
 
   if (isNonRestaurantSalesCandidate(restaurantText)) {
     reasons.push('非到店餐饮门店');
+  }
+
+  const restaurantTagIds = getRestaurantTagIds(restaurant);
+
+  if (isExplicitNonMealPreference(preference) && isLikelyMealCandidate(restaurant, restaurantTagIds)) {
+    reasons.push('明确非正餐意图与正餐候选冲突');
+  }
+
+  if (isExplicitMealPreference(preference) && hasNonMealEvidence(restaurantTagIds, restaurantText)) {
+    reasons.push('明确正餐意图与饮品/甜点候选冲突');
   }
 
   if (requiresBrandCandidate(preference) && !isAcceptableBrandCandidate(restaurant, preference)) {
@@ -1173,6 +1221,12 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
     setSeverity('hard');
   }
 
+  if (explicitNonMeal && isLikelyMealCandidate(restaurant, tagIds)) {
+    tags.add('meal');
+    labels.add('explicit non-meal intent conflicts with restaurant candidate');
+    setSeverity('hard');
+  }
+
   if (explicitDrinkOnly && tagIds.includes('snack') && !tagIds.some((tagId) => NON_MEAL_TAGS.includes(tagId))) {
     tags.add('snack');
     labels.add('drink intent conflicts with snack or dim sum candidate');
@@ -1264,6 +1318,10 @@ function inferTagIdsFromRestaurantText(restaurant: Restaurant, explicitTagIds: T
     DEFAULT_SPICY_HEAVY_TAGS.forEach((tagId) => inferred.add(tagId));
   }
 
+  if (isLikelyMealText(text) && !hasNonMealEvidence([...explicitTagIds, ...inferred], text)) {
+    inferred.add('meal');
+  }
+
   if (['虾饺', '烧卖', '烧麦', '茶点', '早茶', '点心'].some((keyword) => text.includes(keyword))) {
     ['dim_sum', 'meal', 'snack'].forEach((tagId) => inferred.add(tagId));
   }
@@ -1305,6 +1363,31 @@ function getRestaurantText(restaurant: Restaurant): string {
     .toLowerCase();
 }
 
+function isLikelyMealCandidate(restaurant: Restaurant, tagIds: TagId[]): boolean {
+  const text = getRestaurantText(restaurant);
+
+  if (hasNonMealEvidence(tagIds, text)) {
+    return false;
+  }
+
+  return (
+    MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) ||
+    isLikelyMealText(text) ||
+    (getEstimatedCost(restaurant) ?? 0) >= 100
+  );
+}
+
+function isLikelyMealText(text: string): boolean {
+  return [...MEAL_KEYWORDS, ...BROAD_MEAL_KEYWORDS].some((keyword) => text.includes(keyword));
+}
+
+function hasNonMealEvidence(tagIds: TagId[], text: string): boolean {
+  return (
+    NON_MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) ||
+    NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword))
+  );
+}
+
 function getCandidateImageUrl(restaurant: Restaurant, matchedPreferredTagIds: TagId[]): string | undefined {
   return normalizeImageUrl(restaurant.coverImageUrl) || getFallbackImageUrl(restaurant, matchedPreferredTagIds);
 }
@@ -1323,15 +1406,15 @@ function getFallbackImageUrl(restaurant: Restaurant, matchedPreferredTagIds: Tag
     return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80';
   }
 
-  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪/.test(text)) {
+  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪|一点点|1点点|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗/.test(text)) {
     return 'https://images.unsplash.com/photo-1558857563-b371033873b8?auto=format&fit=crop&w=900&q=80';
   }
 
-  if (/咖啡|coffee|cafe/.test(text)) {
+  if (/咖啡|coffee|cafe|星巴克|starbucks|瑞幸|luckin|manner|peet|costa|tims|tim hortons/.test(text)) {
     return 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80';
   }
 
-  if (/甜品|蛋糕|面包|dessert|bakery/.test(text)) {
+  if (/甜品|蛋糕|面包|dessert|bakery|gelato|pinvita|butterful|creamorous|珞珞|冰淇淋|paper stone/.test(text)) {
     return 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80';
   }
 
@@ -1430,8 +1513,13 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
   }
 
   const estimatedCost = getEstimatedCost(restaurant);
+  const flexibleNonMealBudget = isFlexibleNonMealBudget(preference);
 
   if (estimatedCost === undefined) {
+    if (flexibleNonMealBudget) {
+      return -10;
+    }
+
     if (preference.budgetLevel >= 6) {
       return -80;
     }
@@ -1454,6 +1542,14 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
   }
 
   if (range.min !== undefined && estimatedCost < range.min) {
+    if (flexibleNonMealBudget) {
+      if (estimatedCost >= range.min * 0.65) {
+        return 2;
+      }
+
+      return preference.budgetLevel >= 6 ? -14 : -8;
+    }
+
     if ((preference.budgetLevel ?? 3) >= 4) {
       if (estimatedCost >= range.min * 0.85) {
         return 4;
@@ -1681,6 +1777,10 @@ function isClearlyUnderBudget(restaurant: Restaurant, preference?: UserPreferenc
     return false;
   }
 
+  if (isFlexibleNonMealBudget(preference)) {
+    return false;
+  }
+
   const range = getBudgetRange(preference);
   const estimatedCost = getEstimatedCost(restaurant);
 
@@ -1696,7 +1796,58 @@ function isClearlyUnderBudget(restaurant: Restaurant, preference?: UserPreferenc
 }
 
 function isPriceUnknownForStrictBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
-  return preference?.budgetLevel !== undefined && preference.budgetLevel >= 5 && isPriceUnknown(restaurant);
+  return (
+    preference?.budgetLevel !== undefined &&
+    preference.budgetLevel >= 5 &&
+    !isFlexibleNonMealBudget(preference) &&
+    isPriceUnknown(restaurant)
+  );
+}
+
+function isFlexibleNonMealBudget(preference?: UserPreferenceProfile): boolean {
+  if (!preference || (preference.budgetLevel ?? 3) < 5) {
+    return false;
+  }
+
+  const selected = new Set(preference.selectedOptionIds ?? []);
+  const preferred = new Set(getPreferredTagIds(preference));
+
+  return (
+    DRINK_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId)) ||
+    DESSERT_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId)) ||
+    preferred.has('non_meal') ||
+    preferred.has('drink') ||
+    preferred.has('coffee') ||
+    preferred.has('milk_tea') ||
+    preferred.has('dessert') ||
+    preferred.has('afternoon_tea')
+  );
+}
+
+function isExplicitNonMealPreference(preference?: UserPreferenceProfile): boolean {
+  if (!preference) {
+    return false;
+  }
+
+  const selected = new Set(preference.selectedOptionIds ?? []);
+
+  return (
+    selected.has('intent_drink') ||
+    selected.has('intent_dessert') ||
+    selected.has('prefer_milk_tea') ||
+    selected.has('prefer_coffee') ||
+    selected.has('prefer_bakery_dessert')
+  );
+}
+
+function isExplicitMealPreference(preference?: UserPreferenceProfile): boolean {
+  if (!preference) {
+    return false;
+  }
+
+  const selected = new Set(preference.selectedOptionIds ?? []);
+
+  return selected.has('intent_meal') || selected.has('intent_staple');
 }
 
 function isPriceUnknown(restaurant: Restaurant): boolean {

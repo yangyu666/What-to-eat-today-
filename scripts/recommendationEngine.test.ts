@@ -329,6 +329,193 @@ const premiumLowOnlyResult = recommend(
 );
 assert(premiumLowOnlyResult.candidates.length === 0, '100-200 budget should not recommend dozens-yuan restaurants');
 
+const premiumDrinkLowOnlyResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink'],
+    preferredTagIds: ['drink', 'milk_tea', 'coffee', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+    budgetLevel: 5,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'premium-drink-low-price',
+      name: 'Naixue Tea',
+      tags: ['milk tea'],
+      tagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'chain_brand'],
+      category: 'tea drink',
+      distanceMeters: 120,
+      averageCostYuan: 28,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    }
+  ]
+);
+assert(premiumDrinkLowOnlyResult.candidates.length === 1, '100-200 non-meal budget should not filter out real drink candidates solely for being low price');
+
+const luxuryDrinkVsMealResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'budget_over_200'],
+    preferredTagIds: ['drink', 'milk_tea', 'coffee', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'luxury-drink-real',
+      name: 'Premium Tea Lounge',
+      tags: ['tea drink'],
+      tagIds: ['drink', 'milk_tea', 'non_meal', 'afternoon_tea', 'chain_brand'],
+      category: 'tea drink',
+      distanceMeters: 200,
+      averageCostYuan: 48,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    },
+    {
+      id: 'luxury-meal-restaurant',
+      name: 'Jiang by Chef Fei',
+      tags: [],
+      tagIds: [],
+      category: 'Fine Dining Restaurant',
+      distanceMeters: 260,
+      averageCostYuan: 664,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryDrinkVsMealResult.candidates[0]?.restaurantId === 'luxury-drink-real', 'drink intent should outrank high-budget fine dining restaurants');
+assert(!luxuryDrinkVsMealResult.candidates.some((candidate) => candidate.restaurantId === 'luxury-meal-restaurant'), 'drink intent should hard-filter likely meal restaurants even when they match high budget');
+
+const luxuryDessertVsMealResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_dessert', 'budget_over_200'],
+    preferredTagIds: ['dessert', 'afternoon_tea', 'non_meal', 'drink'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'luxury-dessert-real',
+      name: 'Hotel Afternoon Tea',
+      tags: ['dessert'],
+      tagIds: ['dessert', 'afternoon_tea', 'non_meal'],
+      category: 'dessert',
+      distanceMeters: 240,
+      averageCostYuan: 88,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    },
+    {
+      id: 'luxury-dessert-meal',
+      name: 'Li Chateau',
+      tags: [],
+      tagIds: [],
+      category: 'Fine Dining Restaurant',
+      distanceMeters: 80,
+      averageCostYuan: 347,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryDessertVsMealResult.candidates[0]?.restaurantId === 'luxury-dessert-real', 'dessert intent should not drift into fine dining just because budget is high');
+
+const realWorldDrinkKeywordResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea'],
+    preferredTagIds: ['drink', 'milk_tea', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+    budgetLevel: 4,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'real-mixue',
+      name: '蜜雪冰城(正佳广场店)',
+      tags: [],
+      tagIds: [],
+      category: '餐饮服务;冷饮店;冷饮店',
+      distanceMeters: 75,
+      averageCostYuan: 8,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    },
+    {
+      id: 'real-linlee',
+      name: 'LINLEE·手打柠檬茶(天河正佳广场店)',
+      tags: [],
+      tagIds: [],
+      category: '餐饮服务;冷饮店;冷饮店',
+      distanceMeters: 7,
+      averageCostYuan: 18,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    },
+    {
+      id: 'real-xiaocaiyuan',
+      name: '小菜园新徽菜(天河正佳广场店)',
+      tags: [],
+      tagIds: [],
+      category: '餐饮服务;中餐厅;中餐厅',
+      distanceMeters: 10,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    }
+  ]
+);
+assert(['real-mixue', 'real-linlee'].includes(realWorldDrinkKeywordResult.candidates[0]?.restaurantId ?? ''), 'real drink brands such as Mixue and LINLEE should be inferred as drink candidates');
+assert(!realWorldDrinkKeywordResult.candidates.some((candidate) => candidate.restaurantId === 'real-xiaocaiyuan'), 'drink intent should filter Chinese meal restaurants such as Xiaocaiyuan');
+
+const realWorldDessertKeywordResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_dessert'],
+    preferredTagIds: ['dessert', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'],
+    budgetLevel: 4,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'real-sugar-water',
+      name: '庆虹糖水',
+      tags: [],
+      tagIds: [],
+      category: '餐饮服务;甜品店;甜品店',
+      distanceMeters: 6,
+      averageCostYuan: 16,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    },
+    {
+      id: 'real-meal-nearby',
+      name: '小菜园新徽菜(天河正佳广场店)',
+      tags: [],
+      tagIds: [],
+      category: '餐饮服务;中餐厅;中餐厅',
+      distanceMeters: 8,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(realWorldDessertKeywordResult.candidates[0]?.restaurantId === 'real-sugar-water', 'dessert intent should recognize sugar-water dessert shops and avoid nearby meal restaurants');
+
 const dedupeResult = recommend(
   profile({
     preferredTagIds: ['meal', 'rice'],
@@ -1395,3 +1582,207 @@ const avoidDrinkQuery = buildAmapRestaurantQuery(avoidDrinkProfile);
 assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinkQuery.keywords ?? ''), 'avoided drink or dessert categories should not be included in AMap keywords');
 const avoidDrinkResult = recommend(avoidDrinkProfile, breadthRestaurants);
 assert(!['breadth-milk-tea', 'breadth-coffee', 'breadth-dessert'].includes(avoidDrinkResult.candidates[0]?.restaurantId ?? ''), 'avoided category should not be Top1');
+
+const nonMealFallbackGuardResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_coffee'],
+    preferredTagIds: ['drink', 'coffee', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'meal-chain-nearby',
+      name: '蛙来哒',
+      tags: ['连锁餐厅'],
+      category: '湘菜餐厅',
+      distanceMeters: 120,
+      averageCostYuan: 95,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'coffee-farther',
+      name: '精品咖啡馆',
+      tags: ['咖啡', '下午茶'],
+      category: '咖啡馆',
+      distanceMeters: 900,
+      averageCostYuan: 42,
+      openStatus: 'open',
+      rating: 4.1,
+      status: 'active'
+    }
+  ]
+);
+assert(nonMealFallbackGuardResult.candidates[0]?.restaurantId === 'coffee-farther', 'explicit drink or coffee intent must not fallback to meal restaurants while non-meal candidates exist');
+
+const realTeaBrandResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'koi-tea',
+      name: 'KOI Thé',
+      tags: [],
+      category: '餐饮服务;冷饮店;冷饮店',
+      distanceMeters: 800,
+      averageCostYuan: 24,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    },
+    {
+      id: 'rice-shop',
+      name: '小菜园新徽菜',
+      tags: [],
+      category: '中餐厅',
+      distanceMeters: 200,
+      averageCostYuan: 88,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(realTeaBrandResult.candidates[0]?.restaurantId === 'koi-tea', 'KOI and similar real tea brands should be recognized as drink candidates');
+
+const observedMilkTeaBrandResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'observed-tea-house',
+      name: '裕莲茶楼',
+      tags: [],
+      category: '粤式茶楼',
+      distanceMeters: 100,
+      averageCostYuan: 26,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'observed-milk-tea',
+      name: '阿嬷手作',
+      tags: [],
+      category: '餐饮服务;冷饮店',
+      distanceMeters: 280,
+      averageCostYuan: 30,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    }
+  ]
+);
+assert(observedMilkTeaBrandResult.candidates[0]?.restaurantId === 'observed-milk-tea', 'tea houses should not beat observed milk tea brands for milk tea intent');
+
+const observedDessertBrandResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_dessert'],
+    preferredTagIds: ['dessert', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'observed-dessert',
+      name: 'Pinvita Gelato',
+      tags: [],
+      category: '餐饮服务;甜品店',
+      distanceMeters: 300,
+      averageCostYuan: 31,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    },
+    {
+      id: 'observed-dim-sum-gift',
+      name: '点都德有礼',
+      tags: [],
+      category: '餐饮服务;糕饼店',
+      distanceMeters: 80,
+      averageCostYuan: 89,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(observedDessertBrandResult.candidates[0]?.restaurantId === 'observed-dessert', 'observed dessert brands should beat gift or sales-like POIs for dessert intent');
+
+const observedCoffeeBrandResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_coffee'],
+    preferredTagIds: ['coffee', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'milk_tea', 'dessert'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'observed-dessert-station',
+      name: '麦当劳甜品站',
+      tags: [],
+      category: '餐饮服务;冷饮店',
+      distanceMeters: 20,
+      averageCostYuan: 23,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'observed-coffee',
+      name: '星巴克',
+      tags: [],
+      category: '餐饮服务;咖啡厅',
+      distanceMeters: 500,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    }
+  ]
+);
+assert(observedCoffeeBrandResult.candidates[0]?.restaurantId === 'observed-coffee', 'observed coffee chains should beat dessert stations for coffee intent');
+
+const observedDrinkKeywordResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'snack', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'observed-hot-luwei',
+      name: '盛香亭转转热卤',
+      tags: [],
+      category: '餐饮服务;小吃快餐',
+      distanceMeters: 30,
+      averageCostYuan: 50,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'observed-guming',
+      name: '古茗',
+      tags: [],
+      category: '餐饮服务;冷饮店',
+      distanceMeters: 300,
+      averageCostYuan: 15,
+      openStatus: 'open',
+      rating: 4.1,
+      status: 'active'
+    }
+  ]
+);
+assert(observedDrinkKeywordResult.candidates[0]?.restaurantId === 'observed-guming', 'observed tea brands should beat hot luwei or meal snacks for drink intent');

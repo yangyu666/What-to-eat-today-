@@ -14,6 +14,7 @@ type AmapPoiCloudResponse = ApiResponse<AmapPoiCloudData>;
 interface NearbyRestaurantOptions {
   radiusMeters?: number;
   pageSize?: number;
+  pageCount?: number;
   keyword?: string;
   types?: string;
 }
@@ -46,10 +47,11 @@ export async function getNearbyRestaurants(
   }
 
   const restaurants = await fetchNearbyRestaurantsFromCloud(location, {
-    radiusMeters,
-    pageSize: options.pageSize ?? DEFAULT_PAGE_SIZE,
-    keyword: options.keyword,
-    types: options.types
+      radiusMeters,
+      pageSize: options.pageSize ?? DEFAULT_PAGE_SIZE,
+      pageCount: options.pageCount,
+      keyword: options.keyword,
+      types: options.types
   });
 
   if (restaurants.length > 0) {
@@ -84,7 +86,7 @@ async function getUserLocation(): Promise<GeoPoint> {
 async function fetchNearbyRestaurantsFromCloud(
   location: GeoPoint,
   options: Required<Pick<NearbyRestaurantOptions, 'radiusMeters' | 'pageSize'>> &
-    Pick<NearbyRestaurantOptions, 'keyword' | 'types'>
+    Pick<NearbyRestaurantOptions, 'pageCount' | 'keyword' | 'types'>
 ): Promise<Restaurant[]> {
   const app = getApp<IAppOption>();
 
@@ -99,6 +101,7 @@ async function fetchNearbyRestaurantsFromCloud(
       longitude: location.longitude,
       radiusMeters: options.radiusMeters,
       pageSize: options.pageSize,
+      pageCount: options.pageCount,
       keyword: options.keyword,
       types: options.types
     }
@@ -171,6 +174,7 @@ function buildQueryKey(options: NearbyRestaurantOptions): string {
   return [
     options.radiusMeters ?? DEFAULT_RADIUS_METERS,
     options.pageSize ?? DEFAULT_PAGE_SIZE,
+    options.pageCount ?? 1,
     options.keyword?.trim() ?? '',
     options.types?.trim() ?? ''
   ].join('|');

@@ -84,12 +84,12 @@ Object.assign(TAG_LABELS, {
   mall_store: '商场店'
 });
 
-const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
-const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
+const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
 const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
-const NON_RESTAURANT_SALES_KEYWORDS = ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销'];
+const NON_RESTAURANT_SALES_KEYWORDS = ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销', '有礼'];
 
 const TAG_RULES = [
   { pattern: /重庆小面|小面|酸辣粉|川味面/, ids: ['spicy', 'strong_flavor', 'heavy', 'chongqing_noodle', 'noodle', 'quick', 'hot'] },
@@ -102,19 +102,22 @@ const TAG_RULES = [
   { pattern: /烧烤|烤肉|烤串|烤鱼/, ids: ['bbq', 'heavy', 'strong_flavor', 'group'] },
   { pattern: /炸鸡|鸡柳|鸡排|肯德基|kfc|麦当劳|汉堡王|油炸|汉堡|薯条/i, ids: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
   { pattern: /粥|粉面|云吞|馄饨|粤菜|广式|茶餐厅/, ids: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
+  { pattern: /茶楼|早茶/, ids: ['dim_sum', 'meal', 'snack', 'light', 'not_spicy'] },
   { pattern: /兰州|牛肉面|拉面|刀削面|米线|面馆/, ids: ['hot', 'staple', 'noodle', 'quick'] },
   { pattern: /快餐|简餐|便当|盖饭|黄焖鸡|卤肉饭|套餐/, ids: ['quick', 'staple', 'rice', 'meal', 'set_meal', 'solo'] },
   { pattern: /小吃|包子|饺子|煎饼|烧麦|点心/, ids: ['quick', 'snack', 'solo', 'hot'] },
+  { pattern: /热卤|卤味|盛香亭/, ids: ['snack', 'meal', 'hot', 'heavy', 'strong_flavor'] },
+  { pattern: /料理|南洋料理/, ids: ['meal', 'rice', 'relaxed', 'stable'] },
   { pattern: /轻食|沙拉|健康|素食|低卡|减脂/, ids: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
   { pattern: /日式|日本|寿司|咖喱|拉面/, ids: ['rice', 'not_spicy', 'stable', 'solo'] },
   { pattern: /西餐|披萨|意式|brunch|牛排|咖啡/, ids: ['western', 'relaxed', 'slow', 'not_spicy'] }
 ];
 
 TAG_RULES.push(
-  { pattern: /咖啡|cafe|coffee/i, ids: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|霸王茶姬/, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { pattern: /饮品|果茶|糖水/, ids: ['drink', 'non_meal', 'sweet', 'sugary_drink'] },
-  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点/, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { pattern: /咖啡|cafe|coffee|星巴克|starbucks|瑞幸|luckin|manner|peet|costa|tims|tim hortons|m stand|seesaw|arabica/i, ids: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
+  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|1点点|霸王茶姬|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗/i, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /饮品|果茶|糖水|手打柠檬茶|麒麟大口茶|大口茶|koi|thé|混果汁/i, ids: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点|gelato|pinvita|butterful|creamorous|珞珞|bakery|冰淇淋|paper stone/i, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { pattern: /早餐|包子|豆浆|油条|早茶/, ids: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { pattern: /粥|粥粉面/, ids: ['breakfast', 'congee', 'quick', 'hot', 'not_spicy'] },
   { pattern: /夜宵|宵夜/, ids: ['late_night', 'quick', 'hot', 'snack'] },
@@ -171,15 +174,17 @@ exports.main = async (event = {}, context = {}) => {
 
     const radius = clampInteger(event.radiusMeters, 300, 15000, DEFAULT_RADIUS_METERS);
     const pageSize = clampInteger(event.pageSize, 1, 25, DEFAULT_PAGE_SIZE);
+    const pageCount = clampInteger(event.pageCount, 1, 3, 1);
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
     const types = typeof event.types === 'string' && event.types.trim() ? event.types.trim() : AMAP_FOOD_TYPE;
 
-    let amapResponse = await requestAmap({
+    let amapResponse = await requestAmapPages({
       key,
       latitude,
       longitude,
       radius,
       pageSize,
+      pageCount,
       keyword,
       types
     });
@@ -193,12 +198,13 @@ exports.main = async (event = {}, context = {}) => {
     }
 
     if (keyword && (!Array.isArray(amapResponse.pois) || amapResponse.pois.length === 0)) {
-      const fallbackResponse = await requestAmap({
+      const fallbackResponse = await requestAmapPages({
         key,
         latitude,
         longitude,
         radius,
         pageSize,
+        pageCount,
         keyword: '',
         types
       });
@@ -221,7 +227,8 @@ exports.main = async (event = {}, context = {}) => {
         fetchedAt: new Date().toISOString(),
         location: { latitude, longitude },
         radiusMeters: radius,
-        keywordFallbackUsed
+        keywordFallbackUsed,
+        pageCount
       },
       requestId
     };
@@ -230,7 +237,51 @@ exports.main = async (event = {}, context = {}) => {
   }
 };
 
-function requestAmap({ key, latitude, longitude, radius, pageSize, keyword, types }) {
+async function requestAmapPages({ key, latitude, longitude, radius, pageSize, pageCount, keyword, types }) {
+  let mergedResponse;
+  const seenIds = new Set();
+  const pois = [];
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    const response = await requestAmap({
+      key,
+      latitude,
+      longitude,
+      radius,
+      pageSize,
+      page,
+      keyword,
+      types
+    });
+
+    if (response.status !== '1' || response.infocode !== '10000') {
+      return response;
+    }
+
+    mergedResponse = mergedResponse || response;
+    const pagePois = Array.isArray(response.pois) ? response.pois : [];
+
+    pagePois.forEach((poi) => {
+      const key = poi && (poi.id || `${poi.name || ''}|${poi.location || ''}`);
+
+      if (key && !seenIds.has(key)) {
+        seenIds.add(key);
+        pois.push(poi);
+      }
+    });
+
+    if (pagePois.length < pageSize) {
+      break;
+    }
+  }
+
+  return {
+    ...(mergedResponse || { status: '1', infocode: '10000' }),
+    pois
+  };
+}
+
+function requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, types }) {
   const params = new URLSearchParams({
     key,
     location: `${longitude},${latitude}`,
@@ -238,7 +289,7 @@ function requestAmap({ key, latitude, longitude, radius, pageSize, keyword, type
     radius: String(radius),
     sortrule: 'distance',
     offset: String(pageSize),
-    page: '1',
+    page: String(page),
     extensions: 'all',
     output: 'json'
   });

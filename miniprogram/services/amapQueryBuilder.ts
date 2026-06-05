@@ -12,7 +12,7 @@ const DEFAULT_RADIUS_METERS = 1500;
 const AMAP_FOOD_TYPE = '050000';
 const SAFE_FALLBACK_KEYWORDS = ['简餐', '盖饭', '粥', '轻食', '日式'];
 const PREMIUM_FALLBACK_KEYWORDS = ['高端餐厅', '私房菜', '黑珍珠', '米其林', 'omakase', '法餐', '高端日料', 'Fine Dining'];
-const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'LINLEE', '麒麟大口茶', '大口茶', 'KOI', '阿嬷手作', '去茶山', '古茗', '星巴克', '瑞幸', 'Manner', 'Peet', 'Costa', 'Tims'];
 const PREMIUM_CHAIN_KEYWORDS = [
   '高端餐厅',
   '私房菜',
@@ -35,19 +35,19 @@ const PREMIUM_CHAIN_KEYWORDS = [
 const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[] }> = [
   {
     optionIds: ['prefer_milk_tea'],
-    keywords: ['奶茶', '茶饮', '霸王茶姬', '喜茶', '奈雪', '一点点']
+    keywords: ['奶茶', '茶饮', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'LINLEE', '麒麟大口茶', 'KOI', '阿嬷手作', '去茶山', '古茗']
   },
   {
     optionIds: ['prefer_coffee'],
-    keywords: ['咖啡', 'cafe', 'coffee', '下午茶']
+    keywords: ['咖啡', 'cafe', 'coffee', '下午茶', '星巴克', '瑞幸', 'Manner', 'Peet', 'Costa', 'Tims']
   },
   {
     optionIds: ['prefer_bakery_dessert', 'intent_dessert'],
-    keywords: ['甜品', '蛋糕', '面包', '烘焙', '西点']
+    keywords: ['甜品', '蛋糕', '面包', '烘焙', '西点', 'Gelato', '冰淇淋', 'Bakery']
   },
   {
     optionIds: ['intent_drink'],
-    keywords: ['饮品', '奶茶', '茶饮', '咖啡']
+    keywords: ['饮品', '奶茶', '茶饮', '咖啡', '果茶', '柠檬茶', '糖水']
   }
 ];
 const TAG_KEYWORDS: Record<string, string[]> = {
@@ -80,10 +80,10 @@ const TAG_KEYWORDS: Record<string, string[]> = {
   group: ['火锅', '烤肉'],
   bbq: ['烧烤', '烤肉'],
   fried: ['炸鸡', '汉堡']
-  , dessert: ['甜品', '蛋糕', '面包'],
-  milk_tea: ['奶茶', '茶饮', '饮品'],
-  coffee: ['咖啡', '下午茶'],
-  drink: ['饮品', '奶茶', '咖啡'],
+  , dessert: ['甜品', '蛋糕', '面包', 'Gelato', '冰淇淋', 'Bakery'],
+  milk_tea: ['奶茶', '茶饮', '饮品', '霸王茶姬', '喜茶', '奈雪', 'KOI', '阿嬷手作', '去茶山', '古茗'],
+  coffee: ['咖啡', '下午茶', '星巴克', '瑞幸', 'Manner'],
+  drink: ['饮品', '奶茶', '咖啡', '果茶', '柠檬茶', '糖水'],
   afternoon_tea: ['下午茶', '甜品', '咖啡'],
   breakfast: ['早餐', '粥', '包子'],
   lunch: ['简餐', '盖饭', '套餐'],
