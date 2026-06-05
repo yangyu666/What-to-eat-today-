@@ -1786,3 +1786,65 @@ const observedDrinkKeywordResult = recommend(
   ]
 );
 assert(observedDrinkKeywordResult.candidates[0]?.restaurantId === 'observed-guming', 'observed tea brands should beat hot luwei or meal snacks for drink intent');
+
+const strictNonMealMealCategoryResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'spring-pancake',
+      name: '老郑家东北春饼',
+      tags: [],
+      category: '餐饮服务;中餐厅',
+      distanceMeters: 200,
+      averageCostYuan: 71,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'real-tea',
+      name: '爷爷不泡茶',
+      tags: [],
+      category: '餐饮服务;冷饮店',
+      distanceMeters: 500,
+      averageCostYuan: 18,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    }
+  ]
+);
+assert(strictNonMealMealCategoryResult.candidates[0]?.restaurantId === 'real-tea', 'explicit drink intent should hard-filter generic Chinese meal candidates');
+
+const premiumNonMealBudgetCalibration = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_milk_tea', 'budget_over_200'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea'],
+    avoidedTagIds: ['meal', 'rice', 'set_meal'],
+    budgetLevel: 6,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'low-cost-tea',
+      name: '茉莉奶白',
+      tags: [],
+      category: '餐饮服务;冷饮店',
+      distanceMeters: 180,
+      averageCostYuan: 19,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert((premiumNonMealBudgetCalibration.candidates[0]?.confidenceScore ?? 100) <= 58, '200+ drink intent with low-cost tea should not show a strong match');
+assert(
+  Boolean(premiumNonMealBudgetCalibration.candidates[0]?.penaltyReasons?.some((reason) => reason.includes('价格低于所选预算档'))),
+  'high-budget non-meal low-cost fallback should expose budget mismatch reason'
+);

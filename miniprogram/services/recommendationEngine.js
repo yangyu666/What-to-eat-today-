@@ -204,6 +204,11 @@ const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅
 const BROAD_MEAL_KEYWORDS = [
     '餐厅',
     '餐馆',
+    '中餐',
+    '中餐厅',
+    '餐饮服务;中餐厅',
+    '小吃快餐',
+    '快餐',
     '饭店',
     '私厨',
     '酒家',
@@ -214,7 +219,10 @@ const BROAD_MEAL_KEYWORDS = [
     'bistro',
     'chateau',
     'chef',
-    'hotpot'
+    'hotpot',
+    '锅',
+    '菜',
+    '海鲜'
 ];
 const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
 const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
@@ -358,7 +366,7 @@ function recommendRestaurants(options) {
     let fallbackReason;
     let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference, scoreOptionsBase));
     if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
-        fallbackReason = '附近符合条件较少，已放宽部分距离条件';
+        fallbackReason = buildDistanceFallbackReason(preference);
         scored = candidateRestaurants
             .filter((restaurant) => {
             return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
@@ -373,7 +381,7 @@ function recommendRestaurants(options) {
         }));
     }
     if (scored.length === 0) {
-        fallbackReason = '附近符合条件较少，已放宽部分负向条件';
+        fallbackReason = buildNegativeFallbackReason(preference);
         scored = candidateRestaurants
             .filter((restaurant) => {
             return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
@@ -482,9 +490,13 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         fallbackUsed: options.fallbackReason !== undefined,
         candidatePoolWeak: options.candidatePoolWeak ?? false
     });
-    const confidenceScore = historyPenaltyApplies
-        ? Math.min(rawConfidenceScore, 72)
+    const nonMealBudgetMismatch = isHighBudgetNonMealUnderBudget(restaurant, preference);
+    const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
+        ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
         : rawConfidenceScore;
+    const confidenceScore = historyPenaltyApplies
+        ? Math.min(budgetCalibratedConfidenceScore, 72)
+        : budgetCalibratedConfidenceScore;
     return {
         restaurant,
         score: finalScore,
@@ -511,14 +523,14 @@ function scoreRestaurant(restaurant, preference, options = {}) {
             matchedPreferredTagIds,
             matchedAvoidedTagIds
         },
-        reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict),
+        reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
         hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), {
             allowDistanceFallback: options.fallbackReason !== undefined,
             allowNegativeFallback: true,
             allowPriceFallback: true
         }).reasons,
         penaltyReasons: [
-            ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict),
+            ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
             ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
         ],
         matchedPreferredTagIds,
@@ -726,7 +738,7 @@ function buildReasonSummary(candidate) {
     }
     return `${candidate.name} 匹配度 ${candidate.confidenceScore ?? 0}%，${candidate.reason}`;
 }
-function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }) {
+function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }, nonMealBudgetMismatch = false) {
     const reasons = [];
     if (matchedPreferredTagIds.length > 0) {
         reasons.push(`匹配 ${matchedPreferredTagIds.slice(0, 3).join('、')} 等偏好`);
@@ -744,9 +756,14 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
     }
     if (preference?.budgetLevel !== undefined && restaurant.averageCostYuan !== undefined) {
         const budgetMax = getBudgetMaxYuan(preference);
-        reasons.push(restaurant.averageCostYuan <= budgetMax
-            ? `人均约 ${restaurant.averageCostYuan} 元，符合预算`
-            : `人均约 ${restaurant.averageCostYuan} 元，略高于预算`);
+        if (nonMealBudgetMismatch) {
+            reasons.push(`人均约 ${restaurant.averageCostYuan} 元，低于你选择的预算档，按普通匹配展示`);
+        }
+        else {
+            reasons.push(restaurant.averageCostYuan <= budgetMax
+                ? `人均约 ${restaurant.averageCostYuan} 元，符合预算`
+                : `人均约 ${restaurant.averageCostYuan} 元，略高于预算`);
+        }
     }
     if (restaurant.openStatus === 'open') {
         reasons.push('当前营业中');
@@ -762,7 +779,7 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
     }
     return reasons.slice(0, 5);
 }
-function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }) {
+function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }, nonMealBudgetMismatch = false) {
     const reasons = [];
     if (negativeConflict.severity !== 'none') {
         reasons.push(`负向偏好冲突：${negativeConflict.labels.join('、')}`);
@@ -777,6 +794,9 @@ function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackR
     }
     if (isOverBudget(restaurant, preference)) {
         reasons.push('超出预算偏好');
+    }
+    if (nonMealBudgetMismatch) {
+        reasons.push('高预算饮品/甜品候选不足，该店价格低于所选预算档，匹配度已下调');
     }
     if (fallbackReason) {
         reasons.push(fallbackReason);
@@ -1426,6 +1446,34 @@ function isFlexibleNonMealBudget(preference) {
         preferred.has('milk_tea') ||
         preferred.has('dessert') ||
         preferred.has('afternoon_tea'));
+}
+function isHighBudgetNonMealUnderBudget(restaurant, preference) {
+    if (!isFlexibleNonMealBudget(preference)) {
+        return false;
+    }
+    const range = getBudgetRange(preference);
+    const estimatedCost = getEstimatedCost(restaurant);
+    return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
+}
+function getHighBudgetNonMealConfidenceCap(restaurant, preference) {
+    const estimatedCost = getEstimatedCost(restaurant);
+    if ((preference?.budgetLevel ?? 3) >= 6 && (estimatedCost ?? 0) < 100) {
+        return 58;
+    }
+    return 64;
+}
+function buildDistanceFallbackReason(preference) {
+    const selected = new Set(preference?.selectedOptionIds ?? []);
+    if (selected.has('distance_500m') || selected.has('distance_1km')) {
+        return '严格距离内符合条件较少，已放宽距离并下调匹配度';
+    }
+    return '附近严格匹配候选较少，已扩大搜索范围并下调匹配度';
+}
+function buildNegativeFallbackReason(preference) {
+    if (isExplicitNonMealPreference(preference)) {
+        return '同类饮品/甜品候选较少，仅放宽次要偏好，正餐冲突仍会过滤';
+    }
+    return '附近符合条件较少，已放宽部分次要偏好并下调匹配度';
 }
 function isExplicitNonMealPreference(preference) {
     if (!preference) {

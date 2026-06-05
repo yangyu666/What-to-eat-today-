@@ -267,6 +267,11 @@ const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅
 const BROAD_MEAL_KEYWORDS = [
   '餐厅',
   '餐馆',
+  '中餐',
+  '中餐厅',
+  '餐饮服务;中餐厅',
+  '小吃快餐',
+  '快餐',
   '饭店',
   '私厨',
   '酒家',
@@ -277,7 +282,10 @@ const BROAD_MEAL_KEYWORDS = [
   'bistro',
   'chateau',
   'chef',
-  'hotpot'
+  'hotpot',
+  '锅',
+  '菜',
+  '海鲜'
 ];
 const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
 const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
@@ -427,7 +435,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   );
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
-    fallbackReason = '附近符合条件较少，已放宽部分距离条件';
+    fallbackReason = buildDistanceFallbackReason(preference);
     scored = candidateRestaurants
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
@@ -445,7 +453,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   }
 
   if (scored.length === 0) {
-    fallbackReason = '附近符合条件较少，已放宽部分负向条件';
+    fallbackReason = buildNegativeFallbackReason(preference);
     scored = candidateRestaurants
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
@@ -570,9 +578,13 @@ export function scoreRestaurant(
     fallbackUsed: options.fallbackReason !== undefined,
     candidatePoolWeak: options.candidatePoolWeak ?? false
   });
-  const confidenceScore = historyPenaltyApplies
-    ? Math.min(rawConfidenceScore, 72)
+  const nonMealBudgetMismatch = isHighBudgetNonMealUnderBudget(restaurant, preference);
+  const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
+    ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
     : rawConfidenceScore;
+  const confidenceScore = historyPenaltyApplies
+    ? Math.min(budgetCalibratedConfidenceScore, 72)
+    : budgetCalibratedConfidenceScore;
 
   return {
     restaurant,
@@ -608,7 +620,8 @@ export function scoreRestaurant(
       negativeConflict,
       preference,
       options.fallbackReason,
-      temperatureConflict
+      temperatureConflict,
+      nonMealBudgetMismatch
     ),
     hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), {
       allowDistanceFallback: options.fallbackReason !== undefined,
@@ -621,7 +634,8 @@ export function scoreRestaurant(
         negativeConflict,
         preference,
         options.fallbackReason,
-        temperatureConflict
+        temperatureConflict,
+        nonMealBudgetMismatch
       ),
       ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
     ],
@@ -897,7 +911,8 @@ function buildReasons(
   negativeConflict: ReturnType<typeof getNegativeConflict>,
   preference?: UserPreferenceProfile,
   fallbackReason?: string,
-  temperatureConflict: ReturnType<typeof getTemperatureConflict> = { severity: 'none', label: '', penalty: 0 }
+  temperatureConflict: ReturnType<typeof getTemperatureConflict> = { severity: 'none', label: '', penalty: 0 },
+  nonMealBudgetMismatch = false
 ): string[] {
   const reasons: string[] = [];
 
@@ -921,11 +936,15 @@ function buildReasons(
 
   if (preference?.budgetLevel !== undefined && restaurant.averageCostYuan !== undefined) {
     const budgetMax = getBudgetMaxYuan(preference);
-    reasons.push(
-      restaurant.averageCostYuan <= budgetMax
-        ? `人均约 ${restaurant.averageCostYuan} 元，符合预算`
-        : `人均约 ${restaurant.averageCostYuan} 元，略高于预算`
-    );
+    if (nonMealBudgetMismatch) {
+      reasons.push(`人均约 ${restaurant.averageCostYuan} 元，低于你选择的预算档，按普通匹配展示`);
+    } else {
+      reasons.push(
+        restaurant.averageCostYuan <= budgetMax
+          ? `人均约 ${restaurant.averageCostYuan} 元，符合预算`
+          : `人均约 ${restaurant.averageCostYuan} 元，略高于预算`
+      );
+    }
   }
 
   if (restaurant.openStatus === 'open') {
@@ -952,7 +971,8 @@ function buildPenaltyReasons(
   negativeConflict: ReturnType<typeof getNegativeConflict>,
   preference?: UserPreferenceProfile,
   fallbackReason?: string,
-  temperatureConflict: ReturnType<typeof getTemperatureConflict> = { severity: 'none', label: '', penalty: 0 }
+  temperatureConflict: ReturnType<typeof getTemperatureConflict> = { severity: 'none', label: '', penalty: 0 },
+  nonMealBudgetMismatch = false
 ): string[] {
   const reasons: string[] = [];
 
@@ -974,6 +994,10 @@ function buildPenaltyReasons(
 
   if (isOverBudget(restaurant, preference)) {
     reasons.push('超出预算偏好');
+  }
+
+  if (nonMealBudgetMismatch) {
+    reasons.push('高预算饮品/甜品候选不足，该店价格低于所选预算档，匹配度已下调');
   }
 
   if (fallbackReason) {
@@ -1829,6 +1853,45 @@ function isFlexibleNonMealBudget(preference?: UserPreferenceProfile): boolean {
     preferred.has('dessert') ||
     preferred.has('afternoon_tea')
   );
+}
+
+function isHighBudgetNonMealUnderBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
+  if (!isFlexibleNonMealBudget(preference)) {
+    return false;
+  }
+
+  const range = getBudgetRange(preference as UserPreferenceProfile);
+  const estimatedCost = getEstimatedCost(restaurant);
+
+  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
+}
+
+function getHighBudgetNonMealConfidenceCap(restaurant: Restaurant, preference?: UserPreferenceProfile): number {
+  const estimatedCost = getEstimatedCost(restaurant);
+
+  if ((preference?.budgetLevel ?? 3) >= 6 && (estimatedCost ?? 0) < 100) {
+    return 58;
+  }
+
+  return 64;
+}
+
+function buildDistanceFallbackReason(preference?: UserPreferenceProfile): string {
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+
+  if (selected.has('distance_500m') || selected.has('distance_1km')) {
+    return '严格距离内符合条件较少，已放宽距离并下调匹配度';
+  }
+
+  return '附近严格匹配候选较少，已扩大搜索范围并下调匹配度';
+}
+
+function buildNegativeFallbackReason(preference?: UserPreferenceProfile): string {
+  if (isExplicitNonMealPreference(preference)) {
+    return '同类饮品/甜品候选较少，仅放宽次要偏好，正餐冲突仍会过滤';
+  }
+
+  return '附近符合条件较少，已放宽部分次要偏好并下调匹配度';
 }
 
 function isExplicitNonMealPreference(preference?: UserPreferenceProfile): boolean {

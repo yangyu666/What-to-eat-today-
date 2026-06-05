@@ -240,6 +240,10 @@ Page({
     buildReasonItems(recommendation, walkingMinutes, averageCostYuan) {
         const preferenceLabels = this.getPreferenceLabels(recommendation);
         const distanceMeters = recommendation.restaurant?.distanceMeters;
+        const penaltyReasons = recommendation.penaltyReasons ?? [];
+        const hasDistanceFallback = Boolean(recommendation.fallbackReason) ||
+            penaltyReasons.some((reason) => reason.includes('距离') || reason.includes('搜索范围'));
+        const hasBudgetMismatch = penaltyReasons.some((reason) => reason.includes('预算') || reason.includes('价格低于'));
         const items = [
             {
                 title: preferenceLabels.length > 0
@@ -249,19 +253,25 @@ Page({
             },
             {
                 title: typeof distanceMeters === 'number'
-                    ? `距离约 ${distanceMeters} 米，在你的范围内`
+                    ? hasDistanceFallback
+                        ? `距离约 ${distanceMeters} 米，已放宽距离`
+                        : `距离约 ${distanceMeters} 米，在你的范围内`
                     : walkingMinutes
                         ? `步行${walkingMinutes}分钟`
                         : '距离较近',
-                desc: '距离你的位置很近'
+                desc: hasDistanceFallback ? '严格距离内候选较少，匹配度已下调' : '距离你的位置很近'
             },
             {
-                title: typeof averageCostYuan === 'number' ? `人均约 ${averageCostYuan} 元，符合预算` : '人均适中',
-                desc: '符合你的预算范围'
+                title: typeof averageCostYuan === 'number'
+                    ? hasBudgetMismatch
+                        ? `人均约 ${averageCostYuan} 元，预算档不完全匹配`
+                        : `人均约 ${averageCostYuan} 元，符合预算`
+                    : '价格信息有限',
+                desc: hasBudgetMismatch ? '已按普通匹配展示，不会伪装成强匹配' : '符合你的预算范围'
             },
             {
-                title: '出餐速度快',
-                desc: '预计等待时间较短'
+                title: recommendation.fallbackReason ?? '出餐速度快',
+                desc: recommendation.fallbackReason ? '这是放宽条件后的推荐理由' : '预计等待时间较短'
             }
         ];
         return items.slice(0, 4);
