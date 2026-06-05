@@ -1,6 +1,6 @@
 import type { MealHistoryItem } from '../../models/meal';
 import { getHistory } from '../../services/historyService';
-import type { RecommendationAction, RecommendationSource } from '../../types/recommendation';
+import type { RecommendationAction } from '../../types/recommendation';
 
 type HistoryFilter = 'all' | 'accepted';
 
@@ -81,7 +81,6 @@ interface HistoryViewItem extends MealHistoryItem {
   titleText: string;
   subtitleText: string;
   actionText: string;
-  sourceText: string;
   matchText: string;
   reasonText: string;
 }
@@ -157,7 +156,6 @@ Page({
           ? `推荐菜：${item.mealName}`
           : '',
       actionText: getActionText(item.action),
-      sourceText: getSourceText(item.source),
       matchText:
         typeof item.matchPercent === 'number' ? `${Math.round(item.matchPercent)}% 匹配` : '匹配度未知',
       reasonText: getDisplayReasonText(item)
@@ -273,16 +271,4 @@ function localizeReasonText(text?: string): string {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function getSourceText(source?: RecommendationSource): string {
-  const sourceTextMap: Record<RecommendationSource, string> = {
-    amap: '高德',
-    cloud: '云端',
-    mock: '本地',
-    rule: '规则',
-    manual: '手动'
-  };
-
-  return source ? sourceTextMap[source] : '未知来源';
 }

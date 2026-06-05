@@ -145,7 +145,6 @@ function toHistoryViewItem(item) {
         ? `推荐菜：${item.mealName}`
         : '',
     actionText: getActionText(item.action),
-    sourceText: getSourceText(item.source),
     matchText:
       typeof item.matchPercent === 'number' ? `${Math.round(item.matchPercent)}% 匹配` : '匹配度未知',
     reasonText: getDisplayReasonText(item)
@@ -260,16 +259,4 @@ function localizeReasonText(text) {
 
 function escapeRegExp(text) {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function getSourceText(source) {
-  const sourceTextMap = {
-    amap: '高德',
-    cloud: '云端',
-    mock: '本地',
-    rule: '规则',
-    manual: '手动'
-  };
-
-  return source ? sourceTextMap[source] : '未知来源';
 }
