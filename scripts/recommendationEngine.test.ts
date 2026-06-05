@@ -1186,11 +1186,11 @@ const strongMatchResult = recommend(
 assert((strongMatchResult.candidates[0]?.confidenceScore ?? 0) >= 80, '强匹配应达到 80-95');
 
 const observableCandidate = strongMatchResult.candidates[0];
-assert(strongMatchResult.algorithmVersion === 'recommendation-v2', '结果应暴露 algorithmVersion');
+assert(strongMatchResult.algorithmVersion === 'recommendation-v2.5', '结果应暴露 algorithmVersion');
 assert(strongMatchResult.weightProfileId !== undefined, '结果应暴露 weightProfileId');
 assert(strongMatchResult.experimentId !== undefined, '结果应暴露 experimentId');
 assert(strongMatchResult.candidatePoolStats !== undefined, '结果应暴露 candidatePoolStats');
-assert(observableCandidate?.algorithmVersion === 'recommendation-v2', '候选应暴露 algorithmVersion');
+assert(observableCandidate?.algorithmVersion === 'recommendation-v2.5', '候选应暴露 algorithmVersion');
 assert(observableCandidate?.weightProfileId !== undefined, '候选应暴露 weightProfileId');
 assert(observableCandidate?.experimentId !== undefined, '候选应暴露 experimentId');
 assert(observableCandidate?.candidatePoolStats !== undefined, '候选应暴露 candidatePoolStats');

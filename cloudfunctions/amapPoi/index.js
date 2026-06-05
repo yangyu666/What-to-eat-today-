@@ -84,7 +84,7 @@ Object.assign(TAG_LABELS, {
   mall_store: '商场店'
 });
 
-const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
@@ -108,6 +108,7 @@ const TAG_RULES = [
   { pattern: /小吃|包子|饺子|煎饼|烧麦|点心/, ids: ['quick', 'snack', 'solo', 'hot'] },
   { pattern: /热卤|卤味|盛香亭/, ids: ['snack', 'meal', 'hot', 'heavy', 'strong_flavor'] },
   { pattern: /料理|南洋料理/, ids: ['meal', 'rice', 'relaxed', 'stable'] },
+  { pattern: /春饼|东北菜|东北|脆肚|私房菜|啫啫煲|煲仔饭|蛙来哒|鲜笋|外婆小聚/, ids: ['meal', 'rice', 'staple', 'relaxed'] },
   { pattern: /轻食|沙拉|健康|素食|低卡|减脂/, ids: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
   { pattern: /日式|日本|寿司|咖喱|拉面/, ids: ['rice', 'not_spicy', 'stable', 'solo'] },
   { pattern: /西餐|披萨|意式|brunch|牛排|咖啡/, ids: ['western', 'relaxed', 'slow', 'not_spicy'] }
@@ -115,9 +116,9 @@ const TAG_RULES = [
 
 TAG_RULES.push(
   { pattern: /咖啡|cafe|coffee|星巴克|starbucks|瑞幸|luckin|manner|peet|costa|tims|tim hortons|m stand|seesaw|arabica/i, ids: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|1点点|霸王茶姬|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗/i, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { pattern: /饮品|果茶|糖水|手打柠檬茶|麒麟大口茶|大口茶|koi|thé|混果汁/i, ids: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点|gelato|pinvita|butterful|creamorous|珞珞|bakery|冰淇淋|paper stone/i, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|1点点|霸王茶姬|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗|茉莉奶白|爷爷不泡茶|不泡茶|茶理宜世|茶记大咖|t9tea|tamkoko/i, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /饮品|果茶|糖水|手打柠檬茶|麒麟大口茶|大口茶|koi|thé|混果汁|酸奶|牛奶|麦记牛奶|blueglass|茶道|茶园/i, ids: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点|gelato|pinvita|butterful|creamorous|珞珞|bakery|冰淇淋|paper stone|哈根达斯|haagen|baker|spice|bagel|贝果|zakuzaku|双皮奶|marmalade|bake land|老鼎丰/i, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { pattern: /早餐|包子|豆浆|油条|早茶/, ids: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { pattern: /粥|粥粉面/, ids: ['breakfast', 'congee', 'quick', 'hot', 'not_spicy'] },
   { pattern: /夜宵|宵夜/, ids: ['late_night', 'quick', 'hot', 'snack'] },

@@ -2,8 +2,8 @@ const cloud = initCloudSdk();
 
 const DEFAULT_LIMIT = 3;
 const MIN_PRIMARY_POOL_SIZE = 3;
-const ALGORITHM_VERSION = 'recommendation-v2';
-const WEIGHT_PROFILE_ID = 'breadth-v2';
+const ALGORITHM_VERSION = 'recommendation-v2.5';
+const WEIGHT_PROFILE_ID = 'breadth-v2.5';
 const DEFAULT_EXPERIMENT_ID = 'default';
 const BUDGET_LEVEL_TO_YUAN = { 1: 20, 2: 30, 3: 60, 4: 100, 5: 200, 6: 320 };
 const BUDGET_LEVEL_TO_RANGE = {
@@ -126,10 +126,11 @@ INFERRED_TAG_RULES.push(
   { keywords: ['茶楼', '早茶'], tags: ['dim_sum', 'meal', 'snack', 'light', 'not_spicy'] },
   { keywords: ['热卤', '卤味', '盛香亭'], tags: ['snack', 'meal', 'hot', 'heavy', 'strong_flavor'] },
   { keywords: ['料理', '南洋料理'], tags: ['meal', 'rice', 'relaxed', 'stable'] },
+  { keywords: ['春饼', '东北菜', '东北', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '鲜笋', '外婆小聚'], tags: ['meal', 'rice', 'staple', 'relaxed'] },
   { keywords: ['咖啡', 'cafe', 'coffee', '星巴克', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons', 'm stand', 'seesaw', 'arabica'], tags: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '1点点', '霸王茶姬', '蜜雪冰城', '柠檬茶', 'linlee', '麒麟大口茶', '大口茶', 'koi', 'koi thé', 'koi the', 'thé', '阿嬷手作', '去茶山', '古茗'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { keywords: ['饮品', '果茶', '糖水', '手打柠檬茶', '麒麟大口茶', '大口茶', 'koi', 'thé', '混果汁'], tags: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点', 'gelato', 'pinvita', 'butterful', 'creamorous', '珞珞', 'bakery', '冰淇淋', 'paper stone'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '1点点', '霸王茶姬', '蜜雪冰城', '柠檬茶', 'linlee', '麒麟大口茶', '大口茶', 'koi', 'koi thé', 'koi the', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['饮品', '果茶', '糖水', '手打柠檬茶', '麒麟大口茶', '大口茶', 'koi', 'thé', '混果汁', '酸奶', '牛奶', '麦记牛奶', 'blueglass', '茶道', '茶园'], tags: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点', 'gelato', 'pinvita', 'butterful', 'creamorous', '珞珞', 'bakery', '冰淇淋', 'paper stone', '哈根达斯', 'haagen', 'baker', 'spice', 'bagel', '贝果', 'zakuzaku', '双皮奶', 'marmalade', 'bake land', '老鼎丰'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { keywords: ['早餐', '包子', '豆浆', '油条'], tags: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { keywords: ['夜宵', '宵夜'], tags: ['late_night', 'quick', 'hot', 'snack'] },
   { keywords: ['清真', '兰州拉面', '牛肉面'], tags: ['halal', 'noodle', 'hot', 'high_protein'] },
@@ -140,8 +141,8 @@ INFERRED_TAG_RULES.push(
   { keywords: ['花生', '坚果'], tags: ['peanut', 'unclear_ingredients'] }
 );
 
-const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '混果汁', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋'];
-const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭', '徽菜', '新徽菜', '小菜园', '茶楼', '早茶', '热卤', '卤味', '料理'];
+const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '混果汁', '酸奶', '牛奶', 'blueglass', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋', '哈根达斯', 'bagel', '贝果', 'zakuzaku', '双皮奶'];
+const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭', '徽菜', '新徽菜', '小菜园', '茶楼', '早茶', '热卤', '卤味', '料理', '春饼', '东北菜', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '外婆小聚', '香锅'];
 const BROAD_MEAL_KEYWORDS = [
   '餐厅',
   '餐馆',
@@ -161,7 +162,7 @@ const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
 const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
 const SWEET_KEYWORDS = ['甜品', '蛋糕', '奶茶', '茶饮', '糖水'];
 const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
-const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
@@ -1179,13 +1180,13 @@ function getFallbackImageUrl(restaurant, matchedPreferredTagIds) {
   if (/premium|高端|黑珍珠|米其林|omakase|fine dining|法餐|日料|炳胜|利苑|premium_brand/.test(text)) {
     return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80';
   }
-  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪|一点点|1点点|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗/.test(text)) {
+  if (/奶茶|茶饮|milk_tea|霸王茶姬|喜茶|奈雪|一点点|1点点|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗|茉莉奶白|爷爷不泡茶|茶理宜世|茶记大咖|t9tea|tamkoko/.test(text)) {
     return 'https://images.unsplash.com/photo-1558857563-b371033873b8?auto=format&fit=crop&w=900&q=80';
   }
   if (/咖啡|coffee|cafe|星巴克|starbucks|瑞幸|luckin|manner|peet|costa|tims|tim hortons/.test(text)) {
     return 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=900&q=80';
   }
-  if (/甜品|蛋糕|面包|dessert|bakery|gelato|pinvita|butterful|creamorous|珞珞|冰淇淋|paper stone/.test(text)) {
+  if (/甜品|蛋糕|面包|dessert|bakery|gelato|pinvita|butterful|creamorous|珞珞|冰淇淋|paper stone|哈根达斯|haagen|bagel|贝果|zakuzaku|双皮奶|marmalade|bake land|老鼎丰/.test(text)) {
     return 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80';
   }
   if (/辣|川|湘|火锅|麻辣|spicy|strong_flavor/.test(text)) {

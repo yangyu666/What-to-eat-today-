@@ -165,14 +165,14 @@ function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {
     if (selected.has('prefer_milk_tea') || selected.has('intent_drink')) {
         return [
             '精品咖啡|茶饮|奶茶|酒店下午茶|下午茶',
-            '喜茶|奈雪|霸王茶姬|KOI|麒麟大口茶|阿嬷手作|去茶山|古茗|茶饮'
+            '喜茶|奈雪|霸王茶姬|KOI|麒麟大口茶|阿嬷手作|去茶山|古茗|茉莉奶白|爷爷不泡茶|茶理宜世|茶饮'
         ];
     }
     if (selected.has('prefer_coffee')) {
         return ['精品咖啡|咖啡馆|cafe|酒店下午茶|下午茶', '星巴克|瑞幸|Manner|Peet|Costa|Tims'];
     }
     if (selected.has('prefer_bakery_dessert') || selected.has('intent_dessert')) {
-        return ['甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|酒店下午茶|下午茶'];
+        return ['甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|哈根达斯|贝果|双皮奶|酒店下午茶|下午茶'];
     }
     return [];
 }
@@ -208,7 +208,7 @@ function getMallKeywordAttempts(preferenceSnapshot) {
         return [];
     }
     if (selected.has('prefer_milk_tea') || selected.has('intent_drink')) {
-        return ['商场|购物中心|广场|mall|茶饮|奶茶', '购物中心|商场|下午茶|饮品', '商场|购物中心|阿嬷手作|去茶山|KOI|古茗'];
+        return ['商场|购物中心|广场|mall|茶饮|奶茶', '购物中心|商场|下午茶|饮品', '商场|购物中心|阿嬷手作|去茶山|KOI|古茗|茉莉奶白|爷爷不泡茶'];
     }
     if (selected.has('prefer_coffee')) {
         return ['商场|购物中心|广场|mall|咖啡', '购物中心|商场|下午茶|咖啡', '商场|购物中心|星巴克|瑞幸|Manner'];
@@ -240,14 +240,14 @@ function getPremiumKeywordAttempts(keyword) {
     ];
 }
 function getStrictCategoryKeyword(keyword) {
-    if (/奶茶|茶饮|饮品|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗/.test(keyword)) {
-        return '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗';
+    if (/奶茶|茶饮|饮品|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗|茉莉奶白|爷爷不泡茶|茶理宜世/.test(keyword)) {
+        return '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗|茉莉奶白|爷爷不泡茶|茶理宜世';
     }
     if (/咖啡|cafe|coffee|下午茶|星巴克|瑞幸|Manner/.test(keyword)) {
         return '咖啡|cafe|coffee|下午茶|星巴克|瑞幸|Manner';
     }
-    if (/甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery/.test(keyword)) {
-        return '甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery';
+    if (/甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|哈根达斯|贝果|双皮奶/.test(keyword)) {
+        return '甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|哈根达斯|贝果|双皮奶';
     }
     if (/高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑/.test(keyword)) {
         return '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑';

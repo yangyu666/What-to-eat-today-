@@ -12,7 +12,7 @@ export type RecommendationCandidateId = string;
 export type RecommendationSource = 'mock' | 'cloud' | 'rule' | 'manual' | 'amap';
 export type RecommendationAction = 'shown' | 'accepted' | 'skipped' | 'dismissed';
 export type RecommendationConfidenceLabel = 'low' | 'medium' | 'high';
-export type RecommendationAlgorithmVersion = 'recommendation-v2';
+export type RecommendationAlgorithmVersion = 'recommendation-v2' | 'recommendation-v2.5';
 
 export interface CandidatePoolStats {
   totalFetched: number;
