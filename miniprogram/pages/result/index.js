@@ -64,7 +64,12 @@ Page({
         historyFilterEnabled: true,
         excludedHistoryRestaurantIds: [],
         historyPenaltyReasons: [],
-        switchButtonText: '换一家'
+        switchButtonText: '换一家',
+        poiCacheHit: false,
+        poiCacheKey: '',
+        poiCacheAgeMs: undefined,
+        poiFetchReason: '',
+        amapApiCallCount: 0
     },
     onLoad() {
         const result = wx.getStorageSync('meal_questionnaire_result');
@@ -220,6 +225,15 @@ Page({
         const averageCostYuan = recommendation?.restaurant?.averageCostYuan;
         const walkingMinutes = typeof distanceMeters === 'number' ? Math.max(1, Math.ceil(distanceMeters / 120)) : null;
         const rating = recommendation?.restaurant?.rating;
+        if (recommendation) {
+            console.warn('Recommendation POI fetch meta.', {
+                poiCacheHit: recommendation.poiCacheHit,
+                poiCacheKey: recommendation.poiCacheKey,
+                poiCacheAgeMs: recommendation.poiCacheAgeMs,
+                poiFetchReason: recommendation.poiFetchReason,
+                amapApiCallCount: recommendation.amapApiCallCount
+            });
+        }
         this.setData({
             candidates,
             currentIndex,
@@ -234,6 +248,11 @@ Page({
             reasonItems: recommendation
                 ? this.buildReasonItems(recommendation, walkingMinutes, averageCostYuan)
                 : [],
+            poiCacheHit: recommendation?.poiCacheHit === true,
+            poiCacheKey: recommendation?.poiCacheKey ?? '',
+            poiCacheAgeMs: recommendation?.poiCacheAgeMs,
+            poiFetchReason: recommendation?.poiFetchReason ?? '',
+            amapApiCallCount: recommendation?.amapApiCallCount ?? 0,
             ...extraData
         });
     },

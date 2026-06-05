@@ -1,10 +1,15 @@
 import type { MealCandidate } from '../models/meal';
 import type { UserQuestionnaireResult } from '../types/userPreference';
 import { buildAmapRestaurantQuery } from './amapQueryBuilder';
-import { getNearbyRestaurants } from './amapPoiService';
+import {
+  getNearbyRestaurantsWithMeta,
+  type PoiFetchMeta
+} from './amapPoiService';
 import type { HistoryFilterContext } from './historyService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
+
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
   const [candidate] = await getRecommendations(undefined, 1);
@@ -46,21 +51,48 @@ async function getAmapRecommendations(
   const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
   const attempts = buildAmapQueryAttempts(amapQuery, preferenceSnapshot);
-  const restaurantPool = new Map<string, Awaited<ReturnType<typeof getNearbyRestaurants>>[number]>();
+  const restaurantPool = new Map<string, Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>();
+  const metaList: PoiFetchMeta[] = [];
+  let remainingAmapApiCalls = MAX_AMAP_API_CALLS_PER_RECOMMENDATION;
 
   for (const attempt of attempts) {
-    const restaurants = await getNearbyRestaurants({
+    const result = await getNearbyRestaurantsWithMeta({
       radiusMeters: attempt.radiusMeters,
       keyword: attempt.keyword,
       types: attempt.types,
       pageSize: 25,
-      pageCount: attempt.pageCount
+      pageCount: attempt.pageCount,
+      fetchProfile: 'recommendation',
+      fetchReason: `recommendation-attempt-${metaList.length + 1}`,
+      maxAmapApiCalls: remainingAmapApiCalls
     }).catch((error) => {
       console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
-      return [];
+      return {
+        restaurants: [],
+        meta: {
+          poiCacheHit: false,
+          poiCacheKey: '',
+          poiFetchReason: 'amap-failed-fallback',
+          amapApiCallCount: 0
+        }
+      };
     });
+    const restaurants = result.restaurants;
+
+    metaList.push(result.meta);
+    remainingAmapApiCalls = Math.max(
+      0,
+      remainingAmapApiCalls - result.meta.amapApiCallCount
+    );
 
     if (restaurants.length === 0) {
+      if (remainingAmapApiCalls <= 0) {
+        console.warn('AMap POI recommendation live request budget exhausted.', {
+          attempt,
+          maxAmapApiCalls: MAX_AMAP_API_CALLS_PER_RECOMMENDATION
+        });
+      }
+
       continue;
     }
 
@@ -81,7 +113,12 @@ async function getAmapRecommendations(
     source: 'amap'
   });
 
-  return result.candidates;
+  const poiMeta = mergePoiFetchMeta(metaList);
+
+  return result.candidates.map((candidate) => ({
+    ...candidate,
+    ...poiMeta
+  }));
 }
 
 function buildAmapQueryAttempts(
@@ -276,7 +313,23 @@ function getMallKeywordAttempts(
   return ['商场|购物中心|广场|mall|餐厅', '购物中心|商场|连锁餐厅|品牌餐厅'];
 }
 
-function normalizeRestaurantPoolKey(restaurant: Awaited<ReturnType<typeof getNearbyRestaurants>>[number]): string {
+function mergePoiFetchMeta(metaList: PoiFetchMeta[]): PoiFetchMeta {
+  const apiCallCount = metaList.reduce((sum, meta) => sum + meta.amapApiCallCount, 0);
+  const firstKey = metaList.find((meta) => meta.poiCacheKey)?.poiCacheKey ?? '';
+  const cacheAges = metaList
+    .map((meta) => meta.poiCacheAgeMs)
+    .filter((age): age is number => typeof age === 'number');
+
+  return {
+    poiCacheHit: apiCallCount === 0 && metaList.some((meta) => meta.poiCacheHit),
+    poiCacheKey: firstKey,
+    poiCacheAgeMs: cacheAges.length > 0 ? Math.min(...cacheAges) : undefined,
+    poiFetchReason: metaList.map((meta) => meta.poiFetchReason).join(',') || 'no-poi-fetch',
+    amapApiCallCount: apiCallCount
+  };
+}
+
+function normalizeRestaurantPoolKey(restaurant: Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]): string {
   const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');
   const location = restaurant.location;
   const locationKey =

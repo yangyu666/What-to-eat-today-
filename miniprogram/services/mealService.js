@@ -6,6 +6,7 @@ const amapQueryBuilder_1 = require("./amapQueryBuilder");
 const amapPoiService_1 = require("./amapPoiService");
 const preferenceMapper_1 = require("./preferenceMapper");
 const recommendationEngine_1 = require("./recommendationEngine");
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
 async function getTodayRecommendation() {
     const [candidate] = await getRecommendations(undefined, 1);
     if (!candidate) {
@@ -29,18 +30,40 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
     const amapQuery = (0, amapQueryBuilder_1.buildAmapRestaurantQuery)(preferenceSnapshot);
     const attempts = buildAmapQueryAttempts(amapQuery, preferenceSnapshot);
     const restaurantPool = new Map();
+    const metaList = [];
+    let remainingAmapApiCalls = MAX_AMAP_API_CALLS_PER_RECOMMENDATION;
     for (const attempt of attempts) {
-        const restaurants = await (0, amapPoiService_1.getNearbyRestaurants)({
+        const result = await (0, amapPoiService_1.getNearbyRestaurantsWithMeta)({
             radiusMeters: attempt.radiusMeters,
             keyword: attempt.keyword,
             types: attempt.types,
             pageSize: 25,
-            pageCount: attempt.pageCount
+            pageCount: attempt.pageCount,
+            fetchProfile: 'recommendation',
+            fetchReason: `recommendation-attempt-${metaList.length + 1}`,
+            maxAmapApiCalls: remainingAmapApiCalls
         }).catch((error) => {
             console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
-            return [];
+            return {
+                restaurants: [],
+                meta: {
+                    poiCacheHit: false,
+                    poiCacheKey: '',
+                    poiFetchReason: 'amap-failed-fallback',
+                    amapApiCallCount: 0
+                }
+            };
         });
+        const restaurants = result.restaurants;
+        metaList.push(result.meta);
+        remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - result.meta.amapApiCallCount);
         if (restaurants.length === 0) {
+            if (remainingAmapApiCalls <= 0) {
+                console.warn('AMap POI recommendation live request budget exhausted.', {
+                    attempt,
+                    maxAmapApiCalls: MAX_AMAP_API_CALLS_PER_RECOMMENDATION
+                });
+            }
             continue;
         }
         restaurants.forEach((restaurant) => {
@@ -57,7 +80,11 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         limit,
         source: 'amap'
     });
-    return result.candidates;
+    const poiMeta = mergePoiFetchMeta(metaList);
+    return result.candidates.map((candidate) => ({
+        ...candidate,
+        ...poiMeta
+    }));
 }
 function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const baseRadius = amapQuery.radiusMeters;
@@ -220,6 +247,20 @@ function getMallKeywordAttempts(preferenceSnapshot) {
         return ['商场|购物中心|高端餐厅|黑珍珠', '购物中心|商场|炳胜|利苑|广州酒家'];
     }
     return ['商场|购物中心|广场|mall|餐厅', '购物中心|商场|连锁餐厅|品牌餐厅'];
+}
+function mergePoiFetchMeta(metaList) {
+    const apiCallCount = metaList.reduce((sum, meta) => sum + meta.amapApiCallCount, 0);
+    const firstKey = metaList.find((meta) => meta.poiCacheKey)?.poiCacheKey ?? '';
+    const cacheAges = metaList
+        .map((meta) => meta.poiCacheAgeMs)
+        .filter((age) => typeof age === 'number');
+    return {
+        poiCacheHit: apiCallCount === 0 && metaList.some((meta) => meta.poiCacheHit),
+        poiCacheKey: firstKey,
+        poiCacheAgeMs: cacheAges.length > 0 ? Math.min(...cacheAges) : undefined,
+        poiFetchReason: metaList.map((meta) => meta.poiFetchReason).join(',') || 'no-poi-fetch',
+        amapApiCallCount: apiCallCount
+    };
 }
 function normalizeRestaurantPoolKey(restaurant) {
     const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');

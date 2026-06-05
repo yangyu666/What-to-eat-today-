@@ -74,6 +74,11 @@ export interface RecommendationCandidate {
   experimentId?: string;
   imageUrl?: string;
   source?: RecommendationSource;
+  poiCacheHit?: boolean;
+  poiCacheKey?: string;
+  poiCacheAgeMs?: number;
+  poiFetchReason?: string;
+  amapApiCallCount?: number;
 }
 
 export type MealCandidate = RecommendationCandidate;

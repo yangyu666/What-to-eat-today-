@@ -1,11 +1,26 @@
 import { mockRestaurants } from '../miniprogram/data/mockRestaurants';
 import { questionBank } from '../miniprogram/data/questionBank';
 import { buildAmapRestaurantQuery } from '../miniprogram/services/amapQueryBuilder';
+import {
+  __resetNearbyRestaurantCacheForTest,
+  __setAmapPoiCloudFetcherForTest,
+  __setAmapPoiStorageAdapterForTest,
+  getNearbyRestaurantsWithMeta,
+  POI_CACHE_TTL_MS
+} from '../miniprogram/services/amapPoiService';
 import { mapAnswersToPreferenceProfile } from '../miniprogram/services/preferenceMapper';
 import { recommendRestaurants, scoreRestaurant } from '../miniprogram/services/recommendationEngine';
 import { selectQuestionSet } from '../miniprogram/services/questionSelector';
 import type { Restaurant } from '../miniprogram/types/restaurant';
 import type { UserPreferenceAnswer, UserPreferenceProfile } from '../miniprogram/types/userPreference';
+
+declare const require: (path: string) => {
+  validateStressCachePolicy: (input: {
+    cacheFileExists: boolean;
+    allowLive: boolean;
+    liveRequested: boolean;
+  }) => { ok: boolean; mayCallAmap: boolean; reason: string };
+};
 
 function assert(condition: boolean, message: string): asserts condition {
   if (!condition) {
@@ -1848,3 +1863,208 @@ assert(
   Boolean(premiumNonMealBudgetCalibration.candidates[0]?.penaltyReasons?.some((reason) => reason.includes('价格低于所选预算档'))),
   'high-budget non-meal low-cost fallback should expose budget mismatch reason'
 );
+
+void runPoiCacheAndStressTests().catch((error) => {
+  throw error;
+});
+
+async function runPoiCacheAndStressTests() {
+  const storage: Record<string, unknown> = {};
+  const baseLocation = { latitude: 39.909, longitude: 116.455 };
+  let amapCallCount = 0;
+  const cachedRestaurants: Restaurant[] = [
+    {
+      id: 'cache-light-rice',
+      name: 'Light Rice',
+      tags: ['light', 'rice'],
+      tagIds: ['light', 'healthy', 'rice', 'meal', 'quick'],
+      category: 'light rice',
+      distanceMeters: 350,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.6,
+      source: 'amap',
+      status: 'active'
+    },
+    {
+      id: 'cache-spicy-noodle',
+      name: 'Spicy Noodle',
+      tags: ['spicy', 'noodle'],
+      tagIds: ['spicy', 'strong_flavor', 'noodle', 'meal'],
+      category: 'spicy noodle',
+      distanceMeters: 420,
+      averageCostYuan: 32,
+      openStatus: 'open',
+      rating: 4.7,
+      source: 'amap',
+      status: 'active'
+    },
+    {
+      id: 'cache-coffee',
+      name: 'Coffee Bar',
+      tags: ['coffee'],
+      tagIds: ['coffee', 'drink', 'non_meal', 'afternoon_tea'],
+      category: 'coffee',
+      distanceMeters: 260,
+      averageCostYuan: 28,
+      openStatus: 'open',
+      rating: 4.5,
+      source: 'amap',
+      status: 'active'
+    }
+  ];
+
+  __resetNearbyRestaurantCacheForTest();
+  __setAmapPoiStorageAdapterForTest({
+    get: (key) => storage[key],
+    set: (key, value) => {
+      storage[key] = value;
+    }
+  });
+  __setAmapPoiCloudFetcherForTest(async () => {
+    amapCallCount += 1;
+
+    return {
+      restaurants: cachedRestaurants,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: 'test-live-fetch'
+      }
+    };
+  });
+
+  const firstFetch = await getNearbyRestaurantsWithMeta({
+    location: baseLocation,
+    radiusMeters: 3000,
+    pageSize: 25,
+    pageCount: 2,
+    keyword: '',
+    types: '050000',
+    maxAmapApiCalls: 3
+  });
+  assert(firstFetch.meta.poiCacheHit === false, 'first same-query fetch should miss cache');
+  assert(firstFetch.meta.amapApiCallCount === 1, 'first same-query fetch should call AMap once');
+
+  const secondFetch = await getNearbyRestaurantsWithMeta({
+    location: baseLocation,
+    radiusMeters: 3000,
+    pageSize: 25,
+    pageCount: 2,
+    keyword: '',
+    types: '050000',
+    maxAmapApiCalls: 3
+  });
+  assert(secondFetch.meta.poiCacheHit === true, 'same location and query should hit POI cache');
+  assert(Number(amapCallCount) === 1, 'same location and query should not call AMap twice');
+
+  const nearbyFetch = await getNearbyRestaurantsWithMeta({
+    location: { latitude: 39.918, longitude: 116.455 },
+    radiusMeters: 1500,
+    pageSize: 25,
+    pageCount: 2,
+    keyword: '',
+    types: '050000',
+    maxAmapApiCalls: 3
+  });
+  assert(nearbyFetch.meta.poiCacheHit === true, 'location moved less than 2km should hit POI cache');
+  assert(Number(amapCallCount) === 1, 'location moved less than 2km should not call AMap again');
+
+  const farFetch = await getNearbyRestaurantsWithMeta({
+    location: { latitude: 39.94, longitude: 116.455 },
+    radiusMeters: 1500,
+    pageSize: 25,
+    pageCount: 2,
+    keyword: '',
+    types: '050000',
+    maxAmapApiCalls: 3
+  });
+  assert(farFetch.meta.poiCacheHit === false, 'location moved more than 2km should refresh POI cache');
+  assert(Number(amapCallCount) === 2, 'location moved more than 2km should call AMap again');
+
+  const cacheStore = storage.nearby_restaurants_amap_cache as {
+    entries: Array<{ createdAt: number }>;
+  };
+  cacheStore.entries[0].createdAt = Date.now() - POI_CACHE_TTL_MS - 1;
+  __setAmapPoiStorageAdapterForTest({
+    get: (key) => storage[key],
+    set: (key, value) => {
+      storage[key] = value;
+    }
+  });
+  const expiredFetch = await getNearbyRestaurantsWithMeta({
+    location: { latitude: 39.94, longitude: 116.455 },
+    radiusMeters: 1500,
+    pageSize: 25,
+    pageCount: 2,
+    keyword: '',
+    types: '050000',
+    maxAmapApiCalls: 3
+  });
+  assert(expiredFetch.meta.poiCacheHit === false, 'expired POI cache should refresh');
+  assert(Number(amapCallCount) === 3, 'expired POI cache should call AMap again');
+
+  const drinkResult = recommend(
+    profile({
+      selectedOptionIds: ['intent_drink'],
+      preferredTagIds: ['coffee', 'drink', 'non_meal'],
+      avoidedTagIds: ['meal'],
+      maxDistanceMeters: 3000
+    }),
+    cachedRestaurants
+  );
+  const lightResult = recommend(
+    profile({
+      preferredTagIds: ['light', 'healthy', 'rice'],
+      avoidedTagIds: ['spicy', 'strong_flavor'],
+      maxDistanceMeters: 3000
+    }),
+    cachedRestaurants
+  );
+  assert(drinkResult.candidates[0]?.restaurantId === 'cache-coffee', 'cached candidates should rank drink preferences correctly');
+  assert(lightResult.candidates[0]?.restaurantId === 'cache-light-rice', 'cached candidates should rank light meal preferences correctly');
+
+  storage.nearby_restaurants_amap_cache = undefined;
+  __setAmapPoiStorageAdapterForTest({
+    get: (key) => storage[key],
+    set: (key, value) => {
+      storage[key] = value;
+    }
+  });
+  const failedCacheOnlyFetch = await getNearbyRestaurantsWithMeta({
+    location: baseLocation,
+    radiusMeters: 3000,
+    cacheOnly: true,
+    maxAmapApiCalls: 0
+  });
+  assert(failedCacheOnlyFetch.restaurants.length === 0, 'AMap failure fallback path should return an empty POI pool without live calls');
+  assert(failedCacheOnlyFetch.meta.amapApiCallCount === 0, 'fallback path should not count live AMap calls');
+
+  const stress = require('../../../scripts/stressRecommendation.js');
+  const missingCachePolicy = stress.validateStressCachePolicy({
+    cacheFileExists: false,
+    allowLive: false,
+    liveRequested: false
+  });
+  assert(!missingCachePolicy.ok && !missingCachePolicy.mayCallAmap, 'stress without cache should fail and not allow live AMap');
+
+  const existingCachePolicy = stress.validateStressCachePolicy({
+    cacheFileExists: true,
+    allowLive: false,
+    liveRequested: false
+  });
+  assert(existingCachePolicy.ok && !existingCachePolicy.mayCallAmap, 'stress with cache should run with zero AMap calls');
+
+  for (let index = 0; index < 500; index += 1) {
+    const result = recommend(
+      profile({
+        preferredTagIds: index % 2 === 0 ? ['light', 'rice'] : ['coffee', 'drink', 'non_meal'],
+        avoidedTagIds: index % 2 === 0 ? ['spicy'] : ['meal'],
+        maxDistanceMeters: 3000
+      }),
+      cachedRestaurants
+    );
+
+    assert(result.candidates.length > 0, 'stress-style cached recommendation should produce candidates');
+  }
+  assert(Number(amapCallCount) === 3, '500 cached recommendation runs should make zero additional AMap calls');
+}

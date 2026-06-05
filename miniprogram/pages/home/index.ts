@@ -3,6 +3,7 @@ import {
   getHistoryFilterEnabled,
   setHistoryFilterEnabled
 } from '../../services/historyService';
+import { prefetchNearbyRestaurantCandidates } from '../../services/amapPoiService';
 import type { MealHistoryItem } from '../../models/meal';
 
 interface RecentMealItem {
@@ -15,6 +16,7 @@ interface RecentMealItem {
 
 const MAX_RECENT_MEALS = 3;
 const DEFAULT_USER_NAME = '朋友';
+const USER_PROFILE_STORAGE_KEY = 'meal_user_profile';
 const DEFAULT_RECENT_IMAGES = {
   spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
   rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
@@ -28,6 +30,7 @@ Page({
   data: {
     userName: DEFAULT_USER_NAME,
     locationStatus: '定位中',
+    locationAuthDenied: false,
     historyFilterEnabled: true,
     recentMeals: [] as RecentMealItem[]
   },
@@ -51,28 +54,74 @@ Page({
   },
 
   initUserName() {
-    const app = getApp<IAppOption>();
-    const storedUserInfo = getStoredUserInfo();
-    const nickName = app.globalData.userInfo?.nickName || storedUserInfo?.nickName;
-
     this.setData({
-      userName: nickName || DEFAULT_USER_NAME
+      userName: getStoredUserName()
     });
   },
 
   initLocation() {
+    if (this.data.locationAuthDenied) {
+      this.openLocationSetting();
+      return;
+    }
+
+    this.requestLocation();
+  },
+
+  requestLocation() {
     this.setData({ locationStatus: '定位中' });
 
     wx.getLocation({
       type: 'gcj02',
-      success: () => {
+      success: async (result) => {
+        this.prefetchNearbyRestaurants(result.latitude, result.longitude);
+        const locationLabel = await getLocationLabel(result.latitude, result.longitude);
+
         this.setData({
-          locationStatus: '当前位置已获取'
+          locationStatus: locationLabel || '位置未授权',
+          locationAuthDenied: !locationLabel
         });
       },
       fail: () => {
         this.setData({
-          locationStatus: '点击获取位置'
+          locationStatus: '位置未授权',
+          locationAuthDenied: true
+        });
+      }
+    });
+  },
+
+  prefetchNearbyRestaurants(latitude: number, longitude: number) {
+    void prefetchNearbyRestaurantCandidates({
+      location: { latitude, longitude },
+      radiusMeters: 5000,
+      pageSize: 25,
+      pageCount: 3,
+      fetchReason: 'home-location-success-prefetch',
+      maxAmapApiCalls: 3
+    }).catch((error) => {
+      console.warn('Nearby restaurant prefetch failed.', error);
+    });
+  },
+
+  openLocationSetting() {
+    wx.openSetting({
+      success: (result) => {
+        if (result.authSetting['scope.userLocation']) {
+          this.setData({ locationAuthDenied: false });
+          this.requestLocation();
+          return;
+        }
+
+        this.setData({
+          locationStatus: '位置未授权',
+          locationAuthDenied: true
+        });
+      },
+      fail: () => {
+        this.setData({
+          locationStatus: '位置未授权',
+          locationAuthDenied: true
         });
       }
     });
@@ -121,13 +170,27 @@ Page({
   }
 });
 
-function getStoredUserInfo(): WechatMiniprogram.UserInfo | undefined {
+function getStoredUserName(): string {
+  const app = getApp<IAppOption>();
+  const appNickName = app.globalData.userInfo?.nickName;
+
+  if (appNickName) {
+    return appNickName;
+  }
+
+  const profile = wx.getStorageSync(USER_PROFILE_STORAGE_KEY) as { nickname?: string } | undefined;
+
+  if (profile?.nickname) {
+    return profile.nickname;
+  }
+
   const storageKeys = ['userInfo', 'user_profile', 'profile'];
 
   for (const key of storageKeys) {
     const value = wx.getStorageSync(key) as
       | WechatMiniprogram.UserInfo
       | { userInfo?: WechatMiniprogram.UserInfo }
+      | { nickname?: string }
       | undefined;
 
     if (!value) {
@@ -135,15 +198,70 @@ function getStoredUserInfo(): WechatMiniprogram.UserInfo | undefined {
     }
 
     if ('nickName' in value && value.nickName) {
-      return value;
+      return value.nickName;
+    }
+
+    if ('nickname' in value && value.nickname) {
+      return value.nickname;
     }
 
     if ('userInfo' in value && value.userInfo?.nickName) {
-      return value.userInfo;
+      return value.userInfo.nickName;
     }
   }
 
-  return undefined;
+  return DEFAULT_USER_NAME;
+}
+
+async function getLocationLabel(latitude: number, longitude: number): Promise<string | undefined> {
+  if (!wx.cloud) {
+    return undefined;
+  }
+
+  try {
+    // wx.getLocation itself only obtains coordinates. This reverseGeocode cloud action
+    // calls AMap regeo and therefore consumes AMap WebService quota.
+    const response = await wx.cloud.callFunction({
+      name: 'amapPoi',
+      data: {
+        action: 'reverseGeocode',
+        latitude,
+        longitude
+      }
+    });
+    const result = response.result as
+      | {
+          ok?: boolean;
+          data?: {
+            province?: string;
+            city?: string;
+            district?: string;
+          };
+        }
+      | undefined;
+
+    if (!result?.ok || !result.data) {
+      return undefined;
+    }
+
+    return formatLocationLabel(result.data.province, result.data.city, result.data.district);
+  } catch (error) {
+    console.warn('Failed to resolve location label.', error);
+    return undefined;
+  }
+}
+
+function formatLocationLabel(
+  province?: string,
+  city?: string,
+  district?: string
+): string | undefined {
+  const parts = [province, city, district]
+    .filter((part): part is string => Boolean(part))
+    .map((part) => part.replace(/省|市|自治区|特别行政区|地区|盟|区|县$/g, ''));
+  const uniqueParts = parts.filter((part, index) => part && parts.indexOf(part) === index);
+
+  return uniqueParts.length > 0 ? uniqueParts.slice(0, 2).join(' · ') : undefined;
 }
 
 function toRecentMealItem(item: MealHistoryItem): RecentMealItem {

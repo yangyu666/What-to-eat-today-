@@ -4,7 +4,7 @@ cloud.init({
   env: cloud.DYNAMIC_CURRENT_ENV
 });
 
-const COLLECTIONS = ['users', 'recommendation_history'];
+const COLLECTIONS = ['users', 'recommendation_history', 'amap_poi_cache'];
 
 exports.main = async (event = {}, context = {}) => {
   const requestId = context.requestId || createRequestId();

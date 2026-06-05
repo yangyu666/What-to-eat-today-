@@ -22,6 +22,15 @@
 - 数据库：不写库。
 - 上线配置：必须在云函数环境变量里配置 `AMAP_WEB_SERVICE_KEY` 或 `AMAP_KEY`。
 
+#### AMap quota and POI cache
+
+- `wx.getLocation` only obtains device latitude/longitude and does not consume AMap search quota.
+- Quota is consumed by AMap WebService requests: place/around, reverse geocode (`regeo`), and IP location.
+- `amapPoi` caches normalized POI candidate pools in `amap_poi_cache` for quota optimization. This is not a business collection and does not replace `users` or `recommendation_history`.
+- Cache key dimensions include rounded location bucket, radius bucket, `types`, normalized `keyword`, and page profile.
+- Cache TTL is 1 hour in the cloud function. A single cached candidate pool stores at most 250 normalized restaurant records and never stores the raw AMap response.
+- The mini program also keeps a session/storage cache under `nearby_restaurants_amap_cache`; recommendation flows prefer that cache before calling `amapPoi`.
+
 ### `saveRecommendationHistory`
 
 - 入口：`cloudfunctions/saveRecommendationHistory/index.js`
@@ -58,7 +67,11 @@
 
 ## MVP 必建集合
 
-上线前只创建 `users` 和 `recommendation_history` 两个集合。当前推荐主链路依赖高德 POI，不需要先把餐厅全量入库。
+上线前创建 `users`、`recommendation_history` 和 `amap_poi_cache`。当前推荐主链路依赖高德 POI，不需要先把餐厅全量入库；`amap_poi_cache` 只用于额度优化缓存。
+
+### `amap_poi_cache`
+
+Purpose: quota optimization cache for AMap POI candidate pools. It is created by `setupDatabase` but is not a business data source. It can be cleared safely; the app will refetch from AMap when allowed by the request budget.
 
 ### `users`
 
