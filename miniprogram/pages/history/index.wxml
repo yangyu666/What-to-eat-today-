@@ -29,7 +29,10 @@
       <view class="history-main">
         <view class="history-title-row">
           <text class="meal-name">{{item.titleText}}</text>
-          <text class="action-pill">{{item.actionText}}</text>
+          <view class="history-status">
+            <text class="action-pill">{{item.actionText}}</text>
+            <text class="date">{{item.dateText}}</text>
+          </view>
         </view>
         <text class="dish-name">{{item.subtitleText}}</text>
         <text class="note">{{item.reasonText}}</text>
@@ -38,7 +41,6 @@
           <text>{{item.sourceText}}</text>
         </view>
       </view>
-      <text class="date">{{item.dateText}}</text>
     </view>
   </view>
 </view>
