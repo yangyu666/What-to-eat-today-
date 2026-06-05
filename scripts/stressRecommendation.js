@@ -80,6 +80,8 @@ function main() {
     runs,
     amapApiCallCount: 0,
     cacheHitCount: runs,
+    cacheHitRate: runs > 0 ? Number((runs / runs).toFixed(4)) : 0,
+    amapApiCallsAvoidedByCache: runs,
     recommendationSuccessCount,
     noResultCount,
     averageElapsedMs: Number((elapsedMs / runs).toFixed(2)),

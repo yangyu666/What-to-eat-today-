@@ -1864,6 +1864,47 @@ assert(
   'high-budget non-meal low-cost fallback should expose budget mismatch reason'
 );
 
+const mixedTaggedCafeResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_drink', 'prefer_coffee'],
+    preferredTagIds: ['coffee', 'drink', 'non_meal'],
+    avoidedTagIds: ['meal'],
+    budgetLevel: 4,
+    maxDistanceMeters: 1500
+  }),
+  [
+    {
+      id: 'mixed-cafe',
+      name: '无名堂-Chef no one',
+      tags: [],
+      tagIds: ['meal', 'coffee', 'drink', 'non_meal'],
+      category: '餐饮服务;咖啡厅;咖啡厅',
+      distanceMeters: 180,
+      averageCostYuan: 61,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'nearby-meal',
+      name: '春饼小馆',
+      tags: [],
+      tagIds: ['meal', 'rice', 'staple'],
+      category: '餐饮服务;中餐厅;中餐厅',
+      distanceMeters: 80,
+      averageCostYuan: 45,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(mixedTaggedCafeResult.candidates[0]?.restaurantId === 'mixed-cafe', 'mixed meal+coffee tag cafe should remain eligible for explicit drink intent');
+assert(
+  !(mixedTaggedCafeResult.candidates[0]?.penaltyReasons ?? []).some((reason) => reason.includes('explicit non-meal intent conflicts with meal candidate')),
+  'mixed meal+coffee tag cafe should not be treated as a hard meal conflict'
+);
+
 void runPoiCacheAndStressTests().catch((error) => {
   throw error;
 });

@@ -216,7 +216,7 @@ function inferTags(text) {
 }
 
 function inferTagIds(tags) {
-  const ids = new Set(['meal']);
+  const ids = new Set();
   const text = tags.join(' ');
 
   if (/咖啡/.test(text)) {
@@ -250,7 +250,15 @@ function inferTagIds(tags) {
     ids.add('quick');
   }
 
+  if (!hasNonMealTagIds(ids)) {
+    ids.add('meal');
+  }
+
   return [...ids];
+}
+
+function hasNonMealTagIds(ids) {
+  return ['coffee', 'milk_tea', 'drink', 'dessert', 'non_meal'].some((id) => ids.has(id));
 }
 
 function parseAmapLocation(value) {

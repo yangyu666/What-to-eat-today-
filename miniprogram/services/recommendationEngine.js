@@ -998,7 +998,9 @@ function getNegativeConflict(restaurant, preference) {
         labels.add('non-meal category conflict');
         setSeverity('soft');
     }
-    if (explicitNonMeal && MEAL_TAGS.some((tagId) => tagIds.includes(tagId))) {
+    if (explicitNonMeal &&
+        MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) &&
+        !hasNonMealEvidence(tagIds, text)) {
         MEAL_TAGS.forEach((tagId) => {
             if (tagIds.includes(tagId)) {
                 tags.add(tagId);
