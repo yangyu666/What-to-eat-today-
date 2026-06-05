@@ -1,11 +1,13 @@
 <view class="page mine-page">
   <view class="profile-card">
+    <view class="profile-accent"></view>
     <button class="avatar-button" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" aria-label="选择头像">
       <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
       <view wx:else class="avatar-placeholder">未</view>
     </button>
 
     <view class="profile-main">
+      <text class="profile-label">我的资料</text>
       <input
         class="nickname-input"
         type="nickname"
@@ -20,21 +22,45 @@
     </view>
   </view>
 
-  <view class="menu-list">
-    <button
-      wx:for="{{actions}}"
-      wx:key="key"
-      class="menu-item {{item.danger ? 'menu-item-danger' : ''}}"
-      data-key="{{item.key}}"
-      bindtap="onActionTap"
-    >
-      <view class="menu-copy">
-        <text class="menu-title">{{item.title}}</text>
-        <text class="menu-desc">{{item.desc}}</text>
+  <view class="settings-section">
+    <text class="section-heading">设置</text>
+    <view class="menu-list">
+      <view
+        wx:for="{{actions}}"
+        wx:key="key"
+        class="menu-item {{item.feedback ? 'menu-item-feedback' : ''}} {{item.danger ? 'menu-item-danger' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="onActionTap"
+      >
+        <view class="menu-left">
+          <view class="menu-icon {{item.feedback ? 'menu-icon-feedback' : ''}} {{item.danger ? 'menu-icon-danger' : ''}}">
+            <view class="menu-icon-mark"></view>
+          </view>
+          <view class="menu-copy">
+            <text class="menu-title">{{item.title}}</text>
+            <text class="menu-desc">{{item.desc}}</text>
+          </view>
+        </view>
+        <text class="menu-arrow">›</text>
+        <button wx:if="{{item.feedback}}" class="feedback-cover" open-type="feedback" aria-label="意见反馈"></button>
       </view>
-      <text class="menu-arrow">›</text>
-    </button>
+    </view>
   </view>
 
   <text class="version">{{version}}</text>
+
+  <view wx:if="{{guideVisible}}" class="guide-mask" bindtap="closeGuideModal">
+    <view class="guide-dialog" catchtap="noop">
+      <view class="guide-header">
+        <text class="guide-title">关于与说明</text>
+      </view>
+      <scroll-view class="guide-body" scroll-y>
+        <view wx:for="{{guideSections}}" wx:key="title" class="guide-section">
+          <text class="guide-section-title">{{item.title}}</text>
+          <text class="guide-section-content">{{item.content}}</text>
+        </view>
+      </scroll-view>
+      <button class="guide-confirm" bindtap="closeGuideModal">知道了</button>
+    </view>
+  </view>
 </view>

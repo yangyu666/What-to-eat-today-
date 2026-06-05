@@ -1,62 +1,57 @@
+const { clearLocalRecommendationHistory } = require('../../services/historyService');
+
 const USER_PROFILE_STORAGE_KEY = 'meal_user_profile';
-const HISTORY_STORAGE_KEY = 'meal_recommendation_history';
-const HISTORY_FILTER_STORAGE_KEY = 'meal_filter_recent_history';
-const QUESTIONNAIRE_RESULT_STORAGE_KEY = 'meal_questionnaire_result';
 const SYNC_USER_PROFILE_FUNCTION_NAME = 'syncUserProfile';
 const DEFAULT_NICKNAME = '未登录用户';
 const VERSION = 'v0.1.0';
 
 const ACTIONS = [
   {
-    key: 'about',
-    title: '关于今天吃什么',
-    desc: '30-60 秒结束选择困难'
+    key: 'guide',
+    title: '关于与说明',
+    desc: '产品、隐私、推荐和数据来源'
   },
   {
-    key: 'privacy',
-    title: '隐私说明',
-    desc: '了解本地与云端资料保存方式'
-  },
-  {
-    key: 'recommendation',
-    title: '推荐说明',
-    desc: '查看推荐结果如何产生'
-  },
-  {
-    key: 'dataSource',
-    title: '数据来源说明',
-    desc: '查看餐厅数据来源与限制'
+    key: 'feedback',
+    title: '意见反馈',
+    desc: '告诉我们哪里不好用或想吃什么',
+    feedback: true
   },
   {
     key: 'clearCache',
     title: '清除本地缓存',
-    desc: '清除头像昵称、历史缓存和历史过滤开关',
-    danger: true
-  },
-  {
-    key: 'clearPreference',
-    title: '清除问答偏好',
-    desc: '清除已保存的问答结果',
+    desc: '清除头像昵称和本地推荐记录',
     danger: true
   }
 ];
 
-const MODAL_CONTENT = {
-  about: '今天吃什么是一个饮食决策辅助工具，目标是在 30-60 秒内帮你结束选择困难。',
-  privacy:
-    '当前 MVP 会在本地保存你的头像昵称、问答偏好和推荐历史。头像昵称会在你主动设置后同步到云端，用于识别你的个人资料。',
-  recommendation:
-    '推荐结果由问答偏好、附近餐厅、预算、距离、口味、历史过滤等规则综合计算。AI 不直接决定餐厅。',
-  dataSource:
-    '餐厅信息优先来自高德 POI，部分测试阶段会使用 mock 数据。人均、营业状态等字段可能存在偏差，请以实际店铺为准。'
-};
+const GUIDE_SECTIONS = [
+  {
+    title: '关于今天吃什么',
+    content: '这是一个饮食决策辅助工具，目标是在 30-60 秒内帮你结束选择困难。'
+  },
+  {
+    title: '隐私说明',
+    content: '头像昵称仅在你主动设置后保存，用于展示个人资料；问答偏好和推荐记录用于帮助生成更合适的推荐。'
+  },
+  {
+    title: '推荐说明',
+    content: '推荐结果会综合你的问答偏好、附近餐厅、预算、距离、口味和历史记录等信息计算。'
+  },
+  {
+    title: '数据来源',
+    content: '餐厅信息优先来自高德 POI。人均、营业状态等字段可能存在偏差，请以实际店铺为准。'
+  }
+];
 
 Page({
   data: {
     nickname: DEFAULT_NICKNAME,
     avatarUrl: '',
-    statusText: '可设置微信头像和昵称',
+    statusText: '主动设置头像昵称，吃饭决定更有归属感',
     actions: ACTIONS,
+    guideVisible: false,
+    guideSections: GUIDE_SECTIONS,
     version: VERSION
   },
 
@@ -140,27 +135,27 @@ Page({
       return;
     }
 
-    if (key === 'clearPreference') {
-      this.confirmClearPreference();
+    if (key === 'feedback') {
       return;
     }
 
-    const content = MODAL_CONTENT[key];
-
-    if (content) {
-      wx.showModal({
-        title: getActionTitle(key),
-        content,
-        showCancel: false,
-        confirmText: '知道了'
-      });
+    if (key === 'guide') {
+      this.setData({ guideVisible: true });
     }
+  },
+
+  closeGuideModal() {
+    this.setData({ guideVisible: false });
+  },
+
+  noop() {
+    return;
   },
 
   confirmClearCache() {
     wx.showModal({
       title: '清除本地缓存',
-      content: '将清除头像昵称、历史过滤开关和本地推荐历史缓存，不会删除云端资料。',
+      content: '将清除当前设备上的头像昵称和推荐记录缓存，历史页不会再显示旧记录。',
       confirmText: '清除',
       confirmColor: '#e5484d',
       success: (res) => {
@@ -168,37 +163,14 @@ Page({
           return;
         }
 
-        [
-          USER_PROFILE_STORAGE_KEY,
-          HISTORY_FILTER_STORAGE_KEY,
-          HISTORY_STORAGE_KEY
-        ].forEach((key) => wx.removeStorageSync(key));
+        wx.removeStorageSync(USER_PROFILE_STORAGE_KEY);
+        clearLocalRecommendationHistory();
 
         this.setData({
           nickname: DEFAULT_NICKNAME,
           avatarUrl: ''
         });
 
-        wx.showToast({
-          title: '已清除',
-          icon: 'success'
-        });
-      }
-    });
-  },
-
-  confirmClearPreference() {
-    wx.showModal({
-      title: '清除问答偏好',
-      content: '将清除已保存的问答偏好，下次推荐会重新问答。',
-      confirmText: '清除',
-      confirmColor: '#e5484d',
-      success: (res) => {
-        if (!res.confirm) {
-          return;
-        }
-
-        wx.removeStorageSync(QUESTIONNAIRE_RESULT_STORAGE_KEY);
         wx.showToast({
           title: '已清除',
           icon: 'success'
@@ -229,12 +201,6 @@ function normalizeNickname(value) {
   const nickname = typeof value === 'string' ? value.trim() : '';
 
   return nickname || DEFAULT_NICKNAME;
-}
-
-function getActionTitle(key) {
-  const action = ACTIONS.find((item) => item.key === key);
-
-  return action ? action.title : '说明';
 }
 
 async function syncUserProfile(profile) {

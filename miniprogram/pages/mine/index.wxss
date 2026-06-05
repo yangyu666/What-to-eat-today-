@@ -1,27 +1,44 @@
 .mine-page {
   display: flex;
   flex-direction: column;
-  gap: 28rpx;
+  gap: 30rpx;
+  background:
+    linear-gradient(180deg, rgba(24, 198, 83, 0.08) 0%, rgba(246, 248, 247, 0) 300rpx),
+    var(--color-page);
 }
 
 .profile-card {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 24rpx;
-  padding: 32rpx;
-  border: 1rpx solid rgba(56, 45, 35, 0.06);
-  border-radius: 24rpx;
-  background: var(--color-surface);
-  box-shadow: 0 12rpx 32rpx rgba(16, 45, 32, 0.08);
+  gap: 26rpx;
+  overflow: hidden;
+  padding: 34rpx 32rpx;
+  border: 1rpx solid rgba(24, 198, 83, 0.12);
+  border-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: 0 16rpx 38rpx rgba(16, 45, 32, 0.09);
+}
+
+.profile-accent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 8rpx;
+  background: linear-gradient(90deg, #18c653, #f5c84b);
 }
 
 .avatar-button {
-  flex: 0 0 112rpx;
-  width: 112rpx;
-  height: 112rpx;
+  position: relative;
+  flex: 0 0 124rpx;
+  width: 124rpx;
+  height: 124rpx;
   overflow: hidden;
+  border: 6rpx solid #ffffff;
   border-radius: 50%;
   background: rgba(24, 198, 83, 0.1);
+  box-shadow: 0 10rpx 24rpx rgba(16, 45, 32, 0.16);
 }
 
 .avatar-image,
@@ -36,9 +53,9 @@
   align-items: center;
   justify-content: center;
   color: #ffffff;
-  font-size: 38rpx;
+  font-size: 40rpx;
   font-weight: 800;
-  background: linear-gradient(135deg, #18c653, #10a947);
+  background: linear-gradient(135deg, #18c653, #12a978);
 }
 
 .profile-main {
@@ -46,40 +63,71 @@
   min-width: 0;
 }
 
+.profile-label {
+  display: inline-flex;
+  margin-bottom: 10rpx;
+  padding: 6rpx 14rpx;
+  border-radius: 999rpx;
+  color: #0f8f3e;
+  font-size: 22rpx;
+  font-weight: 700;
+  line-height: 1.2;
+  background: rgba(24, 198, 83, 0.1);
+}
+
 .nickname-input {
   width: 100%;
-  height: 48rpx;
+  height: 52rpx;
   color: var(--color-text);
-  font-size: 34rpx;
+  font-size: 36rpx;
   font-weight: 800;
-  line-height: 48rpx;
+  line-height: 52rpx;
 }
 
 .status {
   display: block;
-  margin-top: 8rpx;
+  margin-top: 10rpx;
   color: var(--color-muted);
   font-size: 24rpx;
-  line-height: 1.45;
+  line-height: 1.5;
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14rpx;
+}
+
+.section-heading {
+  display: block;
+  padding-left: 8rpx;
+  color: rgba(56, 45, 35, 0.72);
+  font-size: 26rpx;
+  font-weight: 800;
+  line-height: 1.35;
 }
 
 .menu-list {
   overflow: hidden;
   border: 1rpx solid rgba(56, 45, 35, 0.06);
-  border-radius: 22rpx;
-  background: var(--color-surface);
-  box-shadow: 0 10rpx 28rpx rgba(16, 45, 32, 0.06);
+  border-radius: 24rpx;
+  background: #ffffff;
+  box-shadow: 0 12rpx 30rpx rgba(16, 45, 32, 0.06);
 }
 
 .menu-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20rpx;
   width: 100%;
-  min-height: 116rpx;
-  padding: 24rpx 28rpx;
+  margin: 0;
+  min-height: 126rpx;
+  padding: 26rpx 28rpx;
   border-bottom: 1rpx solid rgba(56, 45, 35, 0.07);
+  border-radius: 0;
+  box-sizing: border-box;
+  line-height: 1;
   text-align: left;
   background: #ffffff;
 }
@@ -92,6 +140,81 @@
   background: rgba(24, 198, 83, 0.06);
 }
 
+.menu-item-feedback {
+  background: linear-gradient(90deg, rgba(24, 198, 83, 0.07), #ffffff 58%);
+}
+
+.feedback-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.menu-left {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+  gap: 22rpx;
+}
+
+.menu-icon {
+  display: flex;
+  flex: 0 0 56rpx;
+  align-items: center;
+  justify-content: center;
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 18rpx;
+  background: rgba(24, 198, 83, 0.1);
+}
+
+.menu-icon-danger {
+  background: rgba(229, 72, 77, 0.1);
+}
+
+.menu-icon-feedback {
+  background: rgba(24, 198, 83, 0.14);
+}
+
+.menu-icon-mark {
+  width: 22rpx;
+  height: 22rpx;
+  border: 5rpx solid #18c653;
+  border-radius: 50%;
+}
+
+.menu-icon-feedback .menu-icon-mark {
+  position: relative;
+  width: 26rpx;
+  height: 20rpx;
+  border: none;
+  border-radius: 10rpx;
+  background: #18c653;
+}
+
+.menu-icon-feedback .menu-icon-mark::after {
+  position: absolute;
+  right: 4rpx;
+  bottom: -5rpx;
+  width: 10rpx;
+  height: 10rpx;
+  border-radius: 0 0 8rpx 0;
+  background: #18c653;
+  content: "";
+}
+
+.menu-icon-danger .menu-icon-mark {
+  width: 24rpx;
+  height: 5rpx;
+  border: none;
+  border-radius: 999rpx;
+  background: #d93036;
+}
+
 .menu-copy {
   flex: 1;
   min-width: 0;
@@ -100,8 +223,8 @@
 .menu-title {
   display: block;
   color: var(--color-text);
-  font-size: 29rpx;
-  font-weight: 700;
+  font-size: 30rpx;
+  font-weight: 800;
   line-height: 1.35;
 }
 
@@ -119,6 +242,7 @@
 
 .menu-arrow {
   flex: 0 0 auto;
+  margin-left: auto;
   color: rgba(56, 45, 35, 0.32);
   font-size: 44rpx;
   line-height: 1;
@@ -127,7 +251,84 @@
 .version {
   display: block;
   padding: 8rpx 0 20rpx;
-  color: var(--color-muted);
+  color: rgba(56, 45, 35, 0.44);
   font-size: 24rpx;
   text-align: center;
+}
+
+.guide-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48rpx;
+  background: rgba(0, 0, 0, 0.34);
+}
+
+.guide-dialog {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: 78vh;
+  overflow: hidden;
+  border-radius: 28rpx;
+  background: #ffffff;
+  box-shadow: 0 28rpx 70rpx rgba(16, 45, 32, 0.18);
+}
+
+.guide-header {
+  padding: 34rpx 34rpx 18rpx;
+  text-align: center;
+}
+
+.guide-title {
+  color: var(--color-text);
+  font-size: 34rpx;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.guide-body {
+  max-height: 58vh;
+  padding: 0 34rpx 20rpx;
+}
+
+.guide-section {
+  padding: 22rpx 0;
+  border-top: 1rpx solid rgba(56, 45, 35, 0.08);
+}
+
+.guide-section:first-child {
+  border-top: none;
+}
+
+.guide-section-title {
+  display: block;
+  color: #0f8f3e;
+  font-size: 27rpx;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.guide-section-content {
+  display: block;
+  margin-top: 10rpx;
+  color: rgba(56, 45, 35, 0.72);
+  font-size: 27rpx;
+  line-height: 1.7;
+  text-align: left;
+}
+
+.guide-confirm {
+  width: 100%;
+  height: 96rpx;
+  border-top: 1rpx solid rgba(56, 45, 35, 0.08);
+  color: #48639c;
+  font-size: 30rpx;
+  font-weight: 800;
+  line-height: 96rpx;
+  text-align: center;
+  background: #ffffff;
 }

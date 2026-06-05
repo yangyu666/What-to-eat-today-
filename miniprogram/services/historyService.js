@@ -1,5 +1,6 @@
 const HISTORY_STORAGE_KEY = 'meal_recommendation_history';
 const HISTORY_FILTER_STORAGE_KEY = 'meal_filter_recent_history';
+const HISTORY_CLEARED_STORAGE_KEY = 'meal_recommendation_history_cleared_at';
 const MAX_LOCAL_HISTORY = 50;
 const DEFAULT_HISTORY_FILTER_LIMIT = 10;
 const SAVE_HISTORY_FUNCTION_NAME = 'saveRecommendationHistory';
@@ -19,6 +20,7 @@ let cloudInitialized = false;
 async function trackRecommendationAction(options) {
   const record = buildHistoryRecord(options);
 
+  wx.removeStorageSync(HISTORY_CLEARED_STORAGE_KEY);
   saveHistoryRecordLocal(record);
   saveHistoryRecordCloud(record).catch((error) => {
     console.warn('Fallback to local history after cloud history save failed.', error);
@@ -28,6 +30,10 @@ async function trackRecommendationAction(options) {
 }
 
 async function getHistory() {
+  if (isLocalHistoryCleared()) {
+    return getLocalHistory();
+  }
+
   try {
     const cloudHistory = await getCloudHistory();
 
@@ -61,6 +67,12 @@ function getHistoryFilterEnabled() {
 
 function setHistoryFilterEnabled(enabled) {
   wx.setStorageSync(HISTORY_FILTER_STORAGE_KEY, enabled);
+}
+
+function clearLocalRecommendationHistory() {
+  wx.removeStorageSync(HISTORY_STORAGE_KEY);
+  wx.removeStorageSync(HISTORY_FILTER_STORAGE_KEY);
+  wx.setStorageSync(HISTORY_CLEARED_STORAGE_KEY, new Date().toISOString());
 }
 
 function getRecentHistoryFilterContext(limit = DEFAULT_HISTORY_FILTER_LIMIT) {
@@ -103,6 +115,10 @@ function uniqueRestaurantIds(records) {
         .filter(Boolean)
     )
   ];
+}
+
+function isLocalHistoryCleared() {
+  return Boolean(wx.getStorageSync(HISTORY_CLEARED_STORAGE_KEY));
 }
 
 function buildHistoryRecord(options) {
@@ -366,6 +382,7 @@ module.exports = {
   getLocalHistory,
   getHistoryFilterEnabled,
   setHistoryFilterEnabled,
+  clearLocalRecommendationHistory,
   getRecentHistoryFilterContext,
   HISTORY_FILTER_STORAGE_KEY
 };
