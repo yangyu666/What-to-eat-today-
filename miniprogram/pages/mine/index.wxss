@@ -4,7 +4,7 @@
   gap: 30rpx;
   background:
     linear-gradient(180deg, rgba(24, 198, 83, 0.08) 0%, rgba(246, 248, 247, 0) 300rpx),
-    var(--color-page);
+    transparent;
 }
 
 .profile-card {
