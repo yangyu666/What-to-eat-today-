@@ -36,10 +36,8 @@ async function trackRecommendationAction(options) {
 async function getHistory() {
     const clearedAt = getLocalHistoryClearedAt();
     try {
-        const cloudHistory = await getCloudHistory();
-        const visibleCloudHistory = clearedAt
-            ? cloudHistory.filter((record) => getRecordTime(record) > clearedAt)
-            : cloudHistory;
+        const cloudHistory = await getCloudHistory(clearedAt);
+        const visibleCloudHistory = filterRecordsAfterClearedAt(cloudHistory, clearedAt);
         if (visibleCloudHistory.length > 0) {
             syncLocalHistory(visibleCloudHistory);
             return clearedAt ? getLocalHistory() : visibleCloudHistory;
@@ -53,7 +51,9 @@ async function getHistory() {
 function getLocalHistory() {
     try {
         const history = wx.getStorageSync(HISTORY_STORAGE_KEY);
-        return Array.isArray(history) ? history.slice(0, MAX_LOCAL_HISTORY) : [];
+        const clearedAt = getLocalHistoryClearedAt();
+        const records = Array.isArray(history) ? history.slice(0, MAX_LOCAL_HISTORY) : [];
+        return filterRecordsAfterClearedAt(records, clearedAt);
     }
     catch (error) {
         console.warn('Failed to read local recommendation history.', error);
@@ -180,8 +180,11 @@ function saveHistoryRecordLocal(record) {
 function syncLocalHistory(records) {
     const localHistory = getLocalHistory();
     const recordMap = new Map();
+    const clearedAt = getLocalHistoryClearedAt();
     [...records, ...localHistory].forEach((record) => {
-        recordMap.set(record.id, record);
+        if (!clearedAt || getRecordTime(record) > clearedAt) {
+            recordMap.set(record.id, record);
+        }
     });
     wx.setStorageSync(HISTORY_STORAGE_KEY, [...recordMap.values()]
         .sort((left, right) => getRecordTime(right) - getRecordTime(left))
@@ -200,12 +203,13 @@ async function saveHistoryRecordCloud(record) {
         throw new Error(payload?.ok === false ? payload.error.message : 'Cloud history save failed.');
     }
 }
-async function getCloudHistory() {
+async function getCloudHistory(clearedAt) {
     ensureCloudInitialized();
     const response = await wx.cloud.callFunction({
         name: LIST_HISTORY_FUNCTION_NAME,
         data: {
-            pageSize: MAX_LOCAL_HISTORY
+            pageSize: MAX_LOCAL_HISTORY,
+            clearedAt: clearedAt ? new Date(clearedAt).toISOString() : undefined
         }
     });
     const payload = response.result;
@@ -215,13 +219,17 @@ async function getCloudHistory() {
     return payload.data.items.map((record) => normalizeHistoryRecord(record));
 }
 function normalizeHistoryRecord(record) {
-    const createdAt = normalizeIsoDate(record.createdAt) ?? new Date().toISOString();
+    const selectedAt = normalizeDateValue(record.selectedAt);
+    const createdAt = normalizeDateValue(record.createdAt) ?? selectedAt;
+    const updatedAt = normalizeDateValue(record.updatedAt) ?? createdAt;
+    const displayDate = createdAt ? new Date(createdAt) : undefined;
     return {
         ...record,
-        id: record.id || record._id || `history-${createdAt}`,
-        dateText: record.dateText || formatDateText(new Date(createdAt)),
+        id: record.id || record._id || `history-${createdAt || Date.now()}`,
+        dateText: record.dateText || (displayDate ? formatDateText(displayDate) : ''),
+        selectedAt,
         createdAt,
-        updatedAt: normalizeIsoDate(record.updatedAt) ?? createdAt
+        updatedAt
     };
 }
 function buildQuestionnaireSnapshot(questionnaire) {
@@ -295,7 +303,29 @@ function formatDateText(date) {
     return `${date.getMonth() + 1}-${date.getDate()} ${time}`;
 }
 function normalizeIsoDate(value) {
+    return normalizeDateValue(value);
+}
+function normalizeDateValue(value) {
     if (!value) {
+        return undefined;
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? undefined : value.toISOString();
+    }
+    if (typeof value === 'object') {
+        const dateLike = value;
+        const nestedValue = dateLike.$date ?? dateLike.date ?? dateLike._date;
+        if (nestedValue) {
+            return normalizeDateValue(nestedValue);
+        }
+        if (typeof dateLike.seconds === 'number') {
+            return new Date(dateLike.seconds * 1000).toISOString();
+        }
+        if (typeof dateLike._seconds === 'number') {
+            return new Date(dateLike._seconds * 1000).toISOString();
+        }
+    }
+    if (typeof value !== 'string' && typeof value !== 'number') {
         return undefined;
     }
     const date = new Date(value);
@@ -304,4 +334,10 @@ function normalizeIsoDate(value) {
 function getRecordTime(record) {
     const timestamp = new Date(record.createdAt || record.selectedAt || '').getTime();
     return Number.isNaN(timestamp) ? 0 : timestamp;
+}
+function filterRecordsAfterClearedAt(records, clearedAt) {
+    if (!clearedAt) {
+        return records;
+    }
+    return records.filter((record) => getRecordTime(record) > clearedAt);
 }

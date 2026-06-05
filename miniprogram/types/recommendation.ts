@@ -172,6 +172,7 @@ export interface ListHistoryRequest {
   pageSize?: number;
   cursor?: string;
   action?: RecommendationAction;
+  clearedAt?: IsoDateString;
 }
 
 export interface ListHistoryResponse {
