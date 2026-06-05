@@ -27,7 +27,6 @@ const DEFAULT_RESTAURANT_IMAGES = {
 let cloudInitialized = false;
 async function trackRecommendationAction(options) {
     const record = buildHistoryRecord(options);
-    wx.removeStorageSync(HISTORY_CLEARED_STORAGE_KEY);
     saveHistoryRecordLocal(record);
     void saveHistoryRecordCloud(record).catch((error) => {
         console.warn('Fallback to local history after cloud history save failed.', error);
@@ -35,14 +34,15 @@ async function trackRecommendationAction(options) {
     return record;
 }
 async function getHistory() {
-    if (isLocalHistoryCleared()) {
-        return getLocalHistory();
-    }
+    const clearedAt = getLocalHistoryClearedAt();
     try {
         const cloudHistory = await getCloudHistory();
-        if (cloudHistory.length > 0) {
-            syncLocalHistory(cloudHistory);
-            return cloudHistory;
+        const visibleCloudHistory = clearedAt
+            ? cloudHistory.filter((record) => getRecordTime(record) > clearedAt)
+            : cloudHistory;
+        if (visibleCloudHistory.length > 0) {
+            syncLocalHistory(visibleCloudHistory);
+            return clearedAt ? getLocalHistory() : visibleCloudHistory;
         }
     }
     catch (error) {
@@ -103,8 +103,10 @@ function uniqueRestaurantIds(records) {
             .filter((restaurantId) => Boolean(restaurantId)))
     ];
 }
-function isLocalHistoryCleared() {
-    return Boolean(wx.getStorageSync(HISTORY_CLEARED_STORAGE_KEY));
+function getLocalHistoryClearedAt() {
+    const value = wx.getStorageSync(HISTORY_CLEARED_STORAGE_KEY);
+    const timestamp = new Date(value || '').getTime();
+    return Number.isNaN(timestamp) ? undefined : timestamp;
 }
 function buildHistoryRecord(options) {
     const now = new Date();
