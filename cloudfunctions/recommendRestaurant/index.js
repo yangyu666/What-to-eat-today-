@@ -90,6 +90,9 @@ const DESSERT_ONLY_OPTION_IDS = ['intent_dessert', 'prefer_bakery_dessert'];
 const BRAND_CHAIN_OPTION_IDS = ['brand_chain'];
 const BRAND_INDEPENDENT_OPTION_IDS = ['brand_independent'];
 const CHAIN_BRAND_TAGS = ['chain_brand', 'low_chain', 'mid_chain', 'premium_brand'];
+const KNOWN_LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', 'kfc', 'mcdonald', '必胜客', '赛百味', '星巴克', '瑞幸', '库迪', '喜茶', '奈雪', '霸王茶姬', '一点点', '1点点', '蜜雪冰城', '古茗', '茶百道', '沪上阿姨'];
+const KNOWN_MID_CHAIN_KEYWORDS = ['绿茶餐厅', '外婆家', '九毛九', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '农耕记', '点都德', '陶陶居', '费大厨', '湘辣辣', '蛙来哒', '江渔儿', '杨国福', '遇见小面', '大家乐', '大快活'];
+const KNOWN_PREMIUM_CHAIN_KEYWORDS = ['广州酒家', '炳胜', '利苑', '白天鹅', '黑珍珠', '米其林', '大董', '新荣记', '甬府', '莆田', '松鹤楼'];
 const MALL_STORE_KEYWORDS = ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', '综合体', '购物公园'];
 const NON_RESTAURANT_SALES_KEYWORDS = ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销', '有礼'];
 const VEGETARIAN_CONFLICT_TAGS = ['bbq', 'meat_heavy', 'pork'];
@@ -727,8 +730,16 @@ function requiresBrandCandidate(preference) {
 function isAcceptableBrandCandidate(restaurant, preference) {
   const tagIds = getRestaurantTagIds(restaurant);
   const hasBrandTag = CHAIN_BRAND_TAGS.some((tag) => tagIds.includes(tag));
+  const text = getRestaurantText(restaurant);
+  const estimatedCost = getEstimatedCost(restaurant) || 0;
   if (hasBrandTag) return true;
-  return ((preference && preference.budgetLevel) || 3) >= 6 && (getEstimatedCost(restaurant) || 0) >= 200;
+  if (hasKnownChainBrandEvidence(text)) return true;
+  if (((preference && preference.budgetLevel) || 3) >= 6) return estimatedCost >= 200;
+  return (
+    ((preference && preference.budgetLevel) || 3) >= 5 &&
+    estimatedCost >= 80 &&
+    (hasMallStoreEvidence(text) || (restaurant.rating || 0) >= 4.3)
+  );
 }
 
 function rankWithLightRandom(scored) {
@@ -788,10 +799,22 @@ function normalizeRestaurantName(name) {
 
 function getRestaurantBrandKey(restaurant) {
   const text = getRestaurantText(restaurant);
-  const brand = [...LOW_CHAIN_KEYWORDS, ...MID_CHAIN_KEYWORDS, ...PREMIUM_CHAIN_KEYWORDS].find((keyword) => {
+  const brand = [...LOW_CHAIN_KEYWORDS, ...MID_CHAIN_KEYWORDS, ...PREMIUM_CHAIN_KEYWORDS, ...KNOWN_LOW_CHAIN_KEYWORDS, ...KNOWN_MID_CHAIN_KEYWORDS, ...KNOWN_PREMIUM_CHAIN_KEYWORDS].find((keyword) => {
     return text.includes(keyword.toLowerCase());
   });
   return brand && brand.toLowerCase();
+}
+
+function hasKnownChainBrandEvidence(text) {
+  return [...KNOWN_LOW_CHAIN_KEYWORDS, ...KNOWN_MID_CHAIN_KEYWORDS, ...KNOWN_PREMIUM_CHAIN_KEYWORDS].some((keyword) =>
+    text.includes(keyword.toLowerCase())
+  );
+}
+
+function hasMallStoreEvidence(text) {
+  return ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', ...MALL_STORE_KEYWORDS].some((keyword) =>
+    text.includes(keyword.toLowerCase())
+  );
 }
 
 function toRecommendationCandidate(scored, source, experimentId) {
@@ -1118,7 +1141,15 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     ['chain_brand', 'low_chain', 'quick'].forEach((tag) => inferred.add(tag));
   }
 
+  if (KNOWN_LOW_CHAIN_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'low_chain', 'quick'].forEach((tag) => inferred.add(tag));
+  }
+
   if (MID_CHAIN_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'mid_chain', 'relaxed'].forEach((tag) => inferred.add(tag));
+  }
+
+  if (KNOWN_MID_CHAIN_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
     ['chain_brand', 'mid_chain', 'relaxed'].forEach((tag) => inferred.add(tag));
   }
 
@@ -1126,7 +1157,15 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((tag) => inferred.add(tag));
   }
 
+  if (KNOWN_PREMIUM_CHAIN_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((tag) => inferred.add(tag));
+  }
+
   if (MALL_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
+    inferred.add('mall_store');
+  }
+
+  if (hasMallStoreEvidence(text)) {
     inferred.add('mall_store');
   }
 
@@ -1361,7 +1400,7 @@ function isClearlyUnderBudget(restaurant, preference) {
   const estimatedCost = getEstimatedCost(restaurant);
   if (range.min === undefined || estimatedCost === undefined) return false;
   if (preference.budgetLevel >= 6) return estimatedCost < range.min;
-  return estimatedCost < range.min * 0.9;
+  return estimatedCost < range.min * 0.75;
 }
 
 function isPriceUnknownForStrictBudget(restaurant, preference) {

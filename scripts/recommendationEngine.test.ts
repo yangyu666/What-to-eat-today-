@@ -1905,6 +1905,49 @@ assert(
   'mixed meal+coffee tag cafe should not be treated as a hard meal conflict'
 );
 
+const midHighBudgetBrandFallbackResult = recommend(
+  profile({
+    selectedOptionIds: ['brand_chain', 'distance_any'],
+    preferredTagIds: ['relaxed', 'slow', 'premium_brand', 'mall_store'],
+    avoidedTagIds: [],
+    budgetLevel: 5,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'budget-brandish',
+      name: '点都德(永旺梦乐城店)',
+      tags: [],
+      tagIds: ['meal'],
+      category: '餐饮服务;中餐厅;广东菜(粤菜)',
+      address: '永旺梦乐城',
+      distanceMeters: 400,
+      averageCostYuan: 86,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'too-cheap-chain',
+      name: '麦当劳(商场店)',
+      tags: [],
+      tagIds: ['meal', 'chain_brand', 'low_chain'],
+      category: '餐饮服务;快餐厅;麦当劳',
+      address: '购物中心',
+      distanceMeters: 200,
+      averageCostYuan: 24,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(midHighBudgetBrandFallbackResult.candidates[0]?.restaurantId === 'budget-brandish', '100-200 brand preference should allow near-budget 80+ mall/high-rating restaurant fallback');
+assert(
+  midHighBudgetBrandFallbackResult.candidates.every((candidate) => candidate.restaurantId !== 'too-cheap-chain'),
+  '100-200 brand preference should still hard-filter clearly low-budget chain restaurants'
+);
+
 void runPoiCacheAndStressTests().catch((error) => {
   throw error;
 });

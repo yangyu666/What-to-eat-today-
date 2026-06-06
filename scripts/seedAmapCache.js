@@ -162,13 +162,18 @@ function convertPoiToRestaurant(poi) {
   const category = normalizeAmapText(poi.type);
   const cost = parsePositiveNumber(poi.biz_ext && poi.biz_ext.cost);
   const rating = parsePositiveNumber(poi.biz_ext && poi.biz_ext.rating);
-  const tags = inferTags(`${poi.name} ${poi.type || ''} ${poi.address || ''}`);
+  const poiText = `${poi.name} ${poi.type || ''} ${poi.address || ''}`;
+  const tagIds = inferTagIdsFromText(poiText);
+
+  if (isNonRestaurantSalesPoi(poiText)) {
+    return null;
+  }
 
   return {
     id: `amap-${poi.id}`,
     name: poi.name,
-    tags,
-    tagIds: inferTagIds(tags),
+    tags: tagIds,
+    tagIds,
     description: category,
     category,
     address: normalizeAmapText(poi.address),
@@ -182,6 +187,75 @@ function convertPoiToRestaurant(poi) {
     source: 'amap',
     status: 'active'
   };
+}
+
+function inferTagIdsFromText(text) {
+  const normalized = String(text || '').toLowerCase();
+  const ids = new Set();
+  const hasAny = (keywords) => keywords.some((keyword) => normalized.includes(keyword.toLowerCase()));
+
+  if (hasAny(['咖啡', 'coffee', 'cafe', 'starbucks', '星巴克', 'luckin', '瑞幸', 'manner', 'peet', 'costa', 'tims', '库迪', 'm stand', 'seesaw', 'arabica'])) {
+    ['coffee', 'drink', 'non_meal', 'afternoon_tea'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['奶茶', '茶饮', '冷饮', '饮品', '凉茶', '果茶', '喜茶', '奈雪', '霸王茶姬', '茉莉奶白', '爷爷不泡茶', '古茗', '茶百道', '沪上阿姨', '柠季', '一点点', '1点点', '蜜雪冰城', 'koi', 'linlee'])) {
+    ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['甜品', '蛋糕', '面包', '烘焙', '西点', '钵仔糕', '糖水', '冰淇淋', 'gelato', 'bakery', 'dessert', '哈根达斯'])) {
+    ['dessert', 'non_meal', 'afternoon_tea', 'sweet'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['重庆小面', '小面', '麻辣烫', '冒菜', '麻辣香锅', '香锅', '川菜', '川味', '湘菜', '酸辣粉', '火锅', '串串', '水煮', '剁椒'])) {
+    ['spicy', 'strong_flavor', 'heavy', 'hot'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['轻食', '沙拉', '健康', '低卡', '减脂', '健身餐'])) {
+    ['light', 'healthy', 'salad', 'low_burden', 'fresh'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['快餐', '简餐', '盖饭', '便当', '套餐', '小吃'])) {
+    ['quick', 'meal', 'staple'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['粥', '粉面', '云吞', '包子', '饺子', '烧麦', '早茶', '茶餐厅'])) {
+    ['quick', 'hot', 'snack', 'staple'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['中餐厅', '餐厅', '餐馆', '饭店', '酒楼', '酒家', '私房菜', '炒菜', '粤菜', '海鲜', '牛扒', '外国餐厅', '日本料理', '寿司'])) {
+    ids.add('meal');
+  }
+
+  if (hasAny(['广州酒家', '陶陶居', '点都德', '炳胜', '利苑', '白天鹅', '黑珍珠', '米其林', '大董', '新荣记', '甬府', '莆田', '松鹤楼'])) {
+    ['chain_brand', 'premium_brand', 'relaxed', 'slow'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['绿茶餐厅', '外婆家', '九毛九', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '农耕记', '费大厨', '湘辣辣', '蛙来哒', '江渔儿', '杨国福', '遇见小面', '大家乐', '大快活'])) {
+    ['chain_brand', 'mid_chain', 'relaxed'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['麦当劳', '肯德基', 'kfc', '星巴克', '瑞幸', '库迪', '奈雪', '喜茶', '霸王茶姬', '一点点', '1点点', '蜜雪冰城'])) {
+    ['chain_brand', 'low_chain'].forEach((id) => ids.add(id));
+  }
+
+  if (hasAny(['商场', '购物中心', '广场', 'mall', '百货'])) {
+    ids.add('mall_store');
+  }
+
+  if (!hasNonMealTagIds(ids)) {
+    ids.add('meal');
+  } else {
+    ids.delete('meal');
+  }
+
+  return [...ids];
+}
+
+function isNonRestaurantSalesPoi(text) {
+  const normalized = String(text || '').toLowerCase();
+  return ['销售中心', '批发', '团购', '月饼', '礼盒', '礼品', '年货', '食品销售', '商贸', '展销', '经销'].some((keyword) =>
+    normalized.includes(keyword)
+  );
 }
 
 function inferTags(text) {
