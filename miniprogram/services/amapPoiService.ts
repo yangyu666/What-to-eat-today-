@@ -144,10 +144,6 @@ const CACHE_KEY = 'nearby_restaurants_amap_cache';
 export const POI_CACHE_TTL_MS = 45 * 60 * 1000;
 export const POI_CACHE_LOCATION_TOLERANCE_METERS = 2000;
 export const POI_CACHE_MAX_RESTAURANTS = 250;
-// 缓存复用的最小半径比例：当缓存条目的覆盖半径 >= 请求半径 * 该比例时即可复用。
-// 用于让首页 prefetch 的较小半径缓存（如 5000m）能服务推荐的较大半径请求（如 10000m），
-// 避免推荐重复请求高德、与 prefetch 抢并发额度而触发 QPS 限流（infocode 10021）。
-const POI_CACHE_RADIUS_REUSE_RATIO = 0.5;
 const MAX_CACHE_ENTRIES = 8;
 
 let sessionCacheStore: NearbyRestaurantsCacheStore | undefined;
@@ -329,6 +325,33 @@ async function getUserLocation(): Promise<GeoPoint> {
   });
 }
 
+// 高德请求串行节流：所有实时请求排队执行并保证相邻间隔，避免首页 prefetch 与推荐
+// 并发打高德触发 QPS 限流（infocode 10021）。个人 key QPS 约 3，350ms 间隔约 2.8 次/秒。
+const AMAP_MIN_REQUEST_INTERVAL_MS = 350;
+let amapRequestQueue: Promise<unknown> = Promise.resolve();
+let lastAmapRequestAt = 0;
+
+function scheduleAmapRequest<T>(task: () => Promise<T>): Promise<T> {
+  const result = amapRequestQueue.then(async () => {
+    const wait = AMAP_MIN_REQUEST_INTERVAL_MS - (Date.now() - lastAmapRequestAt);
+
+    if (wait > 0) {
+      await new Promise<void>((resolve) => setTimeout(() => resolve(), wait));
+    }
+
+    lastAmapRequestAt = Date.now();
+    return task();
+  });
+
+  // 无论成功或失败都让队列继续流转，避免单次失败卡住后续请求
+  amapRequestQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+
+  return result;
+}
+
 async function fetchNearbyRestaurantsFromCloud(
   location: GeoPoint,
   options: Required<Pick<NearbyRestaurantOptions, 'radiusMeters' | 'pageSize'>> &
@@ -344,25 +367,28 @@ async function fetchNearbyRestaurantsFromCloud(
     throw new Error('Cloud is not ready.');
   }
 
-  const response = await wx.cloud.callFunction({
-    name: CLOUD_FUNCTION_NAME,
-    data: {
-      latitude: location.latitude,
-      longitude: location.longitude,
-      mode: options.mode,
-      radiusMeters: options.radiusMeters,
-      pageSize: options.pageSize,
-      pageCount: options.pageCount,
-      keyword: options.keyword,
-      city: options.city,
-      adcode: options.adcode,
-      polygon: options.polygon,
-      id: options.id,
-      types: options.types,
-      fetchReason: options.fetchReason,
-      maxAmapApiCalls: options.maxAmapApiCalls
-    }
-  });
+  // 通过串行节流队列发起，避免与 prefetch 等其他高德请求并发触发 QPS 限流
+  const response = await scheduleAmapRequest(() =>
+    wx.cloud.callFunction({
+      name: CLOUD_FUNCTION_NAME,
+      data: {
+        latitude: location.latitude,
+        longitude: location.longitude,
+        mode: options.mode,
+        radiusMeters: options.radiusMeters,
+        pageSize: options.pageSize,
+        pageCount: options.pageCount,
+        keyword: options.keyword,
+        city: options.city,
+        adcode: options.adcode,
+        polygon: options.polygon,
+        id: options.id,
+        types: options.types,
+        fetchReason: options.fetchReason,
+        maxAmapApiCalls: options.maxAmapApiCalls
+      }
+    })
+  );
   const result = response.result as AmapPoiCloudResponse | undefined;
 
   if (!result?.ok) {
@@ -408,9 +434,7 @@ function readNearbyRestaurantsCache(request: PoiCacheRequest): CacheLookupResult
         return undefined;
       }
 
-      // 放宽半径判定：只要缓存半径不小于请求半径的设定比例即可复用（POI 在中心更密集，
-      // 略小半径的缓存足以支撑推荐），从而复用 prefetch 结果、减少实时高德请求。
-      if (entry.radiusMeters < request.radiusMeters * POI_CACHE_RADIUS_REUSE_RATIO) {
+      if (request.radiusMeters > entry.radiusMeters) {
         return undefined;
       }
 
