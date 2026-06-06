@@ -11,7 +11,7 @@ exports.__setAmapPoiLocationProviderForTest = __setAmapPoiLocationProviderForTes
 exports.__setAmapPoiCloudFetcherForTest = __setAmapPoiCloudFetcherForTest;
 const CLOUD_FUNCTION_NAME = 'amapPoi';
 const DEFAULT_RADIUS_METERS = 1500;
-const PREFETCH_RADIUS_METERS = 5000;
+const PREFETCH_RADIUS_METERS = 10000;
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_PAGE_COUNT = 1;
 const DEFAULT_TYPES = '050000';
@@ -21,7 +21,7 @@ const PREFETCH_FETCH_PROFILE = 'prefetch-broad-food';
 const CACHE_KEY = 'nearby_restaurants_amap_cache';
 exports.POI_CACHE_TTL_MS = 45 * 60 * 1000;
 exports.POI_CACHE_LOCATION_TOLERANCE_METERS = 2000;
-exports.POI_CACHE_MAX_RESTAURANTS = 250;
+exports.POI_CACHE_MAX_RESTAURANTS = 1000;
 const MAX_CACHE_ENTRIES = 8;
 let sessionCacheStore;
 let storageAdapterForTest;
@@ -113,28 +113,75 @@ async function getNearbyRestaurantsWithMeta(options = {}) {
         meta: liveMeta
     };
 }
+// 首页预取的多类目关键词：覆盖正餐、高端、快餐小吃、各菜系、饮品甜品，
+// 让缓存池包含全价位全品类，避免不选品牌/高预算时池子里没有合适的店。
+const PREFETCH_KEYWORD_GROUPS = [
+    '',
+    '高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑|大董|新荣记|广州酒家|白天鹅',
+    '快餐|简餐|盖饭|面|套餐|小吃|粥|粉',
+    '火锅|烧烤|川菜|湘菜|粤菜|江浙|日料|西餐|东北菜',
+    '奶茶|咖啡|茶饮|甜品|烘焙'
+];
 async function prefetchNearbyRestaurantCandidates(options = {}) {
-    const result = await getNearbyRestaurantsWithMeta({
-        ...options,
-        radiusMeters: options.radiusMeters ?? PREFETCH_RADIUS_METERS,
-        mode: options.mode ?? DEFAULT_SEARCH_MODE,
-        pageSize: options.pageSize ?? 25,
-        pageCount: options.pageCount ?? 3,
-        keyword: options.keyword ?? '',
-        types: options.types ?? DEFAULT_TYPES,
-        fetchProfile: options.fetchProfile ?? PREFETCH_FETCH_PROFILE,
-        fetchReason: options.fetchReason ?? 'home-prefetch',
-        maxAmapApiCalls: options.maxAmapApiCalls ?? 3
-    });
+    const location = options.location ?? (await getUserLocation());
+    // 预取半径至少为 PREFETCH_RADIUS_METERS，确保缓存能覆盖推荐可能用到的较大半径（如距离不限）
+    const radiusMeters = Math.max(options.radiusMeters ?? PREFETCH_RADIUS_METERS, PREFETCH_RADIUS_METERS);
+    const pool = new Map();
+    let lastMeta;
+    // 多类目串行预取（经串行节流不会超 QPS），累积去重成一个大池
+    for (let index = 0; index < PREFETCH_KEYWORD_GROUPS.length; index += 1) {
+        const keyword = PREFETCH_KEYWORD_GROUPS[index];
+        const result = await getNearbyRestaurantsWithMeta({
+            ...options,
+            location,
+            radiusMeters,
+            mode: 'polygon',
+            pageSize: 25,
+            pageCount: keyword ? 2 : 3,
+            keyword,
+            types: options.types ?? DEFAULT_TYPES,
+            fetchProfile: PREFETCH_FETCH_PROFILE,
+            fetchReason: keyword ? 'home-prefetch-category' : 'home-prefetch-broad',
+            maxAmapApiCalls: options.maxAmapApiCalls ?? 3
+        }).catch((error) => {
+            console.warn('AMap POI prefetch group failed.', { keyword, error });
+            return undefined;
+        });
+        if (result) {
+            result.restaurants.forEach((restaurant) => pool.set(restaurant.id, restaurant));
+            lastMeta = result.meta;
+        }
+    }
+    const restaurants = [...pool.values()];
+    // 把累积的全品类大池写入一个 broad 缓存条目（keyword 为空），供推荐直接复用，
+    // 避免推荐再逐个实时请求高德，并保证不选品牌/高预算时也有合适候选。
+    if (restaurants.length > 0) {
+        const broadRequest = buildPoiCacheRequest(location, {
+            radiusMeters,
+            mode: 'polygon',
+            keyword: '',
+            types: options.types ?? DEFAULT_TYPES,
+            pageSize: 25,
+            pageCount: 3,
+            fetchProfile: PREFETCH_FETCH_PROFILE
+        });
+        writeNearbyRestaurantsCache({
+            ...broadRequest,
+            restaurants,
+            createdAt: Date.now()
+        });
+    }
     console.warn('AMap POI prefetch finished.', {
-        cacheHit: result.meta.poiCacheHit,
-        cacheKey: result.meta.poiCacheKey,
-        mode: result.meta.poiFetchMode,
-        count: result.restaurants.length,
-        apiCalls: result.meta.amapApiCallCount,
-        reason: result.meta.poiFetchReason
+        groups: PREFETCH_KEYWORD_GROUPS.length,
+        count: restaurants.length,
+        reason: lastMeta?.poiFetchReason ?? 'home-prefetch'
     });
-    return result.meta;
+    return (lastMeta ?? {
+        poiCacheHit: false,
+        poiCacheKey: '',
+        poiFetchReason: 'home-prefetch-empty',
+        amapApiCallCount: 0
+    });
 }
 function buildPoiCacheKey(options) {
     return buildPoiCacheRequest(options.location, options).key;
