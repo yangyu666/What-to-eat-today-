@@ -12,7 +12,7 @@ export type RecommendationCandidateId = string;
 export type RecommendationSource = 'mock' | 'cloud' | 'rule' | 'manual' | 'amap';
 export type RecommendationAction = 'shown' | 'accepted' | 'skipped' | 'dismissed';
 export type RecommendationConfidenceLabel = 'low' | 'medium' | 'high';
-export type RecommendationAlgorithmVersion = 'recommendation-v2' | 'recommendation-v2.5';
+export type RecommendationAlgorithmVersion = 'recommendation-v2' | 'recommendation-v2.5' | 'recommendation-v3.0';
 
 export interface CandidatePoolStats {
   totalFetched: number;
@@ -79,6 +79,14 @@ export interface RecommendationCandidate {
   poiCacheAgeMs?: number;
   poiFetchReason?: string;
   amapApiCallCount?: number;
+  poiFetchMode?: string;
+  aroundCallCount?: number;
+  polygonCallCount?: number;
+  keywordCallCount?: number;
+  idCallCount?: number;
+  cacheHitCount?: number;
+  totalAmapApiCallCount?: number;
+  quotaBucket?: string;
 }
 
 export type MealCandidate = RecommendationCandidate;

@@ -6,6 +6,9 @@ cloud.init({
 });
 
 const AMAP_PLACE_AROUND_URL = 'https://restapi.amap.com/v3/place/around';
+const AMAP_PLACE_POLYGON_URL = 'https://restapi.amap.com/v3/place/polygon';
+const AMAP_PLACE_TEXT_URL = 'https://restapi.amap.com/v3/place/text';
+const AMAP_PLACE_DETAIL_URL = 'https://restapi.amap.com/v3/place/detail';
 const AMAP_REGEOCODE_URL = 'https://restapi.amap.com/v3/geocode/regeo';
 const DEFAULT_RADIUS_METERS = 1500;
 const DEFAULT_PAGE_SIZE = 20;
@@ -176,25 +179,51 @@ exports.main = async (event = {}, context = {}) => {
       };
     }
 
+    const mode = normalizeSearchMode(event.mode);
     const radius = clampInteger(event.radiusMeters, 300, 15000, DEFAULT_RADIUS_METERS);
     const pageSize = clampInteger(event.pageSize, 1, 25, DEFAULT_PAGE_SIZE);
-    const pageCount = clampInteger(event.pageCount, 1, 3, 1);
+    const pageCount = clampInteger(event.pageCount || event.pageNum, 1, 3, 1);
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
+    const city = typeof event.city === 'string' ? event.city.trim() : '';
+    const adcode = typeof event.adcode === 'string' ? event.adcode.trim() : '';
+    const poiId = typeof event.id === 'string' ? event.id.trim() : typeof event.poiId === 'string' ? event.poiId.trim() : '';
     const types = typeof event.types === 'string' && event.types.trim() ? event.types.trim() : AMAP_FOOD_TYPE;
+    const polygon = typeof event.polygon === 'string' && event.polygon.trim()
+      ? event.polygon.trim()
+      : buildRectanglePolygon({ latitude, longitude, radiusMeters: radius });
     const fetchReason = typeof event.fetchReason === 'string' ? event.fetchReason.trim() : 'unspecified';
     const maxAmapApiCalls = clampInteger(event.maxAmapApiCalls, 0, 3, 3);
+    const quotaBucket = getQuotaBucket(mode);
     const cacheKey = buildCloudCacheKey({
+      mode,
       latitude,
       longitude,
       radius,
       pageSize,
       pageCount,
       keyword,
-      types
+      types,
+      city,
+      adcode,
+      polygon,
+      poiId
     });
     const cached = event.cache !== false ? await readCloudPoiCache(cacheKey) : null;
 
     if (cached) {
+      const searchMeta = buildSearchMeta({
+        mode,
+        cacheHit: true,
+        cacheKey,
+        apiCallCount: 0,
+        quotaBucket,
+        radiusMeters: radius,
+        keyword,
+        city,
+        adcode,
+        cacheAgeMs: Date.now() - cached.createdAt
+      });
+
       return {
         ok: true,
         data: {
@@ -209,7 +238,8 @@ exports.main = async (event = {}, context = {}) => {
           cacheKey,
           cacheAgeMs: Date.now() - cached.createdAt,
           fetchReason: 'cloud-cache-hit',
-          amapApiCallCount: 0
+          amapApiCallCount: 0,
+          searchMeta
         },
         requestId
       };
@@ -222,31 +252,53 @@ exports.main = async (event = {}, context = {}) => {
       });
     }
 
-    console.warn('AMap place/around live request.', {
+    if (mode === 'keyword' && !keyword) {
+      return fail(requestId, 'AMAP_KEYWORD_MISSING', 'Keyword search requires keyword.', { cacheKey, fetchReason });
+    }
+
+    if (mode === 'keyword' && !city && !adcode) {
+      return fail(requestId, 'AMAP_KEYWORD_SCOPE_MISSING', 'Keyword search requires city or adcode to avoid national search.', {
+        cacheKey,
+        fetchReason
+      });
+    }
+
+    if (mode === 'id' && !poiId) {
+      return fail(requestId, 'AMAP_ID_MISSING', 'ID search requires id or poiId.', { cacheKey, fetchReason });
+    }
+
+    console.warn('AMap POI live request.', {
+      mode,
       cacheKey,
       fetchReason,
       radius,
       pageSize,
       pageCount,
       keyword,
+      city,
+      adcode,
       types,
       maxAmapApiCalls
     });
 
-    let pageResult = await requestAmapPages({
+    const pageResult = await requestAmapPages({
       key,
+      mode,
       latitude,
       longitude,
       radius,
+      polygon,
       pageSize,
       pageCount,
       keyword,
+      city,
+      adcode,
+      poiId,
       types,
       maxAmapApiCalls
     });
-    let amapResponse = pageResult.response;
-    let amapApiCallCount = pageResult.apiCallCount;
-    let keywordFallbackUsed = false;
+    const amapResponse = pageResult.response;
+    const amapApiCallCount = pageResult.apiCallCount;
 
     if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
       return fail(requestId, 'AMAP_REQUEST_FAILED', amapResponse.info || 'AMap request failed.', {
@@ -255,36 +307,23 @@ exports.main = async (event = {}, context = {}) => {
       });
     }
 
-    if (keyword && (!Array.isArray(amapResponse.pois) || amapResponse.pois.length === 0)) {
-      const remainingAmapApiCalls = maxAmapApiCalls - amapApiCallCount;
-
-      if (remainingAmapApiCalls > 0) {
-        const fallbackResult = await requestAmapPages({
-          key,
-          latitude,
-          longitude,
-          radius,
-          pageSize,
-          pageCount,
-          keyword: '',
-          types,
-          maxAmapApiCalls: remainingAmapApiCalls
-        });
-        const fallbackResponse = fallbackResult.response;
-
-        amapApiCallCount += fallbackResult.apiCallCount;
-
-        if (fallbackResponse.status === '1' && fallbackResponse.infocode === '10000') {
-          amapResponse = fallbackResponse;
-          keywordFallbackUsed = true;
-        }
-      }
-    }
-
     const restaurants = (Array.isArray(amapResponse.pois) ? amapResponse.pois : [])
-      .map(convertPoiToRestaurant)
+      .map((poi) => convertPoiToRestaurant(poi, { latitude, longitude }))
       .filter(Boolean)
+      .filter((restaurant) => shouldKeepRestaurantByDistance(restaurant, mode, radius))
+      .sort(compareRestaurantForPoiSearch)
       .slice(0, MAX_CACHE_RESTAURANTS);
+    const searchMeta = buildSearchMeta({
+      mode,
+      cacheHit: false,
+      cacheKey,
+      apiCallCount: amapApiCallCount,
+      quotaBucket,
+      radiusMeters: radius,
+      keyword,
+      city,
+      adcode
+    });
 
     if (restaurants.length > 0 && event.cache !== false) {
       await writeCloudPoiCache(cacheKey, {
@@ -294,9 +333,13 @@ exports.main = async (event = {}, context = {}) => {
         radiusMeters: radius,
         pageSize,
         pageCount,
+        mode,
         keyword,
         types,
-        keywordFallbackUsed
+        city,
+        adcode,
+        quotaBucket,
+        searchMeta
       });
     }
 
@@ -308,12 +351,13 @@ exports.main = async (event = {}, context = {}) => {
         fetchedAt: new Date().toISOString(),
         location: { latitude, longitude },
         radiusMeters: radius,
-        keywordFallbackUsed,
+        keywordFallbackUsed: false,
         pageCount,
         cacheHit: false,
         cacheKey,
-        fetchReason: 'cloud-cache-miss-live-fetch',
-        amapApiCallCount
+        fetchReason: `cloud-cache-miss-${mode}-fetch`,
+        amapApiCallCount,
+        searchMeta
       },
       requestId
     };
@@ -324,12 +368,17 @@ exports.main = async (event = {}, context = {}) => {
 
 async function requestAmapPages({
   key,
+  mode,
   latitude,
   longitude,
   radius,
+  polygon,
   pageSize,
   pageCount,
   keyword,
+  city,
+  adcode,
+  poiId,
   types,
   maxAmapApiCalls
 }) {
@@ -340,14 +389,19 @@ async function requestAmapPages({
 
   for (let page = 1; page <= pageCount && apiCallCount < maxAmapApiCalls; page += 1) {
     apiCallCount += 1;
-    const response = await requestAmap({
+    const response = await requestAmapSearch({
       key,
+      mode,
       latitude,
       longitude,
       radius,
+      polygon,
       pageSize,
       page,
       keyword,
+      city,
+      adcode,
+      poiId,
       types
     });
 
@@ -433,16 +487,34 @@ async function writeCloudPoiCache(cacheKey, data) {
   }
 }
 
-function buildCloudCacheKey({ latitude, longitude, radius, pageSize, pageCount, keyword, types }) {
+function buildCloudCacheKey({
+  mode,
+  latitude,
+  longitude,
+  radius,
+  pageSize,
+  pageCount,
+  keyword,
+  types,
+  city,
+  adcode,
+  polygon,
+  poiId
+}) {
   const locationBucket = `${roundCoordinate(latitude)}_${roundCoordinate(longitude)}`;
   const radiusBucket = Math.ceil(radius / 500) * 500;
   const normalizedKeyword = normalizeKeyword(keyword) || 'broad';
   const raw = [
-    'v2',
+    'v3',
+    `mode-${mode || 'polygon'}`,
     `loc-${locationBucket}`,
     `r-${radiusBucket}`,
     `types-${normalizeKeySegment(types)}`,
     `kw-${normalizeKeySegment(normalizedKeyword)}`,
+    `city-${normalizeKeySegment(city || 'none')}`,
+    `adcode-${normalizeKeySegment(adcode || 'none')}`,
+    `poly-${hashString(polygon || 'none')}`,
+    `id-${normalizeKeySegment(poiId || 'none')}`,
     `ps-${pageSize}`,
     `pc-${pageCount}`,
     'fp-cloud'
@@ -476,26 +548,62 @@ function hashString(value) {
   return hash.toString(36);
 }
 
-function requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, types }) {
+function requestAmapSearch({
+  key,
+  mode,
+  latitude,
+  longitude,
+  radius,
+  polygon,
+  pageSize,
+  page,
+  keyword,
+  city,
+  adcode,
+  poiId,
+  types
+}) {
   const params = new URLSearchParams({
     key,
-    location: `${longitude},${latitude}`,
     types,
-    radius: String(radius),
-    sortrule: 'distance',
     offset: String(pageSize),
     page: String(page),
     extensions: 'all',
     output: 'json'
   });
+  let url = AMAP_PLACE_AROUND_URL;
 
   if (keyword) {
     params.set('keywords', keyword);
   }
 
-  const url = `${AMAP_PLACE_AROUND_URL}?${params.toString()}`;
+  if (mode === 'polygon') {
+    url = AMAP_PLACE_POLYGON_URL;
+    params.set('polygon', polygon || buildRectanglePolygon({ latitude, longitude, radiusMeters: radius }));
+  } else if (mode === 'keyword') {
+    url = AMAP_PLACE_TEXT_URL;
+    params.delete('page');
+    params.set('page', String(page));
+    if (adcode) {
+      params.set('city', adcode);
+    } else if (city) {
+      params.set('city', city);
+    }
+    params.set('citylimit', 'true');
+  } else if (mode === 'id') {
+    url = AMAP_PLACE_DETAIL_URL;
+    params.delete('types');
+    params.delete('offset');
+    params.delete('page');
+    params.delete('keywords');
+    params.set('id', poiId);
+  } else {
+    params.set('location', `${longitude},${latitude}`);
+    params.set('radius', String(radius));
+    params.set('sortrule', 'distance');
+  }
 
-  return requestJson(url);
+  return requestJson(`${url}?${params.toString()}`);
 }
 
 function requestAmapRegeo({ key, latitude, longitude }) {
@@ -532,7 +640,7 @@ function requestJson(url) {
   });
 }
 
-function convertPoiToRestaurant(poi) {
+function convertPoiToRestaurant(poi, center) {
   if (!poi || !poi.id || !poi.name) {
     return null;
   }
@@ -552,6 +660,8 @@ function convertPoiToRestaurant(poi) {
   const firstPhoto = photos.find((photo) => photo && photo.url);
   const coverImageUrl = firstPhoto && normalizeImageUrl(firstPhoto.url);
 
+  const distanceMeters = parseNumber(poi.distance) || (location && center ? Math.round(getDistanceMeters(center, location)) : undefined);
+
   return {
     id: `amap-${poi.id}`,
     name: poi.name,
@@ -561,7 +671,7 @@ function convertPoiToRestaurant(poi) {
     category: poi.type || undefined,
     address: normalizeAmapText(poi.address),
     location,
-    distanceMeters: parseNumber(poi.distance),
+    distanceMeters,
     priceLevel: toPriceLevel(averageCostYuan),
     averageCostYuan,
     phone: normalizeAmapText(poi.tel),
@@ -719,6 +829,106 @@ function toPriceLevel(cost) {
   }
 
   return 6;
+}
+
+function normalizeSearchMode(mode) {
+  return ['around', 'polygon', 'keyword', 'id'].includes(mode) ? mode : 'polygon';
+}
+
+function getQuotaBucket(mode) {
+  if (mode === 'polygon') return 'place-polygon';
+  if (mode === 'keyword') return 'place-text';
+  if (mode === 'id') return 'place-detail';
+  return 'place-around';
+}
+
+function buildSearchMeta({
+  mode,
+  cacheHit,
+  cacheKey,
+  apiCallCount,
+  quotaBucket,
+  radiusMeters,
+  keyword,
+  city,
+  adcode,
+  cacheAgeMs
+}) {
+  return {
+    mode,
+    cacheHit,
+    cacheKey,
+    apiCallCount,
+    quotaBucket,
+    radiusMeters,
+    keyword,
+    city,
+    adcode,
+    cacheAgeMs,
+    aroundCallCount: mode === 'around' && !cacheHit ? apiCallCount : 0,
+    polygonCallCount: mode === 'polygon' && !cacheHit ? apiCallCount : 0,
+    keywordCallCount: mode === 'keyword' && !cacheHit ? apiCallCount : 0,
+    idCallCount: mode === 'id' && !cacheHit ? apiCallCount : 0,
+    cacheHitCount: cacheHit ? 1 : 0,
+    totalAmapApiCallCount: cacheHit ? 0 : apiCallCount
+  };
+}
+
+function buildRectanglePolygon({ latitude, longitude, radiusMeters }) {
+  const latitudeDelta = radiusMeters / 111320;
+  const longitudeDelta = radiusMeters / (111320 * Math.cos(toRadians(latitude)) || 1);
+  const west = clampCoordinate(longitude - longitudeDelta, -180, 180);
+  const east = clampCoordinate(longitude + longitudeDelta, -180, 180);
+  const north = clampCoordinate(latitude + latitudeDelta, -90, 90);
+  const south = clampCoordinate(latitude - latitudeDelta, -90, 90);
+
+  return `${formatCoordinate(west)},${formatCoordinate(south)}|${formatCoordinate(east)},${formatCoordinate(north)}`;
+}
+
+function shouldKeepRestaurantByDistance(restaurant, mode, radiusMeters) {
+  if (mode !== 'polygon' && mode !== 'keyword') {
+    return true;
+  }
+
+  return typeof restaurant.distanceMeters !== 'number' || restaurant.distanceMeters <= radiusMeters;
+}
+
+function compareRestaurantForPoiSearch(left, right) {
+  const distanceScore = (left.distanceMeters || Number.MAX_SAFE_INTEGER) - (right.distanceMeters || Number.MAX_SAFE_INTEGER);
+  if (distanceScore !== 0) return distanceScore;
+
+  const ratingScore = (right.rating || 0) - (left.rating || 0);
+  if (ratingScore !== 0) return ratingScore;
+
+  return 0;
+}
+
+function getDistanceMeters(left, right) {
+  const earthRadiusMeters = 6371000;
+  const leftLatitude = toRadians(left.latitude);
+  const rightLatitude = toRadians(right.latitude);
+  const latitudeDelta = toRadians(right.latitude - left.latitude);
+  const longitudeDelta = toRadians(right.longitude - left.longitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+    Math.cos(leftLatitude) *
+      Math.cos(rightLatitude) *
+      Math.sin(longitudeDelta / 2) *
+      Math.sin(longitudeDelta / 2);
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function toRadians(value) {
+  return (Number(value) * Math.PI) / 180;
+}
+
+function clampCoordinate(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function formatCoordinate(value) {
+  return Number(value).toFixed(6);
 }
 
 function normalizeAmapText(value) {

@@ -15,6 +15,7 @@ const PREFETCH_RADIUS_METERS = 5000;
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_PAGE_COUNT = 1;
 const DEFAULT_TYPES = '050000';
+const DEFAULT_SEARCH_MODE = 'polygon';
 const DEFAULT_FETCH_PROFILE = 'default';
 const PREFETCH_FETCH_PROFILE = 'prefetch-broad-food';
 const CACHE_KEY = 'nearby_restaurants_amap_cache';
@@ -42,7 +43,15 @@ async function getNearbyRestaurantsWithMeta(options = {}) {
                 poiCacheKey: cached.entry.key,
                 poiCacheAgeMs: cached.ageMs,
                 poiFetchReason: cached.reason,
-                amapApiCallCount: 0
+                amapApiCallCount: 0,
+                poiFetchMode: request.mode,
+                aroundCallCount: 0,
+                polygonCallCount: 0,
+                keywordCallCount: 0,
+                idCallCount: 0,
+                cacheHitCount: 1,
+                totalAmapApiCallCount: 0,
+                quotaBucket: request.quotaBucket
             }
         };
     }
@@ -58,25 +67,40 @@ async function getNearbyRestaurantsWithMeta(options = {}) {
                 poiCacheHit: false,
                 poiCacheKey: request.key,
                 poiFetchReason: options.cacheOnly ? 'cache-only-miss' : 'live-request-limit',
-                amapApiCallCount: 0
+                amapApiCallCount: 0,
+                poiFetchMode: request.mode,
+                aroundCallCount: 0,
+                polygonCallCount: 0,
+                keywordCallCount: 0,
+                idCallCount: 0,
+                cacheHitCount: 0,
+                totalAmapApiCallCount: 0,
+                quotaBucket: request.quotaBucket
             }
         };
     }
     console.warn('AMap POI live request.', {
         cacheKey: request.key,
+        mode: request.mode,
         reason: options.fetchReason ?? 'cache-miss',
         maxAmapApiCalls: options.maxAmapApiCalls
     });
     const fetched = await fetchNearbyRestaurantsFromCloud(location, {
+        mode: request.mode,
         radiusMeters: request.radiusMeters,
         pageSize: request.pageSize,
         pageCount: request.pageCount,
         keyword: request.keyword,
+        city: request.city,
+        adcode: request.adcode,
+        polygon: request.polygon,
+        id: request.id,
         types: request.types,
         fetchReason: options.fetchReason,
         maxAmapApiCalls: options.maxAmapApiCalls
     });
     const restaurants = normalizeRestaurantsForCache(fetched.restaurants);
+    const liveMeta = normalizeLivePoiFetchMeta(request, fetched.meta, options.fetchReason);
     if (restaurants.length > 0) {
         writeNearbyRestaurantsCache({
             ...request,
@@ -86,19 +110,14 @@ async function getNearbyRestaurantsWithMeta(options = {}) {
     }
     return {
         restaurants,
-        meta: {
-            poiCacheHit: false,
-            poiCacheKey: fetched.meta?.poiCacheKey ?? request.key,
-            poiCacheAgeMs: fetched.meta?.poiCacheAgeMs,
-            poiFetchReason: fetched.meta?.poiFetchReason ?? options.fetchReason ?? 'cache-miss-live-fetch',
-            amapApiCallCount: fetched.meta?.amapApiCallCount ?? Math.max(1, request.pageCount)
-        }
+        meta: liveMeta
     };
 }
 async function prefetchNearbyRestaurantCandidates(options = {}) {
     const result = await getNearbyRestaurantsWithMeta({
         ...options,
         radiusMeters: options.radiusMeters ?? PREFETCH_RADIUS_METERS,
+        mode: options.mode ?? DEFAULT_SEARCH_MODE,
         pageSize: options.pageSize ?? 25,
         pageCount: options.pageCount ?? 3,
         keyword: options.keyword ?? '',
@@ -110,6 +129,7 @@ async function prefetchNearbyRestaurantCandidates(options = {}) {
     console.warn('AMap POI prefetch finished.', {
         cacheHit: result.meta.poiCacheHit,
         cacheKey: result.meta.poiCacheKey,
+        mode: result.meta.poiFetchMode,
         count: result.restaurants.length,
         apiCalls: result.meta.amapApiCallCount,
         reason: result.meta.poiFetchReason
@@ -168,10 +188,15 @@ async function fetchNearbyRestaurantsFromCloud(location, options) {
         data: {
             latitude: location.latitude,
             longitude: location.longitude,
+            mode: options.mode,
             radiusMeters: options.radiusMeters,
             pageSize: options.pageSize,
             pageCount: options.pageCount,
             keyword: options.keyword,
+            city: options.city,
+            adcode: options.adcode,
+            polygon: options.polygon,
+            id: options.id,
             types: options.types,
             fetchReason: options.fetchReason,
             maxAmapApiCalls: options.maxAmapApiCalls
@@ -181,6 +206,9 @@ async function fetchNearbyRestaurantsFromCloud(location, options) {
     if (!result?.ok) {
         throw new Error(result?.error.message ?? 'Failed to fetch nearby restaurants.');
     }
+    const searchMeta = result.data.searchMeta;
+    const mode = normalizeSearchMode(searchMeta?.mode ?? options.mode);
+    const apiCallCount = searchMeta?.totalAmapApiCallCount ?? searchMeta?.apiCallCount ?? result.data.amapApiCallCount ?? 0;
     return {
         restaurants: result.data.restaurants,
         meta: {
@@ -188,7 +216,15 @@ async function fetchNearbyRestaurantsFromCloud(location, options) {
             poiCacheKey: result.data.cacheKey,
             poiCacheAgeMs: result.data.cacheAgeMs,
             poiFetchReason: result.data.fetchReason,
-            amapApiCallCount: result.data.amapApiCallCount
+            amapApiCallCount: apiCallCount,
+            poiFetchMode: mode,
+            aroundCallCount: searchMeta?.aroundCallCount ?? (mode === 'around' ? apiCallCount : 0),
+            polygonCallCount: searchMeta?.polygonCallCount ?? (mode === 'polygon' ? apiCallCount : 0),
+            keywordCallCount: searchMeta?.keywordCallCount ?? (mode === 'keyword' ? apiCallCount : 0),
+            idCallCount: searchMeta?.idCallCount ?? (mode === 'id' ? apiCallCount : 0),
+            cacheHitCount: searchMeta?.cacheHitCount ?? (result.data.cacheHit === true ? 1 : 0),
+            totalAmapApiCallCount: apiCallCount,
+            quotaBucket: searchMeta?.quotaBucket ?? getQuotaBucket(mode)
         }
     };
 }
@@ -210,6 +246,13 @@ function readNearbyRestaurantsCache(request) {
         if (!isTypesCovered(request.types, entry.types)) {
             return undefined;
         }
+        const modeCoverage = getModeCoverage(request, entry);
+        if (!modeCoverage.covered) {
+            return undefined;
+        }
+        if (!isScopeCovered(request, entry)) {
+            return undefined;
+        }
         const keywordCoverage = getKeywordCoverage(request.keyword, entry.keyword);
         if (!keywordCoverage.covered) {
             return undefined;
@@ -221,7 +264,7 @@ function readNearbyRestaurantsCache(request) {
             entry,
             restaurants: restaurants.length > 0 ? restaurants : entry.restaurants,
             ageMs,
-            reason: keywordCoverage.mode === 'exact' ? 'session-cache-hit' : 'broad-food-cache-hit'
+            reason: getCacheHitReason(modeCoverage.mode, keywordCoverage.mode)
         };
     })
         .filter((item) => Boolean(item))
@@ -249,7 +292,7 @@ function writeNearbyRestaurantsCache(entry) {
         .filter((item) => Date.now() - item.createdAt <= exports.POI_CACHE_TTL_MS)
         .slice(0, MAX_CACHE_ENTRIES);
     const nextStore = {
-        version: 2,
+        version: 3,
         entries
     };
     sessionCacheStore = nextStore;
@@ -277,11 +320,13 @@ function getNearbyRestaurantsCacheStore() {
 function normalizeCacheStore(rawCache) {
     if (rawCache &&
         typeof rawCache === 'object' &&
-        rawCache.version === 2 &&
+        (rawCache.version === 3 || rawCache.version === 2) &&
         Array.isArray(rawCache.entries)) {
         return {
-            version: 2,
-            entries: rawCache.entries.filter((entry) => Array.isArray(entry.restaurants))
+            version: 3,
+            entries: (rawCache.entries)
+                .map(normalizeCachedNearbyRestaurantsEntry)
+                .filter((entry) => Boolean(entry))
         };
     }
     const legacy = rawCache;
@@ -293,7 +338,7 @@ function normalizeCacheStore(rawCache) {
             fetchProfile: DEFAULT_FETCH_PROFILE
         });
         return {
-            version: 2,
+            version: 3,
             entries: [
                 {
                     ...request,
@@ -304,8 +349,36 @@ function normalizeCacheStore(rawCache) {
         };
     }
     return {
-        version: 2,
+        version: 3,
         entries: []
+    };
+}
+function normalizeCachedNearbyRestaurantsEntry(entry) {
+    if (!entry || typeof entry !== 'object' || !Array.isArray(entry.restaurants)) {
+        return undefined;
+    }
+    const rawEntry = entry;
+    if (!rawEntry.location || typeof rawEntry.createdAt !== 'number') {
+        return undefined;
+    }
+    const request = buildPoiCacheRequest(rawEntry.location, {
+        mode: normalizeSearchMode(rawEntry.mode ?? 'around'),
+        radiusMeters: rawEntry.radiusMeters,
+        pageSize: rawEntry.pageSize,
+        pageCount: rawEntry.pageCount,
+        keyword: rawEntry.keyword,
+        types: rawEntry.types,
+        fetchProfile: rawEntry.fetchProfile,
+        city: rawEntry.city,
+        adcode: rawEntry.adcode,
+        polygon: rawEntry.polygon,
+        id: rawEntry.id
+    });
+    return {
+        ...request,
+        key: typeof rawEntry.key === 'string' && rawEntry.key ? rawEntry.key : request.key,
+        restaurants: normalizeRestaurantsForCache(rawEntry.restaurants ?? []),
+        createdAt: rawEntry.createdAt
     };
 }
 function getStorageAdapter() {
@@ -324,17 +397,30 @@ function buildPoiCacheRequest(location, options) {
     const radiusMeters = options.radiusMeters ?? DEFAULT_RADIUS_METERS;
     const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
     const pageCount = options.pageCount ?? DEFAULT_PAGE_COUNT;
+    const mode = normalizeSearchMode(options.mode);
     const keyword = normalizeKeyword(options.keyword);
     const types = normalizeTypes(options.types);
     const fetchProfile = normalizeFetchProfile(options.fetchProfile);
+    const city = normalizeOptionalText(options.city);
+    const adcode = normalizeOptionalText(options.adcode);
+    const id = normalizeOptionalText(options.id);
+    const polygon = mode === 'polygon'
+        ? normalizeOptionalText(options.polygon) || buildRectanglePolygon(location, radiusMeters)
+        : '';
+    const quotaBucket = getQuotaBucket(mode);
     const locationBucket = buildLocationBucket(location);
     const radiusBucket = buildRadiusBucket(radiusMeters);
     const key = [
-        'v2',
+        'v3',
+        `mode-${mode}`,
         `loc-${locationBucket}`,
         `r-${radiusBucket}`,
         `types-${normalizeKeySegment(types)}`,
         `kw-${normalizeKeySegment(keyword || 'broad')}`,
+        `city-${normalizeKeySegment(city || 'none')}`,
+        `ad-${normalizeKeySegment(adcode || 'none')}`,
+        `poly-${polygon ? hashString(polygon) : 'none'}`,
+        `id-${normalizeKeySegment(id || 'none')}`,
         `ps-${pageSize}`,
         `pc-${pageCount}`,
         `fp-${normalizeKeySegment(fetchProfile)}`
@@ -349,8 +435,84 @@ function buildPoiCacheRequest(location, options) {
         pageSize,
         pageCount,
         fetchProfile,
+        mode,
+        city,
+        adcode,
+        polygon,
+        id,
+        quotaBucket,
         key
     };
+}
+function normalizeLivePoiFetchMeta(request, meta, fetchReason) {
+    const apiCallCount = meta?.totalAmapApiCallCount ?? meta?.amapApiCallCount ?? Math.max(1, request.pageCount);
+    const defaultCounts = buildDefaultModeCallCounts(request.mode, apiCallCount);
+    return {
+        poiCacheHit: false,
+        poiCacheKey: meta?.poiCacheKey ?? request.key,
+        poiCacheAgeMs: meta?.poiCacheAgeMs,
+        poiFetchReason: meta?.poiFetchReason ?? fetchReason ?? `cache-miss-${request.mode}-live-fetch`,
+        amapApiCallCount: apiCallCount,
+        poiFetchMode: meta?.poiFetchMode ?? request.mode,
+        aroundCallCount: meta?.aroundCallCount ?? defaultCounts.aroundCallCount,
+        polygonCallCount: meta?.polygonCallCount ?? defaultCounts.polygonCallCount,
+        keywordCallCount: meta?.keywordCallCount ?? defaultCounts.keywordCallCount,
+        idCallCount: meta?.idCallCount ?? defaultCounts.idCallCount,
+        cacheHitCount: meta?.cacheHitCount ?? 0,
+        totalAmapApiCallCount: meta?.totalAmapApiCallCount ?? apiCallCount,
+        quotaBucket: meta?.quotaBucket ?? request.quotaBucket
+    };
+}
+function buildDefaultModeCallCounts(mode, apiCallCount) {
+    return {
+        aroundCallCount: mode === 'around' ? apiCallCount : 0,
+        polygonCallCount: mode === 'polygon' ? apiCallCount : 0,
+        keywordCallCount: mode === 'keyword' ? apiCallCount : 0,
+        idCallCount: mode === 'id' ? apiCallCount : 0
+    };
+}
+function normalizeSearchMode(mode) {
+    if (mode === 'around' || mode === 'polygon' || mode === 'keyword' || mode === 'id') {
+        return mode;
+    }
+    return DEFAULT_SEARCH_MODE;
+}
+function normalizeOptionalText(value) {
+    return (value ?? '').trim();
+}
+function getQuotaBucket(mode) {
+    if (mode === 'around') {
+        return 'place-around';
+    }
+    if (mode === 'polygon') {
+        return 'place-polygon';
+    }
+    if (mode === 'keyword') {
+        return 'place-keyword';
+    }
+    return 'place-id';
+}
+function buildRectanglePolygon(location, radiusMeters) {
+    const latitudeDelta = radiusMeters / 111320;
+    const longitudeDelta = radiusMeters / (111320 * Math.cos(toRadians(location.latitude)) || 1);
+    const west = formatCoordinate(clampCoordinate(location.longitude - longitudeDelta, -180, 180));
+    const south = formatCoordinate(clampCoordinate(location.latitude - latitudeDelta, -90, 90));
+    const east = formatCoordinate(clampCoordinate(location.longitude + longitudeDelta, -180, 180));
+    const north = formatCoordinate(clampCoordinate(location.latitude + latitudeDelta, -90, 90));
+    return `${west},${south}|${east},${north}`;
+}
+function clampCoordinate(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+}
+function formatCoordinate(value) {
+    return Number(value.toFixed(6)).toString();
+}
+function hashString(value) {
+    let hash = 0;
+    for (let index = 0; index < value.length; index += 1) {
+        hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+    }
+    return hash.toString(36);
 }
 function buildLocationBucket(location) {
     return `${roundCoordinate(location.latitude)}_${roundCoordinate(location.longitude)}`;
@@ -378,6 +540,51 @@ function normalizeKeySegment(value) {
 }
 function isTypesCovered(requestTypes, cacheTypes) {
     return requestTypes === cacheTypes || cacheTypes === DEFAULT_TYPES;
+}
+function getModeCoverage(request, entry) {
+    if (request.mode === 'id') {
+        return {
+            covered: entry.mode === 'id' && request.id === entry.id,
+            mode: 'exact'
+        };
+    }
+    if (request.mode === entry.mode) {
+        return { covered: true, mode: request.mode === 'keyword' ? 'keyword-cache' : 'exact' };
+    }
+    if (entry.mode === 'polygon' && (request.mode === 'around' || request.mode === 'keyword')) {
+        return { covered: true, mode: 'broad-polygon' };
+    }
+    if (entry.mode === 'around' && (request.mode === 'polygon' || request.mode === 'keyword')) {
+        return { covered: true, mode: 'broad-around' };
+    }
+    return { covered: false, mode: 'exact' };
+}
+function isScopeCovered(request, entry) {
+    if (request.mode === 'keyword' || entry.mode === 'keyword') {
+        if (request.adcode && entry.adcode && request.adcode !== entry.adcode) {
+            return false;
+        }
+        if (!request.adcode && request.city && entry.city && request.city !== entry.city) {
+            return false;
+        }
+    }
+    return true;
+}
+function getCacheHitReason(modeCoverage, keywordCoverage) {
+    if (modeCoverage === 'broad-polygon') {
+        return keywordCoverage === 'local-filter'
+            ? 'polygon-cache-local-keyword-hit'
+            : 'polygon-cache-cover-hit';
+    }
+    if (modeCoverage === 'broad-around') {
+        return keywordCoverage === 'local-filter'
+            ? 'around-cache-local-keyword-hit'
+            : 'around-cache-cover-hit';
+    }
+    if (modeCoverage === 'keyword-cache') {
+        return 'keyword-cache-hit';
+    }
+    return keywordCoverage === 'exact' ? 'session-cache-hit' : 'broad-food-cache-hit';
 }
 function getKeywordCoverage(requestKeyword, cacheKeyword) {
     if (requestKeyword === cacheKeyword) {

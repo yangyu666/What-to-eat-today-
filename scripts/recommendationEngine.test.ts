@@ -4,11 +4,13 @@ import { buildAmapRestaurantQuery } from '../miniprogram/services/amapQueryBuild
 import {
   __resetNearbyRestaurantCacheForTest,
   __setAmapPoiCloudFetcherForTest,
+  __setAmapPoiLocationProviderForTest,
   __setAmapPoiStorageAdapterForTest,
   getNearbyRestaurantsWithMeta,
   POI_CACHE_TTL_MS
 } from '../miniprogram/services/amapPoiService';
 import { mapAnswersToPreferenceProfile } from '../miniprogram/services/preferenceMapper';
+import { getLocalRecommendations } from '../miniprogram/services/mealService';
 import { recommendRestaurants, scoreRestaurant } from '../miniprogram/services/recommendationEngine';
 import { selectQuestionSet } from '../miniprogram/services/questionSelector';
 import type { Restaurant } from '../miniprogram/types/restaurant';
@@ -1201,11 +1203,11 @@ const strongMatchResult = recommend(
 assert((strongMatchResult.candidates[0]?.confidenceScore ?? 0) >= 80, '强匹配应达到 80-95');
 
 const observableCandidate = strongMatchResult.candidates[0];
-assert(strongMatchResult.algorithmVersion === 'recommendation-v2.5', '结果应暴露 algorithmVersion');
+assert(strongMatchResult.algorithmVersion === 'recommendation-v3.0', '结果应暴露 algorithmVersion');
 assert(strongMatchResult.weightProfileId !== undefined, '结果应暴露 weightProfileId');
 assert(strongMatchResult.experimentId !== undefined, '结果应暴露 experimentId');
 assert(strongMatchResult.candidatePoolStats !== undefined, '结果应暴露 candidatePoolStats');
-assert(observableCandidate?.algorithmVersion === 'recommendation-v2.5', '候选应暴露 algorithmVersion');
+assert(observableCandidate?.algorithmVersion === 'recommendation-v3.0', '候选应暴露 algorithmVersion');
 assert(observableCandidate?.weightProfileId !== undefined, '候选应暴露 weightProfileId');
 assert(observableCandidate?.experimentId !== undefined, '候选应暴露 experimentId');
 assert(observableCandidate?.candidatePoolStats !== undefined, '候选应暴露 candidatePoolStats');
@@ -1999,20 +2001,29 @@ async function runPoiCacheAndStressTests() {
   ];
 
   __resetNearbyRestaurantCacheForTest();
+  const requestedModes: string[] = [];
   __setAmapPoiStorageAdapterForTest({
     get: (key) => storage[key],
     set: (key, value) => {
       storage[key] = value;
     }
   });
-  __setAmapPoiCloudFetcherForTest(async () => {
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
     amapCallCount += 1;
+    const mode = options.mode ?? 'polygon';
+    requestedModes.push(mode);
 
     return {
       restaurants: cachedRestaurants,
       meta: {
         amapApiCallCount: 1,
-        poiFetchReason: 'test-live-fetch'
+        poiFetchReason: `test-${mode}-live-fetch`,
+        poiFetchMode: mode,
+        aroundCallCount: mode === 'around' ? 1 : 0,
+        polygonCallCount: mode === 'polygon' ? 1 : 0,
+        keywordCallCount: mode === 'keyword' ? 1 : 0,
+        idCallCount: mode === 'id' ? 1 : 0,
+        totalAmapApiCallCount: 1
       }
     };
   });
@@ -2028,6 +2039,9 @@ async function runPoiCacheAndStressTests() {
   });
   assert(firstFetch.meta.poiCacheHit === false, 'first same-query fetch should miss cache');
   assert(firstFetch.meta.amapApiCallCount === 1, 'first same-query fetch should call AMap once');
+  assert(firstFetch.meta.poiFetchMode === 'polygon', 'default POI fetch should use polygon mode');
+  assert(firstFetch.meta.polygonCallCount === 1 && firstFetch.meta.aroundCallCount === 0, 'polygon fetch should not consume around quota');
+  assert(requestedModes[0] === 'polygon', 'front-end POI service should pass polygon mode to the cloud function');
 
   const secondFetch = await getNearbyRestaurantsWithMeta({
     location: baseLocation,
@@ -2040,6 +2054,21 @@ async function runPoiCacheAndStressTests() {
   });
   assert(secondFetch.meta.poiCacheHit === true, 'same location and query should hit POI cache');
   assert(Number(amapCallCount) === 1, 'same location and query should not call AMap twice');
+
+  const keywordFromPolygonCacheFetch = await getNearbyRestaurantsWithMeta({
+    mode: 'keyword',
+    location: baseLocation,
+    radiusMeters: 1500,
+    pageSize: 25,
+    pageCount: 1,
+    keyword: 'coffee',
+    city: 'Beijing',
+    types: '050000',
+    maxAmapApiCalls: 1
+  });
+  assert(keywordFromPolygonCacheFetch.meta.poiCacheHit === true, 'keyword request should reuse broad polygon cache when possible');
+  assert(keywordFromPolygonCacheFetch.restaurants[0]?.id === 'cache-coffee', 'keyword cache hit should locally filter matching category restaurants');
+  assert(Number(amapCallCount) === 1, 'keyword local-filter cache hit should not call AMap');
 
   const nearbyFetch = await getNearbyRestaurantsWithMeta({
     location: { latitude: 39.918, longitude: 116.455 },
@@ -2122,6 +2151,53 @@ async function runPoiCacheAndStressTests() {
   });
   assert(failedCacheOnlyFetch.restaurants.length === 0, 'AMap failure fallback path should return an empty POI pool without live calls');
   assert(failedCacheOnlyFetch.meta.amapApiCallCount === 0, 'fallback path should not count live AMap calls');
+
+  __resetNearbyRestaurantCacheForTest();
+  const serviceStorage: Record<string, unknown> = {};
+  const serviceRequestedModes: string[] = [];
+  const largePolygonPool: Restaurant[] = Array.from({ length: 36 }, (_, index) => ({
+    id: `polygon-pool-${index}`,
+    name: `Polygon Cafe ${index}`,
+    tags: ['coffee'],
+    tagIds: ['coffee', 'drink', 'non_meal', 'afternoon_tea'],
+    category: 'coffee',
+    distanceMeters: 200 + index * 10,
+    averageCostYuan: 35,
+    openStatus: 'open',
+    rating: 4.5,
+    source: 'amap',
+    status: 'active'
+  }));
+
+  __setAmapPoiStorageAdapterForTest({
+    get: (key) => serviceStorage[key],
+    set: (key, value) => {
+      serviceStorage[key] = value;
+    }
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    const mode = options.mode ?? 'polygon';
+    serviceRequestedModes.push(mode);
+
+    return {
+      restaurants: mode === 'around' ? [] : largePolygonPool,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: `service-${mode}-fetch`,
+        poiFetchMode: mode,
+        aroundCallCount: mode === 'around' ? 1 : 0,
+        polygonCallCount: mode === 'polygon' ? 1 : 0,
+        keywordCallCount: mode === 'keyword' ? 1 : 0,
+        totalAmapApiCallCount: 1
+      }
+    };
+  });
+
+  const serviceRecommendations = await getLocalRecommendations(undefined);
+  assert(serviceRecommendations.length > 0, 'mealService should recommend from polygon candidate pool');
+  assert(serviceRequestedModes.includes('polygon'), 'mealService should use polygon mode for the primary pool');
+  assert(!serviceRequestedModes.includes('around'), 'mealService should not call around when polygon pool is sufficient');
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({

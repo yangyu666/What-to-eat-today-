@@ -9,6 +9,8 @@ const {
 } = require('./amapStressUtils');
 
 const AMAP_PLACE_AROUND_URL = 'https://restapi.amap.com/v3/place/around';
+const AMAP_PLACE_POLYGON_URL = 'https://restapi.amap.com/v3/place/polygon';
+const AMAP_PLACE_TEXT_URL = 'https://restapi.amap.com/v3/place/text';
 const DEFAULT_TYPES = '050000';
 
 async function main() {
@@ -26,9 +28,12 @@ async function main() {
   const pageSize = clampInteger(args.pageSize, 1, 25, 25);
   const pageCount = clampInteger(args.pageCount, 1, 10, 3);
   const keyword = typeof args.keyword === 'string' ? args.keyword.trim() : '';
+  const city = typeof args.city === 'string' ? args.city.trim() : '';
+  const adcode = typeof args.adcode === 'string' ? args.adcode.trim() : '';
+  const modes = parseSearchModes(args.modes, keyword);
   const types = typeof args.types === 'string' && args.types.trim() ? args.types.trim() : DEFAULT_TYPES;
   const startedAt = Date.now();
-  const result = await fetchAmapPages({
+  const result = await fetchAmapSeedPool({
     key,
     latitude: point.latitude,
     longitude: point.longitude,
@@ -36,11 +41,17 @@ async function main() {
     pageSize,
     pageCount,
     keyword,
+    city,
+    adcode,
+    modes,
     types
   });
   const restaurants = result.pois
-    .map(convertPoiToRestaurant)
+    .map((poi) => convertPoiToRestaurant(poi, { latitude: point.latitude, longitude: point.longitude }))
     .filter(Boolean)
+    .filter((restaurant) => {
+      return typeof restaurant.distanceMeters !== 'number' || restaurant.distanceMeters <= radius;
+    })
     .slice(0, 250);
   const cacheFile = buildCacheFilePath(point);
   const payload = {
@@ -53,9 +64,13 @@ async function main() {
     pageSize,
     pageCount,
     keyword,
+    city,
+    adcode,
+    searchModes: modes,
     types,
     createdAt: new Date().toISOString(),
     amapApiCallCount: result.apiCallCount,
+    quotaStats: result.quotaStats,
     restaurants
   };
 
@@ -71,6 +86,7 @@ async function main() {
         cacheFile,
         restaurants: restaurants.length,
         amapApiCallCount: result.apiCallCount,
+        quotaStats: result.quotaStats,
         elapsedMs: Date.now() - startedAt
       },
       null,
@@ -79,14 +95,54 @@ async function main() {
   );
 }
 
-async function fetchAmapPages({ key, latitude, longitude, radius, pageSize, pageCount, keyword, types }) {
+async function fetchAmapSeedPool(options) {
+  const seen = new Set();
+  const pois = [];
+  let apiCallCount = 0;
+  const quotaStats = {
+    aroundCallCount: 0,
+    polygonCallCount: 0,
+    keywordCallCount: 0,
+    idCallCount: 0,
+    totalAmapApiCallCount: 0
+  };
+
+  for (const mode of options.modes) {
+    if (mode === 'keyword' && (!options.keyword || (!options.city && !options.adcode))) {
+      continue;
+    }
+
+    const result = await fetchAmapPages({
+      ...options,
+      keyword: mode === 'polygon' && options.modes.includes('keyword') ? '' : options.keyword,
+      mode
+    });
+    apiCallCount += result.apiCallCount;
+    quotaStats[`${mode}CallCount`] += result.apiCallCount;
+
+    result.pois.forEach((poi) => {
+      const poiKey = poi && (poi.id || `${poi.name || ''}|${poi.location || ''}`);
+
+      if (poiKey && !seen.has(poiKey)) {
+        seen.add(poiKey);
+        pois.push(poi);
+      }
+    });
+  }
+
+  quotaStats.totalAmapApiCallCount = apiCallCount;
+
+  return { pois, apiCallCount, quotaStats };
+}
+
+async function fetchAmapPages({ key, latitude, longitude, radius, pageSize, pageCount, keyword, city, adcode, mode, types }) {
   const seen = new Set();
   const pois = [];
   let apiCallCount = 0;
 
   for (let page = 1; page <= pageCount; page += 1) {
     apiCallCount += 1;
-    const response = await requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, types });
+    const response = await requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, city, adcode, mode, types });
 
     if (response.status !== '1' || response.infocode !== '10000') {
       throw new Error(`AMap request failed: ${response.info || response.infocode || response.status}`);
@@ -111,24 +167,38 @@ async function fetchAmapPages({ key, latitude, longitude, radius, pageSize, page
   return { pois, apiCallCount };
 }
 
-function requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, types }) {
+function requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, city, adcode, mode, types }) {
+  const endpoint =
+    mode === 'polygon'
+      ? AMAP_PLACE_POLYGON_URL
+      : mode === 'keyword'
+        ? AMAP_PLACE_TEXT_URL
+        : AMAP_PLACE_AROUND_URL;
   const params = new URLSearchParams({
     key,
-    location: `${longitude},${latitude}`,
     types,
-    radius: String(radius),
-    sortrule: 'distance',
     offset: String(pageSize),
     page: String(page),
     extensions: 'all',
     output: 'json'
   });
 
+  if (mode === 'polygon') {
+    params.set('polygon', buildRectanglePolygon({ latitude, longitude }, radius));
+  } else if (mode === 'keyword') {
+    params.set('city', adcode || city);
+    params.set('citylimit', 'true');
+  } else {
+    params.set('location', `${longitude},${latitude}`);
+    params.set('radius', String(radius));
+    params.set('sortrule', 'distance');
+  }
+
   if (keyword) {
     params.set('keywords', keyword);
   }
 
-  return requestJson(`${AMAP_PLACE_AROUND_URL}?${params.toString()}`);
+  return requestJson(`${endpoint}?${params.toString()}`);
 }
 
 function requestJson(url) {
@@ -153,7 +223,7 @@ function requestJson(url) {
   });
 }
 
-function convertPoiToRestaurant(poi) {
+function convertPoiToRestaurant(poi, center) {
   if (!poi || !poi.id || !poi.name) {
     return null;
   }
@@ -164,6 +234,8 @@ function convertPoiToRestaurant(poi) {
   const rating = parsePositiveNumber(poi.biz_ext && poi.biz_ext.rating);
   const poiText = `${poi.name} ${poi.type || ''} ${poi.address || ''}`;
   const tagIds = inferTagIdsFromText(poiText);
+  const photos = Array.isArray(poi.photos) ? poi.photos : [];
+  const firstPhoto = photos.find((photo) => photo && photo.url);
 
   if (isNonRestaurantSalesPoi(poiText)) {
     return null;
@@ -178,15 +250,82 @@ function convertPoiToRestaurant(poi) {
     category,
     address: normalizeAmapText(poi.address),
     location,
-    distanceMeters: parseNumber(poi.distance),
+    distanceMeters: parseNumber(poi.distance) ?? getDistanceMeters(center, location),
     priceLevel: toPriceLevel(cost),
     averageCostYuan: cost,
     openStatus: 'unknown',
     signatureDishes: [],
+    coverImageUrl: firstPhoto ? normalizeImageUrl(firstPhoto.url) : undefined,
     rating,
     source: 'amap',
     status: 'active'
   };
+}
+
+function normalizeImageUrl(url) {
+  return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : undefined;
+}
+
+function parseSearchModes(value, keyword) {
+  const modes = typeof value === 'string' && value.trim()
+    ? value.split(',').map((item) => item.trim().toLowerCase())
+    : keyword
+      ? ['polygon', 'keyword']
+      : ['polygon'];
+  const allowed = new Set(['polygon', 'keyword', 'around']);
+  const uniqueModes = [...new Set(modes.filter((mode) => allowed.has(mode)))];
+
+  return uniqueModes.length > 0 ? uniqueModes : ['polygon'];
+}
+
+function buildRectanglePolygon(location, radiusMeters) {
+  const latitudeDelta = radiusMeters / 111320;
+  const longitudeDelta = radiusMeters / (111320 * Math.cos(toRadians(location.latitude)) || 1);
+  const west = formatCoordinate(clampNumber(location.longitude - longitudeDelta, -180, 180));
+  const south = formatCoordinate(clampNumber(location.latitude - latitudeDelta, -90, 90));
+  const east = formatCoordinate(clampNumber(location.longitude + longitudeDelta, -180, 180));
+  const north = formatCoordinate(clampNumber(location.latitude + latitudeDelta, -90, 90));
+
+  return `${west},${south}|${east},${north}`;
+}
+
+function getDistanceMeters(left, right) {
+  if (
+    !left ||
+    !right ||
+    typeof left.latitude !== 'number' ||
+    typeof left.longitude !== 'number' ||
+    typeof right.latitude !== 'number' ||
+    typeof right.longitude !== 'number'
+  ) {
+    return undefined;
+  }
+
+  const earthRadiusMeters = 6371000;
+  const leftLatitude = toRadians(left.latitude);
+  const rightLatitude = toRadians(right.latitude);
+  const latitudeDelta = toRadians(right.latitude - left.latitude);
+  const longitudeDelta = toRadians(right.longitude - left.longitude);
+  const haversine =
+    Math.sin(latitudeDelta / 2) * Math.sin(latitudeDelta / 2) +
+    Math.cos(leftLatitude) *
+      Math.cos(rightLatitude) *
+      Math.sin(longitudeDelta / 2) *
+      Math.sin(longitudeDelta / 2);
+
+  return Math.round(earthRadiusMeters * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine)));
+}
+
+function toRadians(value) {
+  return (value * Math.PI) / 180;
+}
+
+function clampNumber(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function formatCoordinate(value) {
+  return Number(value.toFixed(6)).toString();
 }
 
 function inferTagIdsFromText(text) {

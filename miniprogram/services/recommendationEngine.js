@@ -8,8 +8,8 @@ const DEFAULT_LIMIT = 3;
 const MIN_PRIMARY_POOL_SIZE = 3;
 const MAX_SCORE = 100;
 const MIN_SCORE = 0;
-exports.ALGORITHM_VERSION = 'recommendation-v2.5';
-exports.WEIGHT_PROFILE_ID = 'breadth-v2.5';
+exports.ALGORITHM_VERSION = 'recommendation-v3.0';
+exports.WEIGHT_PROFILE_ID = 'poi-strategy-v3.0';
 exports.DEFAULT_EXPERIMENT_ID = 'default';
 const BUDGET_LEVEL_TO_YUAN = {
     1: 20,

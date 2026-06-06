@@ -6,7 +6,9 @@ const amapQueryBuilder_1 = require("./amapQueryBuilder");
 const amapPoiService_1 = require("./amapPoiService");
 const preferenceMapper_1 = require("./preferenceMapper");
 const recommendationEngine_1 = require("./recommendationEngine");
-const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 4;
+const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
+const MIN_POOL_BEFORE_AROUND_FALLBACK = 30;
 async function getTodayRecommendation() {
     const [candidate] = await getRecommendations(undefined, 1);
     if (!candidate) {
@@ -32,15 +34,34 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
     const restaurantPool = new Map();
     const metaList = [];
     let remainingAmapApiCalls = MAX_AMAP_API_CALLS_PER_RECOMMENDATION;
+    let remainingAroundCalls = MAX_AROUND_API_CALLS_PER_RECOMMENDATION;
     for (const attempt of attempts) {
+        if (remainingAmapApiCalls <= 0) {
+            break;
+        }
+        if (attempt.mode === 'keyword' && !attempt.city && !attempt.adcode) {
+            continue;
+        }
+        if (restaurantPool.size >= MIN_POOL_BEFORE_AROUND_FALLBACK &&
+            attempt.reason.includes('supplement')) {
+            continue;
+        }
+        if (attempt.mode === 'around') {
+            if (restaurantPool.size >= MIN_POOL_BEFORE_AROUND_FALLBACK || remainingAroundCalls <= 0) {
+                continue;
+            }
+        }
         const result = await (0, amapPoiService_1.getNearbyRestaurantsWithMeta)({
+            mode: attempt.mode,
             radiusMeters: attempt.radiusMeters,
             keyword: attempt.keyword,
+            city: attempt.city,
+            adcode: attempt.adcode,
             types: attempt.types,
             pageSize: 25,
             pageCount: attempt.pageCount,
             fetchProfile: 'recommendation',
-            fetchReason: `recommendation-attempt-${metaList.length + 1}`,
+            fetchReason: attempt.reason,
             maxAmapApiCalls: remainingAmapApiCalls
         }).catch((error) => {
             console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
@@ -50,13 +71,21 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
                     poiCacheHit: false,
                     poiCacheKey: '',
                     poiFetchReason: 'amap-failed-fallback',
-                    amapApiCallCount: 0
+                    amapApiCallCount: 0,
+                    poiFetchMode: attempt.mode,
+                    aroundCallCount: 0,
+                    polygonCallCount: 0,
+                    keywordCallCount: 0,
+                    idCallCount: 0,
+                    cacheHitCount: 0,
+                    totalAmapApiCallCount: 0
                 }
             };
         });
         const restaurants = result.restaurants;
         metaList.push(result.meta);
         remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - result.meta.amapApiCallCount);
+        remainingAroundCalls = Math.max(0, remainingAroundCalls - (result.meta.aroundCallCount ?? (attempt.mode === 'around' ? result.meta.amapApiCallCount : 0)));
         if (restaurants.length === 0) {
             if (remainingAmapApiCalls <= 0) {
                 console.warn('AMap POI recommendation live request budget exhausted.', {
@@ -88,7 +117,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
 }
 function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const baseRadius = amapQuery.radiusMeters;
-    const wideRadius = Math.max(baseRadius, 3000);
+    const polygonRadius = Math.max(baseRadius, 3000);
     const baseKeyword = amapQuery.keywords ?? '';
     const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
     const premiumKeywords = getPremiumKeywordAttempts(baseKeyword);
@@ -97,92 +126,82 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const mallKeywords = getMallKeywordAttempts(preferenceSnapshot);
     const premiumSearch = premiumKeywords.length > 0 || nonMealPremiumKeywords.length > 0 || brandChainKeywords.length > 0;
     const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
-    return [
-        {
-            radiusMeters: baseRadius,
+    const scopedLocation = getScopedKeywordSearchLocation(preferenceSnapshot);
+    const keywordAttempts = [
+        relaxedKeyword || baseKeyword,
+        ...premiumKeywords,
+        ...nonMealPremiumKeywords,
+        ...brandChainKeywords,
+        ...mallKeywords
+    ].filter(Boolean);
+    const attempts = [];
+    if (baseKeyword) {
+        attempts.push({
+            mode: 'polygon',
+            radiusMeters: polygonRadius,
             keyword: baseKeyword,
             types: amapQuery.types,
-            pageCount: 2
-        },
-        {
-            radiusMeters: wideRadius,
-            keyword: relaxedKeyword,
-            types: amapQuery.types,
-            pageCount: 2
-        },
-        {
+            pageCount: 1,
+            reason: 'recommendation-polygon-keyword-primary'
+        });
+    }
+    attempts.push({
+        mode: 'polygon',
+        radiusMeters: polygonRadius,
+        keyword: '',
+        types: amapQuery.types,
+        pageCount: 2,
+        reason: 'recommendation-polygon-broad-primary'
+    });
+    attempts.push({
+        mode: 'around',
+        radiusMeters: maxRadius,
+        keyword: relaxedKeyword || baseKeyword,
+        types: amapQuery.types,
+        pageCount: 1,
+        reason: 'recommendation-around-last-resort'
+    });
+    keywordAttempts.forEach((keyword) => {
+        attempts.push({
+            mode: 'polygon',
             radiusMeters: maxRadius,
-            keyword: relaxedKeyword,
+            keyword,
             types: amapQuery.types,
-            pageCount: premiumSearch ? 3 : 2
-        },
-        ...premiumKeywords.flatMap((keyword) => [
-            {
-                radiusMeters: wideRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 2
-            },
-            {
-                radiusMeters: 10000,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 2
-            },
-            {
-                radiusMeters: maxRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 3
-            }
-        ]),
-        ...nonMealPremiumKeywords.flatMap((keyword) => [
-            {
-                radiusMeters: wideRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 2
-            },
-            {
-                radiusMeters: maxRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 3
-            }
-        ]),
-        ...brandChainKeywords.flatMap((keyword) => [
-            {
-                radiusMeters: wideRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 2
-            },
-            {
-                radiusMeters: maxRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 3
-            }
-        ]),
-        ...mallKeywords.flatMap((keyword) => [
-            {
-                radiusMeters: wideRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 2
-            },
-            {
-                radiusMeters: maxRadius,
-                keyword,
-                types: amapQuery.types,
-                pageCount: 3
-            }
-        ])
-    ].filter((attempt, index, attempts) => {
-        return attempts.findIndex((item) => {
-            return item.radiusMeters === attempt.radiusMeters && item.keyword === attempt.keyword && item.types === attempt.types;
+            pageCount: premiumSearch ? 2 : 1,
+            reason: 'recommendation-polygon-keyword-supplement'
+        });
+        attempts.push({
+            mode: 'keyword',
+            radiusMeters: maxRadius,
+            keyword,
+            city: scopedLocation.city,
+            adcode: scopedLocation.adcode,
+            types: amapQuery.types,
+            pageCount: 1,
+            reason: 'recommendation-keyword-scoped-supplement'
+        });
+    });
+    return attempts.filter((attempt, index, allAttempts) => {
+        return allAttempts.findIndex((item) => {
+            return (item.mode === attempt.mode &&
+                item.radiusMeters === attempt.radiusMeters &&
+                item.keyword === attempt.keyword &&
+                item.types === attempt.types &&
+                (item.city ?? '') === (attempt.city ?? '') &&
+                (item.adcode ?? '') === (attempt.adcode ?? ''));
         }) === index;
     });
+}
+function getScopedKeywordSearchLocation(preferenceSnapshot) {
+    const city = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapCity ?? preferenceSnapshot.constraints?.city);
+    const adcode = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapAdcode ?? preferenceSnapshot.constraints?.adcode);
+    return {
+        city,
+        adcode
+    };
+}
+function getStringPreferenceValue(value) {
+    return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {
     if ((preferenceSnapshot.budgetLevel ?? 3) < 5) {
@@ -254,13 +273,31 @@ function mergePoiFetchMeta(metaList) {
     const cacheAges = metaList
         .map((meta) => meta.poiCacheAgeMs)
         .filter((age) => typeof age === 'number');
+    const modes = uniqueText(metaList.map((meta) => meta.poiFetchMode).filter(Boolean));
+    const quotaBuckets = uniqueText(metaList.map((meta) => meta.quotaBucket).filter(Boolean));
+    const aroundCallCount = metaList.reduce((sum, meta) => sum + (meta.aroundCallCount ?? 0), 0);
+    const polygonCallCount = metaList.reduce((sum, meta) => sum + (meta.polygonCallCount ?? 0), 0);
+    const keywordCallCount = metaList.reduce((sum, meta) => sum + (meta.keywordCallCount ?? 0), 0);
+    const idCallCount = metaList.reduce((sum, meta) => sum + (meta.idCallCount ?? 0), 0);
+    const cacheHitCount = metaList.reduce((sum, meta) => sum + (meta.cacheHitCount ?? (meta.poiCacheHit ? 1 : 0)), 0);
     return {
         poiCacheHit: apiCallCount === 0 && metaList.some((meta) => meta.poiCacheHit),
         poiCacheKey: firstKey,
         poiCacheAgeMs: cacheAges.length > 0 ? Math.min(...cacheAges) : undefined,
         poiFetchReason: metaList.map((meta) => meta.poiFetchReason).join(',') || 'no-poi-fetch',
-        amapApiCallCount: apiCallCount
+        amapApiCallCount: apiCallCount,
+        poiFetchMode: modes[0],
+        aroundCallCount,
+        polygonCallCount,
+        keywordCallCount,
+        idCallCount,
+        cacheHitCount,
+        totalAmapApiCallCount: apiCallCount,
+        quotaBucket: quotaBuckets.join(',')
     };
+}
+function uniqueText(values) {
+    return [...new Set(values.filter((value) => Boolean(value)))];
 }
 function normalizeRestaurantPoolKey(restaurant) {
     const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');

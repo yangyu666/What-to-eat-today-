@@ -2,8 +2,8 @@ const cloud = initCloudSdk();
 
 const DEFAULT_LIMIT = 3;
 const MIN_PRIMARY_POOL_SIZE = 3;
-const ALGORITHM_VERSION = 'recommendation-v2.5';
-const WEIGHT_PROFILE_ID = 'breadth-v2.5';
+const ALGORITHM_VERSION = 'recommendation-v3.0';
+const WEIGHT_PROFILE_ID = 'poi-strategy-v3.0';
 const DEFAULT_EXPERIMENT_ID = 'default';
 const BUDGET_LEVEL_TO_YUAN = { 1: 20, 2: 30, 3: 60, 4: 100, 5: 200, 6: 320 };
 const BUDGET_LEVEL_TO_RANGE = {

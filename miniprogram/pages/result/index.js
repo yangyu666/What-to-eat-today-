@@ -69,7 +69,15 @@ Page({
         poiCacheKey: '',
         poiCacheAgeMs: undefined,
         poiFetchReason: '',
-        amapApiCallCount: 0
+        amapApiCallCount: 0,
+        poiFetchMode: '',
+        aroundCallCount: 0,
+        polygonCallCount: 0,
+        keywordCallCount: 0,
+        idCallCount: 0,
+        cacheHitCount: 0,
+        totalAmapApiCallCount: 0,
+        quotaBucket: ''
     },
     onLoad() {
         const result = wx.getStorageSync('meal_questionnaire_result');
@@ -236,7 +244,15 @@ Page({
                 poiCacheKey: recommendation.poiCacheKey,
                 poiCacheAgeMs: recommendation.poiCacheAgeMs,
                 poiFetchReason: recommendation.poiFetchReason,
-                amapApiCallCount: recommendation.amapApiCallCount
+                amapApiCallCount: recommendation.amapApiCallCount,
+                poiFetchMode: recommendation.poiFetchMode,
+                aroundCallCount: recommendation.aroundCallCount,
+                polygonCallCount: recommendation.polygonCallCount,
+                keywordCallCount: recommendation.keywordCallCount,
+                idCallCount: recommendation.idCallCount,
+                cacheHitCount: recommendation.cacheHitCount,
+                totalAmapApiCallCount: recommendation.totalAmapApiCallCount,
+                quotaBucket: recommendation.quotaBucket
             });
         }
         this.setData({
@@ -258,6 +274,14 @@ Page({
             poiCacheAgeMs: recommendation?.poiCacheAgeMs,
             poiFetchReason: recommendation?.poiFetchReason ?? '',
             amapApiCallCount: recommendation?.amapApiCallCount ?? 0,
+            poiFetchMode: recommendation?.poiFetchMode ?? '',
+            aroundCallCount: recommendation?.aroundCallCount ?? 0,
+            polygonCallCount: recommendation?.polygonCallCount ?? 0,
+            keywordCallCount: recommendation?.keywordCallCount ?? 0,
+            idCallCount: recommendation?.idCallCount ?? 0,
+            cacheHitCount: recommendation?.cacheHitCount ?? 0,
+            totalAmapApiCallCount: recommendation?.totalAmapApiCallCount ?? 0,
+            quotaBucket: recommendation?.quotaBucket ?? '',
             ...extraData
         });
     },

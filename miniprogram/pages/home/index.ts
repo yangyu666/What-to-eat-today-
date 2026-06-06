@@ -94,10 +94,11 @@ Page({
   prefetchNearbyRestaurants(latitude: number, longitude: number) {
     void prefetchNearbyRestaurantCandidates({
       location: { latitude, longitude },
+      mode: 'polygon',
       radiusMeters: 5000,
       pageSize: 25,
       pageCount: 3,
-      fetchReason: 'home-location-success-prefetch',
+      fetchReason: 'home-location-success-polygon-prefetch',
       maxAmapApiCalls: 3
     }).catch((error) => {
       console.warn('Nearby restaurant prefetch failed.', error);

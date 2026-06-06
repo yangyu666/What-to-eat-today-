@@ -26,10 +26,17 @@
 
 - `wx.getLocation` only obtains device latitude/longitude and does not consume AMap search quota.
 - Quota is consumed by AMap WebService requests: place/around, reverse geocode (`regeo`), and IP location.
+- V3.0 POI fetch order is cache -> polygon -> keyword supplement -> around fallback. Around search is not the primary path.
+- `amapPoi` supports `mode: "around" | "polygon" | "keyword" | "id"`. Polygon search receives a rectangle generated from the user's location and radius; keyword search requires `city` or `adcode` to avoid nationwide searches.
 - `amapPoi` caches normalized POI candidate pools in `amap_poi_cache` for quota optimization. This is not a business collection and does not replace `users` or `recommendation_history`.
-- Cache key dimensions include rounded location bucket, radius bucket, `types`, normalized `keyword`, and page profile.
+- Cache key dimensions include rounded location bucket, search `mode`, radius bucket, `types`, normalized `keyword`, `city/adcode`, polygon hash, POI id, and page profile.
 - Cache TTL is 1 hour in the cloud function. A single cached candidate pool stores at most 250 normalized restaurant records and never stores the raw AMap response.
 - The mini program also keeps a session/storage cache under `nearby_restaurants_amap_cache`; recommendation flows prefer that cache before calling `amapPoi`.
+- POI response meta includes `poiFetchMode`, `poiCacheHit`, `poiCacheKey`, `poiFetchReason`, `aroundCallCount`, `polygonCallCount`, `keywordCallCount`, `idCallCount`, `cacheHitCount`, `totalAmapApiCallCount`, and `quotaBucket`.
+- Stress testing is cache-first by default. `npm.cmd run stress:recommendation` reads `.cache/amap-poi/*.json` and makes 0 live AMap calls unless `ALLOW_LIVE_AMAP_STRESS=1` and `--live` are explicitly set.
+- Seed examples:
+  - `npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000`
+  - `npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000 --modes polygon,keyword --keyword coffee --city Beijing`
 
 ### `saveRecommendationHistory`
 
