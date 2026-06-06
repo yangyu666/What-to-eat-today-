@@ -144,6 +144,10 @@ const CACHE_KEY = 'nearby_restaurants_amap_cache';
 export const POI_CACHE_TTL_MS = 45 * 60 * 1000;
 export const POI_CACHE_LOCATION_TOLERANCE_METERS = 2000;
 export const POI_CACHE_MAX_RESTAURANTS = 250;
+// 缓存复用的最小半径比例：当缓存条目的覆盖半径 >= 请求半径 * 该比例时即可复用。
+// 用于让首页 prefetch 的较小半径缓存（如 5000m）能服务推荐的较大半径请求（如 10000m），
+// 避免推荐重复请求高德、与 prefetch 抢并发额度而触发 QPS 限流（infocode 10021）。
+const POI_CACHE_RADIUS_REUSE_RATIO = 0.5;
 const MAX_CACHE_ENTRIES = 8;
 
 let sessionCacheStore: NearbyRestaurantsCacheStore | undefined;
@@ -404,7 +408,9 @@ function readNearbyRestaurantsCache(request: PoiCacheRequest): CacheLookupResult
         return undefined;
       }
 
-      if (request.radiusMeters > entry.radiusMeters) {
+      // 放宽半径判定：只要缓存半径不小于请求半径的设定比例即可复用（POI 在中心更密集，
+      // 略小半径的缓存足以支撑推荐），从而复用 prefetch 结果、减少实时高德请求。
+      if (entry.radiusMeters < request.radiusMeters * POI_CACHE_RADIUS_REUSE_RATIO) {
         return undefined;
       }
 

@@ -389,7 +389,7 @@ async function requestAmapPages({
 
   for (let page = 1; page <= pageCount && apiCallCount < maxAmapApiCalls; page += 1) {
     apiCallCount += 1;
-    const response = await requestAmapSearch({
+    const response = await requestAmapSearchWithRetry({
       key,
       mode,
       latitude,
@@ -546,6 +546,49 @@ function hashString(value) {
   }
 
   return hash.toString(36);
+}
+
+// 高德"访问过于频繁 / 并发(QPS)超限"类错误码：这些是瞬时限制（每秒滑动窗口），
+// 短暂退避后重试通常即可成功。不含日配额耗尽(10003)和权限类错误（重试无意义）。
+const AMAP_RETRYABLE_INFOCODES = new Set(['10004', '10019', '10020', '10021', '10022', '10023', '10024', '10025', '10026', '10029']);
+const AMAP_RETRY_MAX_ATTEMPTS = 3;
+const AMAP_RETRY_BASE_DELAY_MS = 250;
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// 调用高德搜索；遇到 QPS/并发限流类错误（如 infocode 10021）时按指数退避重试。
+// 首页 prefetch 与推荐流程可能并发打高德，瞬时并发超过个人 key 的 QPS 上限会整批失败，
+// 这里让被限流的单个请求自动错开重试，避免推荐因瞬时限流而拿到空结果。
+async function requestAmapSearchWithRetry(params) {
+  let response;
+
+  for (let attempt = 0; attempt < AMAP_RETRY_MAX_ATTEMPTS; attempt += 1) {
+    if (attempt > 0) {
+      // 指数退避：250ms、500ms，错开瞬时并发高峰
+      await delay(AMAP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
+    }
+
+    response = await requestAmapSearch(params);
+    const infocode = response && response.infocode != null ? String(response.infocode) : '';
+
+    if (response && response.status === '1') {
+      return response;
+    }
+
+    if (!AMAP_RETRYABLE_INFOCODES.has(infocode)) {
+      return response; // 非限流类错误（如参数错误）重试无意义，直接返回
+    }
+
+    console.warn('AMap request throttled, retrying.', {
+      infocode,
+      info: response && response.info,
+      attempt: attempt + 1
+    });
+  }
+
+  return response;
 }
 
 function requestAmapSearch({
