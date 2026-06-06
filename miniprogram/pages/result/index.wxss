@@ -3,8 +3,8 @@
   flex-direction: column;
   gap: 20rpx;
   min-height: 100vh;
-  padding-top: 24rpx;
-  background: #ffffff;
+  padding-top: 176rpx;
+  background: transparent;
 }
 
 .result-card {
