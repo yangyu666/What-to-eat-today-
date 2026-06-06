@@ -1,4 +1,6 @@
 <view class="page result-page">
+  <button class="result-back-button" bindtap="goHome">‹ 首页</button>
+
   <view class="empty-state" wx:if="{{loading}}">
     <text>正在匹配附近适合的一家...</text>
   </view>

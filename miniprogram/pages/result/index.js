@@ -219,6 +219,11 @@ Page({
             }
         });
     },
+    goHome() {
+        wx.switchTab({
+            url: '/pages/home/index'
+        });
+    },
     setCurrentRecommendation(candidates, currentIndex, extraData = {}) {
         const recommendation = candidates[currentIndex] ?? null;
         const distanceMeters = recommendation?.restaurant?.distanceMeters;

@@ -9,12 +9,12 @@
 
 .question-nav {
   display: grid;
-  grid-template-columns: 72rpx minmax(0, 1fr) 88rpx;
+  grid-template-columns: 72rpx minmax(0, 1fr) 120rpx;
   align-items: center;
   width: calc(100vw - 64rpx);
   max-width: 686rpx;
   height: 88rpx;
-  padding: 0 18rpx;
+  padding: 0 28rpx 0 18rpx;
   border: 1rpx solid rgba(17, 24, 39, 0.05);
   border-radius: 24rpx;
   background: #ffffff;
@@ -40,11 +40,13 @@
 }
 
 .skip-button {
-  justify-self: end;
-  width: 88rpx;
+  justify-self: center;
+  width: 96rpx;
   min-width: 0;
   color: #111827;
   font-size: 28rpx;
+  font-weight: 600;
+  line-height: 1;
   white-space: nowrap;
 }
 

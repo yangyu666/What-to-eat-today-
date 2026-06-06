@@ -270,6 +270,12 @@ Page({
     });
   },
 
+  goHome() {
+    wx.switchTab({
+      url: '/pages/home/index'
+    });
+  },
+
   setCurrentRecommendation(
     candidates: MealCandidate[],
     currentIndex: number,
