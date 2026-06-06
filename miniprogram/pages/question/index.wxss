@@ -9,7 +9,7 @@
 
 .question-nav {
   display: grid;
-  grid-template-columns: 88rpx 1fr 100rpx;
+  grid-template-columns: 72rpx minmax(0, 1fr) 88rpx;
   align-items: center;
   width: calc(100vw - 64rpx);
   max-width: 686rpx;
@@ -19,6 +19,7 @@
   border-radius: 24rpx;
   background: #ffffff;
   box-shadow: 0 8rpx 24rpx rgba(0, 0, 0, 0.08);
+  overflow: hidden;
 }
 
 .icon-button,
@@ -35,11 +36,16 @@
   border-radius: 16rpx;
   font-size: 52rpx;
   line-height: 1;
+  justify-self: start;
 }
 
 .skip-button {
+  justify-self: end;
+  width: 88rpx;
+  min-width: 0;
   color: #111827;
   font-size: 28rpx;
+  white-space: nowrap;
 }
 
 .progress-text {
