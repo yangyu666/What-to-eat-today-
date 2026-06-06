@@ -276,7 +276,7 @@ const INFERRED_TAG_RULES: Array<{ keywords: string[]; tags: TagId[]; skipWhenNot
   { keywords: ['酸辣粉'], tags: ['spicy', 'strong_flavor', 'heavy', 'chongqing', 'noodle', 'hot'], skipWhenNotSpicy: true },
   { keywords: ['火锅', '串串'], tags: ['spicy', 'strong_flavor', 'heavy', 'hotpot', 'hot'], skipWhenNotSpicy: true },
   { keywords: ['炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
-  { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group'] },
+  { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group', 'meal'] },
   { keywords: ['粥', '粉面', '云吞', '馄饨', '广式', '茶餐厅'], tags: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { keywords: ['茶楼', '早茶'], tags: ['dim_sum', 'meal', 'snack', 'light', 'not_spicy'] },
   { keywords: ['春饼', '东北菜', '东北', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '鲜笋', '外婆小聚'], tags: ['meal', 'rice', 'staple', 'relaxed'] },
@@ -724,8 +724,8 @@ export function applyHardFilters(
 
   const restaurantTagIds = getRestaurantTagIds(restaurant);
 
-  if (isExplicitNonMealPreference(preference) && isLikelyMealCandidate(restaurant, restaurantTagIds)) {
-    reasons.push('明确非正餐意图与正餐候选冲突');
+  if (isExplicitNonMealPreference(preference) && !hasNonMealEvidence(restaurantTagIds, restaurantText)) {
+    reasons.push('明确想要饮品/甜品，但该店缺少相应特征');
   }
 
   if (isExplicitMealPreference(preference) && hasNonMealEvidence(restaurantTagIds, restaurantText)) {
@@ -1684,11 +1684,8 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
 
   if (range.min !== undefined && estimatedCost < range.min) {
     if (flexibleNonMealBudget) {
-      if (estimatedCost >= range.min * 0.65) {
-        return 2;
-      }
-
-      return preference.budgetLevel >= 6 ? -14 : -8;
+      // 非正餐意图（想喝饮品/吃甜品）：人均低于正餐预算属正常，不因便宜而扣分
+      return estimatedCost >= range.min * 0.4 ? 14 : 6;
     }
 
     if ((preference.budgetLevel ?? 3) >= 4) {
@@ -1946,7 +1943,7 @@ function isPriceUnknownForStrictBudget(restaurant: Restaurant, preference?: User
 }
 
 function isFlexibleNonMealBudget(preference?: UserPreferenceProfile): boolean {
-  if (!preference || (preference.budgetLevel ?? 3) < 5) {
+  if (!preference) {
     return false;
   }
 
@@ -1966,7 +1963,8 @@ function isFlexibleNonMealBudget(preference?: UserPreferenceProfile): boolean {
 }
 
 function isHighBudgetNonMealUnderBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
-  if (!isFlexibleNonMealBudget(preference)) {
+  // 仅在高预算档(>=5)选了便宜非正餐时才提示"低于预算档"；低预算选便宜饮品属正常，不下调匹配度
+  if (!isFlexibleNonMealBudget(preference) || (preference?.budgetLevel ?? 3) < 5) {
     return false;
   }
 
