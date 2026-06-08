@@ -182,7 +182,9 @@ exports.main = async (event = {}, context = {}) => {
     const mode = normalizeSearchMode(event.mode);
     const radius = clampInteger(event.radiusMeters, 300, 15000, DEFAULT_RADIUS_METERS);
     const pageSize = clampInteger(event.pageSize, 1, 25, DEFAULT_PAGE_SIZE);
-    const pageCount = clampInteger(event.pageCount || event.pageNum, 1, 3, 1);
+    // 拉取页数上限放宽到 8（默认仍为 1）：高德 polygon 单次最多约返回 200 条(8页×25)，
+    // 此前锁死在 3 页(75家)导致 CBD 等密集区高端店被默认排序挤到后面、召回不全。
+    const pageCount = clampInteger(event.pageCount || event.pageNum, 1, 8, 1);
     const keyword = typeof event.keyword === 'string' ? event.keyword.trim() : '';
     const city = typeof event.city === 'string' ? event.city.trim() : '';
     const adcode = typeof event.adcode === 'string' ? event.adcode.trim() : '';
@@ -192,7 +194,9 @@ exports.main = async (event = {}, context = {}) => {
       ? event.polygon.trim()
       : buildRectanglePolygon({ latitude, longitude, radiusMeters: radius });
     const fetchReason = typeof event.fetchReason === 'string' ? event.fetchReason.trim() : 'unspecified';
-    const maxAmapApiCalls = clampInteger(event.maxAmapApiCalls, 0, 3, 3);
+    // API 调用预算上限同步放宽到 8（默认仍为 3），与 pageCount 配合让首页预取可一次拉满较深页数；
+    // 实际并发仍由小程序端串行节流(约2.8 QPS)控制，不会触发 QPS 限流。
+    const maxAmapApiCalls = clampInteger(event.maxAmapApiCalls, 0, 8, 3);
     const quotaBucket = getQuotaBucket(mode);
     const cacheKey = buildCloudCacheKey({
       mode,

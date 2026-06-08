@@ -113,14 +113,25 @@ async function getNearbyRestaurantsWithMeta(options = {}) {
         meta: liveMeta
     };
 }
-// 首页预取的多类目关键词：覆盖正餐、高端、快餐小吃、各菜系、饮品甜品，
+// 首页预取的多类目关键词 + 各自拉取页数：覆盖正餐、高端、快餐小吃、各菜系、饮品甜品，
 // 让缓存池包含全价位全品类，避免不选品牌/高预算时池子里没有合适的店。
+// 页数差异化：broad 拉满（高德 polygon 单次上限约 8 页/200 条），高端类目加深到 4 页
+// （高端店在高德默认热度排序里靠后，broad 即使拉满也只能覆盖约 25 家高端，需专项搜索补足），
+// 其余高频类目保持 2 页即可。稀疏区域云函数会在某页返回不足时自动提前停止，不会空耗调用。
+//
+// ⚠️ 顺序很关键：带关键词的类目组必须排在 broad（空关键词）之前。
+// 缓存命中判定里"空关键词条目可经本地过滤覆盖任何带词请求"，若 broad 先写入缓存，
+// 后续类目组会直接命中 broad 缓存、不再真正按类目搜索（高端等专项店就补不进池子）。
+// 把 broad 放最后，保证各类目都真实搜索一次、把各自品类的店补进池，broad 最后再补全量正餐。
+const PREFETCH_BROAD_PAGE_COUNT = 8;
+const PREFETCH_PREMIUM_PAGE_COUNT = 4;
+const PREFETCH_CATEGORY_PAGE_COUNT = 2;
 const PREFETCH_KEYWORD_GROUPS = [
-    '',
-    '高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑|大董|新荣记|广州酒家|白天鹅',
-    '快餐|简餐|盖饭|面|套餐|小吃|粥|粉',
-    '火锅|烧烤|川菜|湘菜|粤菜|江浙|日料|西餐|东北菜',
-    '奶茶|咖啡|茶饮|甜品|烘焙'
+    { keyword: '高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑|大董|新荣记|广州酒家|白天鹅', pageCount: PREFETCH_PREMIUM_PAGE_COUNT },
+    { keyword: '快餐|简餐|盖饭|面|套餐|小吃|粥|粉', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
+    { keyword: '火锅|烧烤|川菜|湘菜|粤菜|江浙|日料|西餐|东北菜', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
+    { keyword: '奶茶|咖啡|茶饮|甜品|烘焙', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
+    { keyword: '', pageCount: PREFETCH_BROAD_PAGE_COUNT }
 ];
 async function prefetchNearbyRestaurantCandidates(options = {}) {
     const location = options.location ?? (await getUserLocation());
@@ -130,19 +141,20 @@ async function prefetchNearbyRestaurantCandidates(options = {}) {
     let lastMeta;
     // 多类目串行预取（经串行节流不会超 QPS），累积去重成一个大池
     for (let index = 0; index < PREFETCH_KEYWORD_GROUPS.length; index += 1) {
-        const keyword = PREFETCH_KEYWORD_GROUPS[index];
+        const { keyword, pageCount } = PREFETCH_KEYWORD_GROUPS[index];
         const result = await getNearbyRestaurantsWithMeta({
             ...options,
             location,
             radiusMeters,
             mode: 'polygon',
             pageSize: 25,
-            pageCount: keyword ? 2 : 3,
+            pageCount,
             keyword,
             types: options.types ?? DEFAULT_TYPES,
             fetchProfile: PREFETCH_FETCH_PROFILE,
             fetchReason: keyword ? 'home-prefetch-category' : 'home-prefetch-broad',
-            maxAmapApiCalls: options.maxAmapApiCalls ?? 3
+            // API 调用预算需 >= 该组页数，否则云函数会在拉到预算上限时提前截断，加深就失效了
+            maxAmapApiCalls: Math.max(options.maxAmapApiCalls ?? 0, pageCount)
         }).catch((error) => {
             console.warn('AMap POI prefetch group failed.', { keyword, error });
             return undefined;
@@ -162,7 +174,7 @@ async function prefetchNearbyRestaurantCandidates(options = {}) {
             keyword: '',
             types: options.types ?? DEFAULT_TYPES,
             pageSize: 25,
-            pageCount: 3,
+            pageCount: PREFETCH_BROAD_PAGE_COUNT,
             fetchProfile: PREFETCH_FETCH_PROFILE
         });
         writeNearbyRestaurantsCache({
