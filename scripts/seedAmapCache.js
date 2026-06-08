@@ -550,3 +550,10 @@ if (require.main === module) {
     process.exitCode = 1;
   });
 }
+
+// 导出转换逻辑供 seedAmapRichPool 等脚本复用（仅新增导出，不改变直接运行行为）。
+module.exports = {
+  convertPoiToRestaurant,
+  inferTagIdsFromText,
+  isNonRestaurantSalesPoi
+};

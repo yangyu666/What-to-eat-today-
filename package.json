@@ -9,6 +9,7 @@
     "test:recommendation": "tsc scripts/recommendationEngine.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/recommendation-test --skipLibCheck --strict && node .tmp/recommendation-test/scripts/recommendationEngine.test.js",
     "test:preference": "tsc scripts/preferenceFlow.test.ts --target ES2020 --module commonjs --moduleResolution node --outDir .tmp/preference-test --skipLibCheck --strict && node .tmp/preference-test/scripts/preferenceFlow.test.js",
     "seed:amap-cache": "node scripts/seedAmapCache.js",
+    "seed:amap-rich": "node scripts/seedAmapRichPool.js",
     "stress:recommendation": "node scripts/stressRecommendation.js"
   },
   "devDependencies": {
