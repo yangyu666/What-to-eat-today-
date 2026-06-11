@@ -6,9 +6,12 @@
     </view>
   </view>
 
-  <view class="hero">
-    <text class="greeting">Hi，{{userName}} 👋</text>
+  <view class="intro">
+    <text class="greeting">Hi, {{userName}} 👋</text>
     <text class="subtitle">今天想吃点什么呢？</text>
+  </view>
+
+  <view class="hero">
     <text class="title">今天吃<text class="accent">什么</text>？</text>
   </view>
 
@@ -17,9 +20,14 @@
   </view>
 
   <view class="history-filter-card">
-    <view class="history-filter-copy">
-      <text class="history-filter-title">避开最近推荐</text>
-      <text class="history-filter-desc">开启后优先换新选择</text>
+    <view class="card-left">
+      <view class="home-card-icon filter-card-icon">
+        <image class="home-card-icon-image" src="/assets/icons/recommend.png" mode="aspectFit" />
+      </view>
+      <view class="history-filter-copy">
+        <text class="history-filter-title">避开最近推荐</text>
+        <text class="history-filter-desc">开启后优先换新选择</text>
+      </view>
     </view>
     <switch
       class="history-filter-switch"
@@ -30,19 +38,33 @@
   </view>
 
   <view class="history-entry" bindtap="openHistory">
-    <view>
-      <text class="entry-title">历史记录</text>
-      <text class="entry-desc">查看之前吃过和推荐过的选择</text>
+    <view class="card-left">
+      <view class="home-card-icon history-card-icon">
+        <view class="history-glyph"></view>
+      </view>
+      <view>
+        <text class="entry-title">历史记录</text>
+        <text class="entry-desc">查看之前吃过和推荐过的选择</text>
+      </view>
     </view>
     <text class="entry-arrow">›</text>
   </view>
 
-  <view class="recent-section" wx:if="{{recentMeals.length > 0}}">
+  <view class="recent-section">
     <view class="section-header">
-      <text class="section-title">最近推荐</text>
+      <view class="section-title-wrap">
+        <view class="section-icon"></view>
+        <text class="section-title">最近推荐</text>
+      </view>
       <text class="section-link" bindtap="openHistory">查看全部 ›</text>
     </view>
-    <view class="recent-list">
+    <view class="recent-empty" wx:if="{{recentMeals.length === 0}}">
+      <view class="recent-empty-icon">
+        <view class="recommend-glyph empty-recommend-glyph"></view>
+      </view>
+      <text>还没有记录，快去决定第一顿吧！</text>
+    </view>
+    <view class="recent-list" wx:else>
       <view class="recent-card" wx:for="{{recentMeals}}" wx:key="id">
         <view class="meal-cover">
           <image class="meal-cover-image" src="{{item.imageUrl}}" mode="aspectFill" lazy-load="true" />

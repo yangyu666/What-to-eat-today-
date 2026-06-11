@@ -27,16 +27,16 @@
     </view>
 
     <text class="restaurant-name">{{recommendation.restaurant.name}}</text>
-    <button class="navigate-link" bindtap="navigateToRestaurant">导航到这家店</button>
+    <text class="navigate-link" bindtap="navigateToRestaurant">导航到这家店</text>
 
     <view class="info-row">
       <view class="info-item">
-        <text class="info-icon">距</text>
+        <text class="info-icon">约</text>
         <text>{{walkText}}</text>
       </view>
       <view class="divider"></view>
       <view class="info-item">
-        <text class="info-icon">¥</text>
+        <text class="info-icon">价格</text>
         <text>{{averageCostText}}</text>
       </view>
       <view class="divider"></view>
