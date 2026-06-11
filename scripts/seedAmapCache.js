@@ -310,12 +310,12 @@ function classifyAmapFailure(response) {
     return { retryable: true, cooldown: null, countAsQuota: false, reason: 'network' };
   }
 
-  if (AMAP_QUOTA_EXHAUSTED_INFOCODES.has(infocode) || /quota|daily|limit|exceed|配额|额度|上限|超限|耗尽/.test(info)) {
-    return { retryable: true, cooldown: 'quota', countAsQuota: true, reason: 'quota' };
-  }
-
   if (AMAP_QPS_INFOCODES.has(infocode) || /qps|throttle|频繁|并发|繁忙/.test(info)) {
     return { retryable: true, cooldown: 'qps', countAsQuota: false, reason: 'qps' };
+  }
+
+  if (AMAP_QUOTA_EXHAUSTED_INFOCODES.has(infocode) || /quota|daily|limit|exceed|配额|额度|上限|超限|耗尽/.test(info)) {
+    return { retryable: true, cooldown: 'quota', countAsQuota: true, reason: 'quota' };
   }
 
   return { retryable: false, cooldown: null, countAsQuota: false, reason: 'fatal' };
