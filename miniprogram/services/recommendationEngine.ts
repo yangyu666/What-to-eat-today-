@@ -472,14 +472,14 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
       allowNegativeFallback: true,
-      allowPriceFallback: false
+      allowUnknownPriceFallback: false
     }).passed;
   });
   const primaryHardFiltered = candidateRestaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
       allowNegativeFallback: false,
-      allowPriceFallback: false
+      allowUnknownPriceFallback: false
     }).passed;
   });
   const afterNegativeFilter = primaryHardFiltered.length;
@@ -496,7 +496,8 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: false,
-          allowPriceFallback: (preference?.budgetLevel ?? 3) < 5
+          // 高预算 fallback 只放开价格缺失，明确低价候选仍然硬过滤。
+          allowUnknownPriceFallback: true
         }).passed;
       })
       .map((restaurant) =>
@@ -514,7 +515,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
           allowDistanceFallback: true,
           allowNegativeFallback: true,
-          allowPriceFallback: (preference?.budgetLevel ?? 3) < 5
+          allowUnknownPriceFallback: true
         }).passed;
       })
       .map((restaurant) =>
@@ -681,7 +682,7 @@ export function scoreRestaurant(
     hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), {
       allowDistanceFallback: options.fallbackReason !== undefined,
       allowNegativeFallback: true,
-      allowPriceFallback: true
+      allowUnknownPriceFallback: options.fallbackReason !== undefined
     }).reasons,
     penaltyReasons: [
       ...buildPenaltyReasons(
@@ -707,7 +708,7 @@ export function applyHardFilters(
   restaurant: Restaurant,
   preference: UserPreferenceProfile | undefined,
   excludeRestaurantIds: Set<RestaurantId>,
-  options: { allowDistanceFallback: boolean; allowNegativeFallback: boolean; allowPriceFallback: boolean }
+  options: { allowDistanceFallback: boolean; allowNegativeFallback: boolean; allowUnknownPriceFallback: boolean }
 ): HardFilterResult {
   const reasons: string[] = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
@@ -757,11 +758,11 @@ export function applyHardFilters(
     reasons.push('价格明显超出预算');
   }
 
-  if (!options.allowPriceFallback && isClearlyUnderBudget(restaurant, preference)) {
+  if (isClearlyUnderBudget(restaurant, preference)) {
     reasons.push('price clearly below requested budget');
   }
 
-  if (!options.allowPriceFallback && isPriceUnknownForStrictBudget(restaurant, preference)) {
+  if (!options.allowUnknownPriceFallback && isPriceUnknownForStrictBudget(restaurant, preference)) {
     reasons.push('price unknown for strict high budget');
   }
 

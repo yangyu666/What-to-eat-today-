@@ -529,7 +529,7 @@ function recommendRestaurants(options) {
     fallbackReason = buildDistanceFallbackReason(preference);
     scored = candidateRestaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, !preference || (preference.budgetLevel || 3) < 5).passed
+        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, true).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -543,7 +543,7 @@ function recommendRestaurants(options) {
     fallbackReason = buildNegativeFallbackReason(preference);
     scored = candidateRestaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, !preference || (preference.budgetLevel || 3) < 5).passed
+        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, true).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -690,7 +690,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   };
 }
 
-function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback, allowPriceFallback) {
+function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback, allowUnknownPriceFallback) {
   const reasons = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
@@ -708,8 +708,8 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
     reasons.push(`距离 ${restaurant.distanceMeters} 米，超出 ${preference.maxDistanceMeters} 米偏好`);
   }
   if (isClearlyOverBudget(restaurant, preference)) reasons.push('价格明显超出预算');
-  if (!allowPriceFallback && isClearlyUnderBudget(restaurant, preference)) reasons.push('price clearly below requested budget');
-  if (!allowPriceFallback && isPriceUnknownForStrictBudget(restaurant, preference)) reasons.push('price unknown for strict high budget');
+  if (isClearlyUnderBudget(restaurant, preference)) reasons.push('price clearly below requested budget');
+  if (!allowUnknownPriceFallback && isPriceUnknownForStrictBudget(restaurant, preference)) reasons.push('price unknown for strict high budget');
   if (preference && preference.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) reasons.push('预计耗时明显超出偏好');
   if (!allowNegativeFallback && negativeConflict.severity === 'hard') reasons.push(`命中明确负向偏好：${negativeConflict.labels.join('、')}`);
 

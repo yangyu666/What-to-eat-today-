@@ -321,7 +321,18 @@ const luxuryUnknownOnlyResult = recommend(
     }
   ]
 );
-assert(luxuryUnknownOnlyResult.candidates.length === 0, '200+ budget should not recommend price unknown candidates');
+assert(
+  luxuryUnknownOnlyResult.candidates[0]?.restaurantId === 'luxury-unknown-price',
+  '200+ budget fallback may include price-unknown candidates'
+);
+assert(
+  luxuryUnknownOnlyResult.candidatePoolStats?.fallbackUsed === true,
+  '200+ budget price-unknown fallback should be marked as fallback'
+);
+assert(
+  (luxuryUnknownOnlyResult.candidates[0]?.confidenceScore ?? 100) <= 64,
+  '200+ budget price-unknown fallback should keep confidence capped'
+);
 
 const premiumLowOnlyResult = recommend(
   profile({
