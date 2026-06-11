@@ -302,9 +302,6 @@ function formatDateText(date) {
     }
     return `${date.getMonth() + 1}-${date.getDate()} ${time}`;
 }
-function normalizeIsoDate(value) {
-    return normalizeDateValue(value);
-}
 function normalizeDateValue(value) {
     if (!value) {
         return undefined;
