@@ -16,6 +16,8 @@ const AMAP_FOOD_TYPE = '050000';
 const CACHE_COLLECTION = 'amap_poi_cache';
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_RESTAURANTS = 250;
+const AMAP_QPS_COOLDOWN_MS = 45 * 1000;
+const amapKeyCooldowns = new Map();
 
 const TAG_LABELS = {
   spicy: '辣',
@@ -141,9 +143,9 @@ exports.main = async (event = {}, context = {}) => {
   const requestId = context.requestId || `amap-poi-${Date.now()}`;
 
   try {
-    const key = process.env.AMAP_WEB_SERVICE_KEY || process.env.AMAP_KEY;
+    const keyManager = createAmapKeyManager({ requestId });
 
-    if (!key) {
+    if (keyManager.keyCount === 0) {
       return fail(requestId, 'AMAP_KEY_MISSING', 'AMap WebService key is not configured.');
     }
 
@@ -155,12 +157,18 @@ exports.main = async (event = {}, context = {}) => {
     }
 
     if (event.action === 'reverseGeocode') {
-      const amapResponse = await requestAmapRegeo({ key, latitude, longitude });
+      const amapResponse = await requestAmapRegeoWithKeySwitch({
+        keyManager,
+        latitude,
+        longitude,
+        maxAmapApiCalls: keyManager.keyCount
+      });
 
       if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
         return fail(requestId, 'AMAP_REGEOCODE_FAILED', amapResponse.info || 'AMap reverse geocode failed.', {
           infocode: amapResponse.infocode,
-          status: amapResponse.status
+          status: amapResponse.status,
+          ...keyManager.getMeta()
         });
       }
 
@@ -175,7 +183,8 @@ exports.main = async (event = {}, context = {}) => {
           district: normalizeAmapText(addressComponent && addressComponent.district),
           address: normalizeAmapText(amapResponse.regeocode && amapResponse.regeocode.formatted_address)
         },
-        requestId
+        requestId,
+        meta: keyManager.getMeta()
       };
     }
 
@@ -225,7 +234,8 @@ exports.main = async (event = {}, context = {}) => {
         keyword,
         city,
         adcode,
-        cacheAgeMs: Date.now() - cached.createdAt
+        cacheAgeMs: Date.now() - cached.createdAt,
+        keyMeta: keyManager.getMeta()
       });
 
       return {
@@ -243,6 +253,7 @@ exports.main = async (event = {}, context = {}) => {
           cacheAgeMs: Date.now() - cached.createdAt,
           fetchReason: 'cloud-cache-hit',
           amapApiCallCount: 0,
+          ...keyManager.getMeta(),
           searchMeta
         },
         requestId
@@ -286,7 +297,7 @@ exports.main = async (event = {}, context = {}) => {
     });
 
     const pageResult = await requestAmapPages({
-      key,
+      keyManager,
       mode,
       latitude,
       longitude,
@@ -307,7 +318,8 @@ exports.main = async (event = {}, context = {}) => {
     if (amapResponse.status !== '1' || amapResponse.infocode !== '10000') {
       return fail(requestId, 'AMAP_REQUEST_FAILED', amapResponse.info || 'AMap request failed.', {
         infocode: amapResponse.infocode,
-        status: amapResponse.status
+        status: amapResponse.status,
+        ...pageResult.keyMeta
       });
     }
 
@@ -326,7 +338,8 @@ exports.main = async (event = {}, context = {}) => {
       radiusMeters: radius,
       keyword,
       city,
-      adcode
+      adcode,
+      keyMeta: pageResult.keyMeta
     });
 
     if (restaurants.length > 0 && event.cache !== false) {
@@ -361,6 +374,7 @@ exports.main = async (event = {}, context = {}) => {
         cacheKey,
         fetchReason: `cloud-cache-miss-${mode}-fetch`,
         amapApiCallCount,
+        ...pageResult.keyMeta,
         searchMeta
       },
       requestId
@@ -371,7 +385,7 @@ exports.main = async (event = {}, context = {}) => {
 };
 
 async function requestAmapPages({
-  key,
+  keyManager,
   mode,
   latitude,
   longitude,
@@ -392,9 +406,8 @@ async function requestAmapPages({
   let apiCallCount = 0;
 
   for (let page = 1; page <= pageCount && apiCallCount < maxAmapApiCalls; page += 1) {
-    apiCallCount += 1;
     const response = await requestAmapSearchWithRetry({
-      key,
+      keyManager,
       mode,
       latitude,
       longitude,
@@ -406,13 +419,18 @@ async function requestAmapPages({
       city,
       adcode,
       poiId,
-      types
+      types,
+      getRemainingApiCalls: () => maxAmapApiCalls - apiCallCount,
+      recordApiCall: () => {
+        apiCallCount += 1;
+      }
     });
 
     if (response.status !== '1' || response.infocode !== '10000') {
       return {
         response,
-        apiCallCount
+        apiCallCount,
+        keyMeta: keyManager.getMeta()
       };
     }
 
@@ -438,7 +456,8 @@ async function requestAmapPages({
       ...(mergedResponse || { status: '1', infocode: '10000' }),
       pois
     },
-    apiCallCount
+    apiCallCount,
+    keyMeta: keyManager.getMeta()
   };
 }
 
@@ -554,7 +573,8 @@ function hashString(value) {
 
 // 高德"访问过于频繁 / 并发(QPS)超限"类错误码：这些是瞬时限制（每秒滑动窗口），
 // 短暂退避后重试通常即可成功。不含日配额耗尽(10003)和权限类错误（重试无意义）。
-const AMAP_RETRYABLE_INFOCODES = new Set(['10004', '10019', '10020', '10021', '10022', '10023', '10024', '10025', '10026', '10029']);
+const AMAP_QPS_INFOCODES = new Set(['10004', '10019', '10020', '10021', '10022', '10023', '10024', '10025', '10026', '10029']);
+const AMAP_QUOTA_EXHAUSTED_INFOCODES = new Set(['10003']);
 const AMAP_RETRY_MAX_ATTEMPTS = 3;
 const AMAP_RETRY_BASE_DELAY_MS = 250;
 
@@ -567,32 +587,226 @@ function delay(ms) {
 // 这里让被限流的单个请求自动错开重试，避免推荐因瞬时限流而拿到空结果。
 async function requestAmapSearchWithRetry(params) {
   let response;
+  const maxAttempts = Math.max(AMAP_RETRY_MAX_ATTEMPTS, params.keyManager.keyCount);
 
-  for (let attempt = 0; attempt < AMAP_RETRY_MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < maxAttempts && params.getRemainingApiCalls() > 0; attempt += 1) {
     if (attempt > 0) {
       // 指数退避：250ms、500ms，错开瞬时并发高峰
       await delay(AMAP_RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1));
     }
 
-    response = await requestAmapSearch(params);
+    const keyEntry = params.keyManager.getCurrentKey();
+
+    if (!keyEntry) {
+      return response || { status: '0', infocode: 'AMAP_KEYS_UNAVAILABLE', info: 'No AMap key is available for this request.' };
+    }
+
+    params.recordApiCall();
+
+    try {
+      response = await requestAmapSearch({
+        ...params,
+        key: keyEntry.key
+      });
+    } catch (error) {
+      response = {
+        status: '0',
+        infocode: 'NETWORK_ERROR',
+        info: error && error.message ? error.message : 'AMap network request failed.'
+      };
+    }
     const infocode = response && response.infocode != null ? String(response.infocode) : '';
+    const errorClass = classifyAmapFailure(response);
 
     if (response && response.status === '1') {
       return response;
     }
 
-    if (!AMAP_RETRYABLE_INFOCODES.has(infocode)) {
+    if (!errorClass.retryable) {
       return response; // 非限流类错误（如参数错误）重试无意义，直接返回
     }
 
-    console.warn('AMap request throttled, retrying.', {
+    params.keyManager.markFailure(keyEntry.index, errorClass);
+
+    console.warn('AMap request failed, switching key when available.', {
       infocode,
       info: response && response.info,
-      attempt: attempt + 1
+      attempt: attempt + 1,
+      key: keyEntry.label,
+      reason: errorClass.reason,
+      nextKeyIndex: params.keyManager.peekNextKeyIndex()
     });
   }
 
   return response;
+}
+
+async function requestAmapRegeoWithKeySwitch({ keyManager, latitude, longitude, maxAmapApiCalls }) {
+  let response;
+
+  for (let attempt = 0; attempt < maxAmapApiCalls; attempt += 1) {
+    const keyEntry = keyManager.getCurrentKey();
+
+    if (!keyEntry) {
+      return response || { status: '0', infocode: 'AMAP_KEYS_UNAVAILABLE', info: 'No AMap key is available for this request.' };
+    }
+
+    try {
+      response = await requestAmapRegeo({ key: keyEntry.key, latitude, longitude });
+    } catch (error) {
+      response = {
+        status: '0',
+        infocode: 'NETWORK_ERROR',
+        info: error && error.message ? error.message : 'AMap network request failed.'
+      };
+    }
+
+    if (response && response.status === '1' && response.infocode === '10000') {
+      return response;
+    }
+
+    const errorClass = classifyAmapFailure(response);
+
+    if (!errorClass.retryable) {
+      return response;
+    }
+
+    keyManager.markFailure(keyEntry.index, errorClass);
+  }
+
+  return response;
+}
+
+function parseAmapKeysFromEnv(env = process.env) {
+  const raw =
+    env.AMAP_WEB_SERVICE_KEYS ||
+    env.AMAP_KEYS ||
+    env.AMAP_WEB_SERVICE_KEY ||
+    env.AMAP_KEY ||
+    '';
+
+  return String(raw)
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
+}
+
+function createAmapKeyManager({ env = process.env, requestId = '', now = Date.now } = {}) {
+  const keys = parseAmapKeysFromEnv(env);
+  const requestSalt = requestId || String(now());
+  let currentIndex = keys.length > 0 ? parseInt(hashString(requestSalt), 36) % keys.length : 0;
+  let switchCount = 0;
+  let quotaErrorCount = 0;
+  const exhaustedForRequest = new Set();
+
+  function isAvailable(index) {
+    if (exhaustedForRequest.has(index)) {
+      return false;
+    }
+
+    const cooldownUntil = amapKeyCooldowns.get(keys[index]);
+    return !cooldownUntil || cooldownUntil <= now();
+  }
+
+  function findAvailableIndex(startIndex) {
+    if (keys.length === 0) {
+      return -1;
+    }
+
+    for (let offset = 0; offset < keys.length; offset += 1) {
+      const index = (startIndex + offset) % keys.length;
+
+      if (isAvailable(index)) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  function moveToNextAvailable() {
+    const nextIndex = findAvailableIndex((currentIndex + 1) % keys.length);
+
+    if (nextIndex >= 0 && nextIndex !== currentIndex) {
+      switchCount += 1;
+      currentIndex = nextIndex;
+    }
+
+    return nextIndex;
+  }
+
+  return {
+    get keyCount() {
+      return keys.length;
+    },
+    getCurrentKey() {
+      const availableIndex = findAvailableIndex(currentIndex);
+
+      if (availableIndex < 0) {
+        return null;
+      }
+
+      if (availableIndex !== currentIndex) {
+        switchCount += 1;
+        currentIndex = availableIndex;
+      }
+
+      return {
+        key: keys[currentIndex],
+        index: currentIndex,
+        label: maskAmapKey(keys[currentIndex], currentIndex)
+      };
+    },
+    markFailure(index, errorClass) {
+      if (errorClass.countAsQuota) {
+        quotaErrorCount += 1;
+      }
+
+      if (errorClass.cooldown === 'qps') {
+        amapKeyCooldowns.set(keys[index], now() + AMAP_QPS_COOLDOWN_MS);
+      } else if (errorClass.cooldown === 'quota') {
+        exhaustedForRequest.add(index);
+      }
+
+      moveToNextAvailable();
+    },
+    peekNextKeyIndex() {
+      const nextIndex = findAvailableIndex((currentIndex + 1) % keys.length);
+      return nextIndex >= 0 ? nextIndex + 1 : null;
+    },
+    getMeta() {
+      return {
+        amapKeyIndex: keys.length > 0 ? currentIndex + 1 : null,
+        amapKeyCount: keys.length,
+        amapKeySwitchCount: switchCount,
+        quotaErrorCount
+      };
+    }
+  };
+}
+
+function classifyAmapFailure(response) {
+  const infocode = response && response.infocode != null ? String(response.infocode) : '';
+  const info = String((response && response.info) || '').toLowerCase();
+
+  if (infocode === 'NETWORK_ERROR') {
+    return { retryable: true, cooldown: null, countAsQuota: false, reason: 'network' };
+  }
+
+  if (AMAP_QUOTA_EXHAUSTED_INFOCODES.has(infocode) || /quota|daily|limit|exceed|配额|额度|上限|超限|耗尽/.test(info)) {
+    return { retryable: true, cooldown: 'quota', countAsQuota: true, reason: 'quota' };
+  }
+
+  if (AMAP_QPS_INFOCODES.has(infocode) || /qps|throttle|频繁|并发|繁忙/.test(info)) {
+    return { retryable: true, cooldown: 'qps', countAsQuota: false, reason: 'qps' };
+  }
+
+  return { retryable: false, cooldown: null, countAsQuota: false, reason: 'fatal' };
+}
+
+function maskAmapKey(key, index) {
+  const tail = String(key || '').slice(-4);
+  return tail ? `key#${index + 1}(...${tail})` : `key#${index + 1}`;
 }
 
 function requestAmapSearch({
@@ -899,7 +1113,8 @@ function buildSearchMeta({
   keyword,
   city,
   adcode,
-  cacheAgeMs
+  cacheAgeMs,
+  keyMeta
 }) {
   return {
     mode,
@@ -917,7 +1132,8 @@ function buildSearchMeta({
     keywordCallCount: mode === 'keyword' && !cacheHit ? apiCallCount : 0,
     idCallCount: mode === 'id' && !cacheHit ? apiCallCount : 0,
     cacheHitCount: cacheHit ? 1 : 0,
-    totalAmapApiCallCount: cacheHit ? 0 : apiCallCount
+    totalAmapApiCallCount: cacheHit ? 0 : apiCallCount,
+    ...(keyMeta || {})
   };
 }
 
@@ -1007,3 +1223,11 @@ function fail(requestId, code, message, details) {
     requestId
   };
 }
+
+module.exports = {
+  ...module.exports,
+  classifyAmapFailure,
+  createAmapKeyManager,
+  maskAmapKey,
+  parseAmapKeysFromEnv
+};

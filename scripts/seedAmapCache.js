@@ -12,16 +12,18 @@ const AMAP_PLACE_AROUND_URL = 'https://restapi.amap.com/v3/place/around';
 const AMAP_PLACE_POLYGON_URL = 'https://restapi.amap.com/v3/place/polygon';
 const AMAP_PLACE_TEXT_URL = 'https://restapi.amap.com/v3/place/text';
 const DEFAULT_TYPES = '050000';
+const AMAP_QPS_INFOCODES = new Set(['10004', '10019', '10020', '10021', '10022', '10023', '10024', '10025', '10026', '10029']);
+const AMAP_QUOTA_EXHAUSTED_INFOCODES = new Set(['10003']);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const point = getPointInput(args);
-  const key = process.env.AMAP_WEB_SERVICE_KEY || process.env.AMAP_KEY;
+  const keyManager = createSeedAmapKeyManager();
 
   requirePointForSeed(point);
 
-  if (!key) {
-    throw new Error('AMAP_WEB_SERVICE_KEY or AMAP_KEY is required for seed:amap-cache.');
+  if (keyManager.keyCount === 0) {
+    throw new Error('AMAP_WEB_SERVICE_KEYS, AMAP_KEYS, AMAP_WEB_SERVICE_KEY or AMAP_KEY is required for seed:amap-cache.');
   }
 
   const radius = clampInteger(args.radius, 300, 15000, 5000);
@@ -34,7 +36,7 @@ async function main() {
   const types = typeof args.types === 'string' && args.types.trim() ? args.types.trim() : DEFAULT_TYPES;
   const startedAt = Date.now();
   const result = await fetchAmapSeedPool({
-    key,
+    keyManager,
     latitude: point.latitude,
     longitude: point.longitude,
     radius,
@@ -70,6 +72,7 @@ async function main() {
     types,
     createdAt: new Date().toISOString(),
     amapApiCallCount: result.apiCallCount,
+    amapKeyStats: result.keyStats,
     quotaStats: result.quotaStats,
     restaurants
   };
@@ -86,6 +89,7 @@ async function main() {
         cacheFile,
         restaurants: restaurants.length,
         amapApiCallCount: result.apiCallCount,
+        amapKeyStats: result.keyStats,
         quotaStats: result.quotaStats,
         elapsedMs: Date.now() - startedAt
       },
@@ -132,20 +136,21 @@ async function fetchAmapSeedPool(options) {
 
   quotaStats.totalAmapApiCallCount = apiCallCount;
 
-  return { pois, apiCallCount, quotaStats };
+  return { pois, apiCallCount, quotaStats, keyStats: options.keyManager.getStats() };
 }
 
-async function fetchAmapPages({ key, latitude, longitude, radius, pageSize, pageCount, keyword, city, adcode, mode, types }) {
+async function fetchAmapPages({ keyManager, latitude, longitude, radius, pageSize, pageCount, keyword, city, adcode, mode, types }) {
   const seen = new Set();
   const pois = [];
   let apiCallCount = 0;
 
   for (let page = 1; page <= pageCount; page += 1) {
-    apiCallCount += 1;
-    const response = await requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, city, adcode, mode, types });
+    const result = await requestAmapWithKeySwitch({ keyManager, latitude, longitude, radius, pageSize, page, keyword, city, adcode, mode, types });
+    apiCallCount += result.apiCallCount;
+    const response = result.response;
 
     if (response.status !== '1' || response.infocode !== '10000') {
-      throw new Error(`AMap request failed: ${response.info || response.infocode || response.status}`);
+      throw new Error(`AMap request failed after key switch: ${response.info || response.infocode || response.status}`);
     }
 
     const pagePois = Array.isArray(response.pois) ? response.pois : [];
@@ -165,6 +170,155 @@ async function fetchAmapPages({ key, latitude, longitude, radius, pageSize, page
   }
 
   return { pois, apiCallCount };
+}
+
+async function requestAmapWithKeySwitch(params) {
+  let response;
+  let apiCallCount = 0;
+  const maxAttempts = Math.max(1, params.keyManager.keyCount);
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const keyEntry = params.keyManager.getCurrentKey();
+
+    if (!keyEntry) {
+      return {
+        response: response || { status: '0', infocode: 'AMAP_KEYS_UNAVAILABLE', info: 'No AMap key is available for this request.' },
+        apiCallCount
+      };
+    }
+
+    apiCallCount += 1;
+
+    try {
+      response = await requestAmap({ ...params, key: keyEntry.key });
+    } catch (error) {
+      response = {
+        status: '0',
+        infocode: 'NETWORK_ERROR',
+        info: error && error.message ? error.message : 'AMap network request failed.'
+      };
+    }
+
+    if (response.status === '1' && response.infocode === '10000') {
+      return { response, apiCallCount };
+    }
+
+    const errorClass = classifyAmapFailure(response);
+
+    if (!errorClass.retryable) {
+      return { response, apiCallCount };
+    }
+
+    params.keyManager.markFailure(keyEntry.index, errorClass);
+    console.warn(`AMap seed request failed on ${keyEntry.label}; trying next key when available. infocode=${response.infocode || ''}`);
+  }
+
+  return { response, apiCallCount };
+}
+
+function parseAmapKeysFromEnv(env = process.env) {
+  const raw =
+    env.AMAP_WEB_SERVICE_KEYS ||
+    env.AMAP_KEYS ||
+    env.AMAP_WEB_SERVICE_KEY ||
+    env.AMAP_KEY ||
+    '';
+
+  return String(raw)
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
+}
+
+function createSeedAmapKeyManager({ env = process.env } = {}) {
+  const keys = parseAmapKeysFromEnv(env);
+  let currentIndex = 0;
+  let switchCount = 0;
+  let quotaErrorCount = 0;
+  const exhaustedForRun = new Set();
+
+  function findAvailableIndex(startIndex) {
+    for (let offset = 0; offset < keys.length; offset += 1) {
+      const index = (startIndex + offset) % keys.length;
+
+      if (!exhaustedForRun.has(index)) {
+        return index;
+      }
+    }
+
+    return -1;
+  }
+
+  function moveToNextAvailable() {
+    const nextIndex = findAvailableIndex((currentIndex + 1) % keys.length);
+
+    if (nextIndex >= 0 && nextIndex !== currentIndex) {
+      switchCount += 1;
+      currentIndex = nextIndex;
+    }
+  }
+
+  return {
+    get keyCount() {
+      return keys.length;
+    },
+    getCurrentKey() {
+      const availableIndex = findAvailableIndex(currentIndex);
+
+      if (availableIndex < 0) {
+        return null;
+      }
+
+      if (availableIndex !== currentIndex) {
+        switchCount += 1;
+        currentIndex = availableIndex;
+      }
+
+      return {
+        key: keys[currentIndex],
+        index: currentIndex,
+        label: `key#${currentIndex + 1}`
+      };
+    },
+    markFailure(index, errorClass) {
+      if (errorClass.countAsQuota) {
+        quotaErrorCount += 1;
+      }
+
+      if (errorClass.cooldown === 'quota') {
+        exhaustedForRun.add(index);
+      }
+
+      moveToNextAvailable();
+    },
+    getStats() {
+      return {
+        amapKeyIndex: keys.length > 0 ? currentIndex + 1 : null,
+        amapKeyCount: keys.length,
+        amapKeySwitchCount: switchCount,
+        quotaErrorCount
+      };
+    }
+  };
+}
+
+function classifyAmapFailure(response) {
+  const infocode = response && response.infocode != null ? String(response.infocode) : '';
+  const info = String((response && response.info) || '').toLowerCase();
+
+  if (infocode === 'NETWORK_ERROR') {
+    return { retryable: true, cooldown: null, countAsQuota: false, reason: 'network' };
+  }
+
+  if (AMAP_QUOTA_EXHAUSTED_INFOCODES.has(infocode) || /quota|daily|limit|exceed|配额|额度|上限|超限|耗尽/.test(info)) {
+    return { retryable: true, cooldown: 'quota', countAsQuota: true, reason: 'quota' };
+  }
+
+  if (AMAP_QPS_INFOCODES.has(infocode) || /qps|throttle|频繁|并发|繁忙/.test(info)) {
+    return { retryable: true, cooldown: 'qps', countAsQuota: false, reason: 'qps' };
+  }
+
+  return { retryable: false, cooldown: null, countAsQuota: false, reason: 'fatal' };
 }
 
 function requestAmap({ key, latitude, longitude, radius, pageSize, page, keyword, city, adcode, mode, types }) {
@@ -554,6 +708,9 @@ if (require.main === module) {
 // 导出转换逻辑供 seedAmapRichPool 等脚本复用（仅新增导出，不改变直接运行行为）。
 module.exports = {
   convertPoiToRestaurant,
+  createSeedAmapKeyManager,
+  classifyAmapFailure,
   inferTagIdsFromText,
-  isNonRestaurantSalesPoi
+  isNonRestaurantSalesPoi,
+  parseAmapKeysFromEnv
 };

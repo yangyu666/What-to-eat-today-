@@ -20,7 +20,17 @@
 - 出参：`ApiResponse<{ restaurants, location }>`
 - 职责：调用高德 WebService POI，返回附近餐厅候选。
 - 数据库：不写库。
-- 上线配置：必须在云函数环境变量里配置 `AMAP_WEB_SERVICE_KEY` 或 `AMAP_KEY`。
+- 上线配置：必须在云函数环境变量里配置 `AMAP_WEB_SERVICE_KEYS` / `AMAP_KEYS` / `AMAP_WEB_SERVICE_KEY` / `AMAP_KEY` 之一。
+
+#### AMap key configuration
+
+- Configure AMap WebService keys only in cloud function environment variables, or in a local temporary shell environment when running seed scripts. Do not commit real keys to code, README examples, issue comments, chat records, screenshots, or logs.
+- Single-key compatibility is preserved: set `AMAP_WEB_SERVICE_KEY` or `AMAP_KEY`.
+- Multi-key mode uses comma-separated values: set `AMAP_WEB_SERVICE_KEYS` or `AMAP_KEYS`, for example `AMAP_WEB_SERVICE_KEYS=key1,key2,key3` with placeholder values only.
+- Priority is `AMAP_WEB_SERVICE_KEYS` > `AMAP_KEYS` > `AMAP_WEB_SERVICE_KEY` > `AMAP_KEY`.
+- The function returns only key metadata such as `amapKeyIndex`, `amapKeyCount`, `amapKeySwitchCount`, and `quotaErrorCount`; it must never return or log the real key.
+- Multi-key mode is for legal quota pooling, QPS sharing, and failover among keys you own. It does not replace the cloud cache, mini program session cache, or explicit seed workflow.
+- In the WeChat CloudBase console, open the deployed `amapPoi` cloud function, edit Environment Variables, add `AMAP_WEB_SERVICE_KEYS`, paste your owned WebService keys separated by English commas, save, and redeploy/restart the function instance if the console requires it.
 
 #### AMap quota and POI cache
 
@@ -32,11 +42,11 @@
 - Cache key dimensions include rounded location bucket, search `mode`, radius bucket, `types`, normalized `keyword`, `city/adcode`, polygon hash, POI id, and page profile.
 - Cache TTL is 1 hour in the cloud function. A single cached candidate pool stores at most 250 normalized restaurant records and never stores the raw AMap response.
 - The mini program also keeps a session/storage cache under `nearby_restaurants_amap_cache`; recommendation flows prefer that cache before calling `amapPoi`.
-- POI response meta includes `poiFetchMode`, `poiCacheHit`, `poiCacheKey`, `poiFetchReason`, `aroundCallCount`, `polygonCallCount`, `keywordCallCount`, `idCallCount`, `cacheHitCount`, `totalAmapApiCallCount`, and `quotaBucket`.
-- Stress testing is cache-first by default. `npm.cmd run stress:recommendation` reads `.cache/amap-poi/*.json` and makes 0 live AMap calls unless `ALLOW_LIVE_AMAP_STRESS=1` and `--live` are explicitly set.
+- POI response meta includes `poiFetchMode`, `poiCacheHit`, `poiCacheKey`, `poiFetchReason`, `aroundCallCount`, `polygonCallCount`, `keywordCallCount`, `idCallCount`, `cacheHitCount`, `totalAmapApiCallCount`, `quotaBucket`, `amapKeyIndex`, `amapKeyCount`, `amapKeySwitchCount`, and `quotaErrorCount`.
+- Stress testing is cache-first only. `npm.cmd run stress:recommendation` reads `.cache/amap-poi/*.json`; when the cache file is missing it requires an explicit seed run and still does not make live AMap calls.
 - Seed examples:
-  - `npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000`
-  - `npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000 --modes polygon,keyword --keyword coffee --city Beijing`
+  - `set AMAP_WEB_SERVICE_KEYS=key1,key2 && npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000`
+  - `set AMAP_WEB_SERVICE_KEYS=key1,key2 && npm.cmd run seed:amap-cache -- --label test-point-1 --lat 39.909 --lng 116.455 --radius 15000 --modes polygon,keyword --keyword coffee --city Beijing`
 
 ### `saveRecommendationHistory`
 
@@ -164,7 +174,7 @@ Purpose: quota optimization cache for AMap POI candidate pools. It is created by
 1. 部署云函数：`setupDatabase`、`amapPoi`、`saveRecommendationHistory`、`listHistory`、`syncUserProfile`。
 2. 在微信开发者工具里测试调用 `setupDatabase`，创建 `users`、`recommendation_history`。
 3. 保留部署：`recommendRestaurant`。
-4. 给 `amapPoi` 配置环境变量：`AMAP_WEB_SERVICE_KEY` 或 `AMAP_KEY`。
+4. 给 `amapPoi` 配置环境变量：`AMAP_WEB_SERVICE_KEYS` / `AMAP_KEYS` / `AMAP_WEB_SERVICE_KEY` / `AMAP_KEY` 之一。
 5. 配置集合权限，禁止全量公开读写。
 6. 配置索引：`recommendation_history` 的 `_openid + createdAt`、`_openid + action + createdAt`。
 7. 真机验证头像昵称同步、推荐历史保存、历史页读取。

@@ -68,18 +68,10 @@ function validateStressCachePolicy({ cacheFileExists, allowLive, liveRequested }
     };
   }
 
-  if (allowLive && liveRequested) {
-    return {
-      ok: true,
-      mayCallAmap: true,
-      reason: 'explicit-live-stress'
-    };
-  }
-
   return {
     ok: false,
     mayCallAmap: false,
-    reason: 'cache-file-missing'
+    reason: allowLive && liveRequested ? 'live-stress-disabled-seed-required' : 'cache-file-missing'
   };
 }
 

@@ -16,7 +16,7 @@ const fs = require('fs');
 const https = require('https');
 const path = require('path');
 const { parseArgs, getPointInput, buildCacheFilePath, requirePointForSeed } = require('./amapStressUtils');
-const { convertPoiToRestaurant } = require('./seedAmapCache');
+const { convertPoiToRestaurant, createSeedAmapKeyManager, classifyAmapFailure } = require('./seedAmapCache');
 
 const AMAP_PLACE_POLYGON_URL = 'https://restapi.amap.com/v3/place/polygon';
 const DEFAULT_TYPES = '050000'; // 餐饮服务大类：含中餐/外国/快餐/咖啡/茶/冷饮/糕饼/甜品等全部子类
@@ -45,9 +45,9 @@ async function main() {
     return;
   }
 
-  const key = process.env.AMAP_WEB_SERVICE_KEY || process.env.AMAP_KEY;
-  if (!key) {
-    throw new Error('AMAP_WEB_SERVICE_KEY or AMAP_KEY is required. 只看方案请加 --plan。');
+  const keyManager = createSeedAmapKeyManager();
+  if (keyManager.keyCount === 0) {
+    throw new Error('AMAP_WEB_SERVICE_KEYS, AMAP_KEYS, AMAP_WEB_SERVICE_KEY or AMAP_KEY is required. Use --plan to preview without live AMap calls.');
   }
 
   const pool = new Map();
@@ -67,21 +67,34 @@ async function main() {
       await throttle();
       let res;
       try {
-        res = await requestPolygon({ key, polygon: cell.polygon, types, page });
+        const requestResult = await requestPolygonWithKeySwitch({
+          keyManager,
+          polygon: cell.polygon,
+          types,
+          page,
+          maxApiCalls: maxApiCalls - apiCalls
+        });
+        res = requestResult.response;
+        apiCalls += requestResult.apiCallCount;
       } catch (error) {
         console.warn(`  网络错误 cell#${index} page${page}: ${error.message}`);
         continue;
       }
-      apiCalls += 1;
-
       if (res.status !== '1' || res.infocode !== '10000') {
         if (RETRYABLE_INFOCODES.has(res.infocode)) {
           console.warn(`  限流/繁忙(${res.infocode})，退避 1.2s 重试一次…`);
           await sleep(1200);
           await throttle();
           try {
-            res = await requestPolygon({ key, polygon: cell.polygon, types, page });
-            apiCalls += 1;
+            const retryResult = await requestPolygonWithKeySwitch({
+              keyManager,
+              polygon: cell.polygon,
+              types,
+              page,
+              maxApiCalls: maxApiCalls - apiCalls
+            });
+            res = retryResult.response;
+            apiCalls += retryResult.apiCallCount;
           } catch (error) {
             continue;
           }
@@ -128,6 +141,7 @@ async function main() {
     types,
     createdAt: new Date().toISOString(),
     amapApiCallCount: apiCalls,
+    amapKeyStats: keyManager.getStats(),
     quotaStats: {
       aroundCallCount: 0,
       polygonCallCount: apiCalls,
@@ -147,6 +161,7 @@ async function main() {
         cacheFile,
         restaurants: restaurants.length,
         amapApiCallCount: apiCalls,
+        amapKeyStats: keyManager.getStats(),
         efficiencyPerCall: apiCalls ? Number((restaurants.length / apiCalls).toFixed(1)) : 0,
         stoppedBy: stopped || 'completed',
         elapsedMs: Date.now() - startedAt
@@ -195,6 +210,57 @@ function printPlan(p) {
     `  AMAP_KEY=*** node scripts/seedAmapRichPool.js --label ${p.point.label || '<label>'} --lat ${p.point.latitude} --lng ${p.point.longitude} --radius ${p.radius} --grid ${p.grid} --maxApiCalls ${p.maxApiCalls}`
   ];
   console.log(lines.join('\n'));
+}
+
+async function requestPolygonWithKeySwitch(params) {
+  let response;
+  let apiCallCount = 0;
+  const maxAttempts = Math.min(Math.max(1, params.keyManager.keyCount), Math.max(0, params.maxApiCalls || 0));
+
+  if (maxAttempts <= 0) {
+    return {
+      response: { status: '0', infocode: 'AMAP_LIVE_REQUEST_LIMIT', info: 'Seed AMap API call budget is exhausted.' },
+      apiCallCount
+    };
+  }
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const keyEntry = params.keyManager.getCurrentKey();
+
+    if (!keyEntry) {
+      return {
+        response: response || { status: '0', infocode: 'AMAP_KEYS_UNAVAILABLE', info: 'No AMap key is available for this request.' },
+        apiCallCount
+      };
+    }
+
+    apiCallCount += 1;
+
+    try {
+      response = await requestPolygon({ key: keyEntry.key, polygon: params.polygon, types: params.types, page: params.page });
+    } catch (error) {
+      response = {
+        status: '0',
+        infocode: 'NETWORK_ERROR',
+        info: error && error.message ? error.message : 'AMap network request failed.'
+      };
+    }
+
+    if (response.status === '1' && response.infocode === '10000') {
+      return { response, apiCallCount };
+    }
+
+    const errorClass = classifyAmapFailure(response);
+
+    if (!errorClass.retryable) {
+      return { response, apiCallCount };
+    }
+
+    params.keyManager.markFailure(keyEntry.index, errorClass);
+    console.warn(`  AMap rich seed failed on ${keyEntry.label}; trying next key when available. infocode=${response.infocode || ''}`);
+  }
+
+  return { response, apiCallCount };
 }
 
 function requestPolygon({ key, polygon, types, page }) {
