@@ -143,6 +143,7 @@ const DEFAULT_FETCH_PROFILE = 'default';
 const PREFETCH_FETCH_PROFILE = 'prefetch-broad-food';
 const CACHE_KEY = 'nearby_restaurants_amap_cache';
 export const POI_CACHE_TTL_MS = 45 * 60 * 1000;
+export const POI_STALE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 export const POI_CACHE_LOCATION_TOLERANCE_METERS = 2000;
 export const POI_CACHE_MAX_RESTAURANTS = 1000;
 const MAX_CACHE_ENTRIES = 8;
@@ -223,20 +224,55 @@ export async function getNearbyRestaurantsWithMeta(
     maxAmapApiCalls: options.maxAmapApiCalls
   });
 
-  const fetched = await fetchNearbyRestaurantsFromCloud(location, {
-    mode: request.mode,
-    radiusMeters: request.radiusMeters,
-    pageSize: request.pageSize,
-    pageCount: request.pageCount,
-    keyword: request.keyword,
-    city: request.city,
-    adcode: request.adcode,
-    polygon: request.polygon,
-    id: request.id,
-    types: request.types,
-    fetchReason: options.fetchReason,
-    maxAmapApiCalls: options.maxAmapApiCalls
-  });
+  let fetched: { restaurants: Restaurant[]; meta?: Partial<PoiFetchMeta> };
+
+  try {
+    fetched = await fetchNearbyRestaurantsFromCloud(location, {
+      mode: request.mode,
+      radiusMeters: request.radiusMeters,
+      pageSize: request.pageSize,
+      pageCount: request.pageCount,
+      keyword: request.keyword,
+      city: request.city,
+      adcode: request.adcode,
+      polygon: request.polygon,
+      id: request.id,
+      types: request.types,
+      fetchReason: options.fetchReason,
+      maxAmapApiCalls: options.maxAmapApiCalls
+    });
+  } catch (error) {
+    const staleCached = isAmapQuotaError(error) ? readNearbyRestaurantsCache(request, { allowStale: true }) : undefined;
+
+    if (staleCached) {
+      console.warn('AMap quota exhausted; using stale local POI cache.', {
+        cacheKey: staleCached.entry.key,
+        ageMs: staleCached.ageMs,
+        reason: options.fetchReason
+      });
+
+      return {
+        restaurants: staleCached.restaurants,
+        meta: {
+          poiCacheHit: true,
+          poiCacheKey: staleCached.entry.key,
+          poiCacheAgeMs: staleCached.ageMs,
+          poiFetchReason: `stale-cache-hit-after-quota:${staleCached.reason}`,
+          amapApiCallCount: 0,
+          poiFetchMode: request.mode,
+          aroundCallCount: 0,
+          polygonCallCount: 0,
+          keywordCallCount: 0,
+          idCallCount: 0,
+          cacheHitCount: 1,
+          totalAmapApiCallCount: 0,
+          quotaBucket: request.quotaBucket
+        }
+      };
+    }
+
+    throw error;
+  }
   const restaurants = normalizeRestaurantsForCache(fetched.restaurants);
   const liveMeta = normalizeLivePoiFetchMeta(request, fetched.meta, options.fetchReason);
 
@@ -502,14 +538,18 @@ async function fetchNearbyRestaurantsFromCloud(
   };
 }
 
-function readNearbyRestaurantsCache(request: PoiCacheRequest): CacheLookupResult | undefined {
+function readNearbyRestaurantsCache(
+  request: PoiCacheRequest,
+  options: { allowStale?: boolean } = {}
+): CacheLookupResult | undefined {
   const store = getNearbyRestaurantsCacheStore();
   const now = Date.now();
+  const maxAgeMs = options.allowStale ? POI_STALE_CACHE_TTL_MS : POI_CACHE_TTL_MS;
   const candidates = store.entries
     .map((entry) => {
       const ageMs = now - entry.createdAt;
 
-      if (ageMs > POI_CACHE_TTL_MS) {
+      if (ageMs > maxAgeMs) {
         return undefined;
       }
 
@@ -550,7 +590,9 @@ function readNearbyRestaurantsCache(request: PoiCacheRequest): CacheLookupResult
         entry,
         restaurants: restaurants.length > 0 ? restaurants : entry.restaurants,
         ageMs,
-        reason: getCacheHitReason(modeCoverage.mode, keywordCoverage.mode)
+        reason: options.allowStale
+          ? `stale-${getCacheHitReason(modeCoverage.mode, keywordCoverage.mode)}`
+          : getCacheHitReason(modeCoverage.mode, keywordCoverage.mode)
       };
     })
     .filter((item): item is CacheLookupResult => Boolean(item))
@@ -567,6 +609,13 @@ function readNearbyRestaurantsCache(request: PoiCacheRequest): CacheLookupResult
     });
 
   return candidates[0];
+}
+
+function isAmapQuotaError(error: unknown): boolean {
+  const payload = error as { message?: string; code?: string; details?: unknown } | undefined;
+  const text = `${payload?.message ?? ''} ${payload?.code ?? ''} ${JSON.stringify(payload?.details ?? {})}`;
+
+  return /AMAP_DAILY_QUOTA_EXHAUSTED|USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(text);
 }
 
 function writeNearbyRestaurantsCache(entry: CachedNearbyRestaurantsEntry) {

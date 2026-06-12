@@ -84,6 +84,24 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         catch (error) {
             console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
             if (isAmapDailyQuotaError(error)) {
+                if (restaurantPool.size > 0) {
+                    metaList.push({
+                        poiCacheHit: false,
+                        poiCacheKey: '',
+                        poiCacheAgeMs: 0,
+                        poiFetchReason: 'amap-quota-exhausted-after-partial-pool',
+                        amapApiCallCount: 0,
+                        poiFetchMode: attempt.mode,
+                        aroundCallCount: 0,
+                        polygonCallCount: 0,
+                        keywordCallCount: 0,
+                        idCallCount: 0,
+                        cacheHitCount: 0,
+                        totalAmapApiCallCount: 0,
+                        quotaBucket: ''
+                    });
+                    break;
+                }
                 throw new Error('AMAP_DAILY_QUOTA_EXHAUSTED');
             }
             meta = {
