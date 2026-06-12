@@ -140,14 +140,15 @@ Page({
         }
         catch (error) {
             console.error('Failed to load recommendation.', error);
+            const errorText = getRecommendationErrorText(error);
             this.setData({
                 loading: false,
                 candidates: [],
                 recommendation: null,
-                errorText: '推荐加载失败，请稍后重试'
+                errorText
             });
             wx.showToast({
-                title: '推荐加载失败',
+                title: isAmapQuotaError(error) ? '附近餐厅暂时不可用' : '推荐加载失败',
                 icon: 'none'
             });
         }
@@ -390,6 +391,16 @@ function getStableCoverImageUrl(recommendation) {
 }
 function normalizeImageUrl(url) {
     return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : '';
+}
+function getRecommendationErrorText(error) {
+    if (isAmapQuotaError(error)) {
+        return '今天附近餐厅数据暂时获取不到，请稍后再试。';
+    }
+    return '推荐加载失败，请稍后重试';
+}
+function isAmapQuotaError(error) {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /AMAP_DAILY_QUOTA_EXHAUSTED|USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(message);
 }
 function getFallbackCoverImageUrl(recommendation) {
     if (!recommendation) {

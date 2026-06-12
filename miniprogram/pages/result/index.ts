@@ -171,7 +171,7 @@ Page({
         errorText
       });
       wx.showToast({
-        title: isAmapQuotaError(error) ? '高德额度已满' : '推荐加载失败',
+        title: isAmapQuotaError(error) ? '附近餐厅暂时不可用' : '推荐加载失败',
         icon: 'none'
       });
     }
@@ -485,7 +485,7 @@ function normalizeImageUrl(url: string | undefined): string {
 
 function getRecommendationErrorText(error: unknown): string {
   if (isAmapQuotaError(error)) {
-    return '高德今日搜索额度已用完，暂时无法获取附近真实餐厅。请稍后再试，或更换可用的高德 WebService Key。';
+    return '今天附近餐厅数据暂时获取不到，请稍后再试。';
   }
 
   return '推荐加载失败，请稍后重试';
