@@ -179,7 +179,9 @@ function filterHistory(history: MealHistoryItem[], filter: HistoryFilter): MealH
     return history.filter((item) => item.action === 'accepted');
   }
 
-  return [...history].sort((left, right) => getActionPriority(left.action) - getActionPriority(right.action));
+  return history
+    .filter((item) => item.action !== 'shown')
+    .sort((left, right) => getActionPriority(left.action) - getActionPriority(right.action));
 }
 
 function getActionPriority(action?: RecommendationAction): number {

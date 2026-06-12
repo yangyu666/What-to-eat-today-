@@ -1,7 +1,7 @@
 <view class="page history-page">
   <view class="section-heading">
     <text class="section-title">吃饭记录</text>
-    <text class="muted">记录最近展示、跳过和采纳的推荐。</text>
+    <text class="muted">记录最近跳过和采纳的推荐。</text>
   </view>
 
   <view class="filter-tabs">
