@@ -5,6 +5,7 @@ import { getNearbyRestaurantsWithMeta } from './amapPoiService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
 const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
+const MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
 const MIN_PREMIUM_POOL_BEFORE_FALLBACK = 6;
@@ -63,6 +64,10 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
                 continue;
             }
         }
+        const attemptAmapBudget = getAttemptAmapBudget(attempt, remainingAmapApiCalls);
+        if (!attempt.cacheOnly && attemptAmapBudget <= 0) {
+            break;
+        }
         let restaurants = [];
         let meta;
         try {
@@ -78,7 +83,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
                 fetchProfile: 'recommendation',
                 fetchReason: attempt.reason,
                 cacheOnly: attempt.cacheOnly === true,
-                maxAmapApiCalls: Math.min(1, remainingAmapApiCalls)
+                maxAmapApiCalls: attemptAmapBudget
             });
             restaurants = result.restaurants.map((restaurant) => normalizeRestaurantShape(restaurant));
             meta = normalizePoiFetchMeta(result.meta, attempt.mode);
@@ -88,7 +93,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
             if (isAmapDailyQuotaError(error)) {
                 quotaErrorSeen = true;
                 if (!attempt.cacheOnly) {
-                    remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - 1);
+                    remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - attemptAmapBudget);
                     remainingAroundCalls = Math.max(0, remainingAroundCalls - (attempt.mode === 'around' ? 1 : 0));
                 }
                 metaList.push({
@@ -129,7 +134,8 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         }
         metaList.push(meta);
         remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - meta.amapApiCallCount);
-        remainingAroundCalls = Math.max(0, remainingAroundCalls - (meta.aroundCallCount ?? (attempt.mode === 'around' ? meta.amapApiCallCount : 0)));
+        const aroundAttemptUsed = attempt.mode === 'around' && (meta.amapApiCallCount > 0 || meta.aroundCallCount > 0) ? 1 : 0;
+        remainingAroundCalls = Math.max(0, remainingAroundCalls - aroundAttemptUsed);
         if (restaurants.length === 0) {
             if (!attempt.cacheOnly && remainingAmapApiCalls <= 0) {
                 console.warn('AMap POI recommendation live request budget exhausted.', {
@@ -161,6 +167,12 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         ...candidate,
         ...poiMeta
     }));
+}
+function getAttemptAmapBudget(attempt, remainingAmapApiCalls) {
+    if (attempt.cacheOnly) {
+        return 0;
+    }
+    return Math.max(0, Math.min(MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST, remainingAmapApiCalls));
 }
 function isAmapDailyQuotaError(error) {
     const payload = (error || {});

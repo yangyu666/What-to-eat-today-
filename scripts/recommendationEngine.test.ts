@@ -2415,6 +2415,7 @@ async function runPoiCacheAndStressTests() {
 
   __resetNearbyRestaurantCacheForTest();
   const quotaRecoveryRequestedModes: string[] = [];
+  const quotaRecoveryMaxAmapCalls: number[] = [];
   __setAmapPoiStorageAdapterForTest({
     get: () => undefined,
     set: () => undefined
@@ -2423,6 +2424,7 @@ async function runPoiCacheAndStressTests() {
   __setAmapPoiCloudFetcherForTest(async (_location, options) => {
     const mode = options.mode ?? 'polygon';
     quotaRecoveryRequestedModes.push(mode);
+    quotaRecoveryMaxAmapCalls.push(options.maxAmapApiCalls ?? 0);
 
     if (quotaRecoveryRequestedModes.length === 1) {
       throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
@@ -2462,13 +2464,17 @@ async function runPoiCacheAndStressTests() {
   );
   assert(quotaRecoveryRequestedModes[0] === 'polygon', 'quota recovery should fail from the primary polygon fetch first');
   assert(
+    quotaRecoveryMaxAmapCalls[0] >= 2,
+    'primary recommendation POI request should reserve enough budget for AMap key switching'
+  );
+  assert(
     quotaRecoveryRequestedModes[1] === 'polygon' || quotaRecoveryRequestedModes[1] === 'around' || quotaRecoveryRequestedModes[1] === 'keyword',
     'quota recovery should switch to another polygon, around, or scoped keyword fallback'
   );
   assert(quotaRecoveredRecommendations.length > 0, 'quota recovery fallback should still return restaurant recommendations');
 
   __resetNearbyRestaurantCacheForTest();
-  const midHighBudgetQuotaAttempts: Array<{ mode: string; keyword: string }> = [];
+  const midHighBudgetQuotaAttempts: Array<{ mode: string; keyword: string; maxAmapApiCalls: number }> = [];
   __setAmapPoiStorageAdapterForTest({
     get: () => undefined,
     set: () => undefined
@@ -2477,7 +2483,8 @@ async function runPoiCacheAndStressTests() {
   __setAmapPoiCloudFetcherForTest(async (_location, options) => {
     midHighBudgetQuotaAttempts.push({
       mode: options.mode ?? 'polygon',
-      keyword: options.keyword ?? ''
+      keyword: options.keyword ?? '',
+      maxAmapApiCalls: options.maxAmapApiCalls ?? 0
     });
     throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
   });
@@ -2514,19 +2521,25 @@ async function runPoiCacheAndStressTests() {
     '100-200 brand path should use concrete mid-high meal keywords before generic mall keywords'
   );
   assert(
-    midHighBudgetQuotaAttempts.some((attempt) => attempt.mode === 'polygon' && attempt.keyword === ''),
-    '100-200 brand path should try a broad polygon fallback before around-only fallback'
+    midHighBudgetQuotaAttempts.reduce((sum, attempt) => sum + attempt.maxAmapApiCalls, 0) === 3,
+    '100-200 brand path should spend the bounded AMap key retry budget before surfacing quota failure'
+  );
+  assert(
+    midHighBudgetQuotaAttempts.every((attempt) => attempt.mode !== 'around'),
+    '100-200 brand path should not jump to around while polygon key-retry budget is being exhausted'
   );
 
   __resetNearbyRestaurantCacheForTest();
   let quotaFailureCallCount = 0;
+  let quotaFailurePlannedAmapBudget = 0;
   __setAmapPoiStorageAdapterForTest({
     get: () => undefined,
     set: () => undefined
   });
   __setAmapPoiLocationProviderForTest(async () => baseLocation);
-  __setAmapPoiCloudFetcherForTest(async () => {
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
     quotaFailureCallCount += 1;
+    quotaFailurePlannedAmapBudget += options.maxAmapApiCalls ?? 0;
     throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
   });
 
@@ -2550,7 +2563,8 @@ async function runPoiCacheAndStressTests() {
     quotaErrorMessage = error instanceof Error ? error.message : String(error);
   }
   assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'quota exhaustion should surface only after fallback searches are also unavailable');
-  assert(quotaFailureCallCount === 3, 'quota exhaustion should spend the bounded recommendation budget, not stop after the first mode or loop indefinitely');
+  assert(quotaFailureCallCount === 2, 'quota exhaustion should use bounded logical POI attempts while leaving room for key retry inside each attempt');
+  assert(quotaFailurePlannedAmapBudget === 3, 'quota exhaustion should spend the bounded recommendation AMap budget, not stop after the first key or loop indefinitely');
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({
