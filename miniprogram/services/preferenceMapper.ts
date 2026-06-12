@@ -129,8 +129,8 @@ function applyLegacyAnswer(draft: MutablePreferenceProfile, answer: UserPreferen
     if (answer.value === 500 || answer.value === 1000) {
       draft.maxDistanceMeters = answer.value;
     } else if (answer.value === 'any') {
-      draft.maxDistanceMeters = 5000;
-      draft.maxEstimatedMinutes = 90;
+      draft.maxDistanceMeters = 10000;
+      draft.maxEstimatedMinutes = 120;
     }
   }
 

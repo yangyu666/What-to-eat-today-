@@ -334,6 +334,28 @@ assert(
   '200+ budget price-unknown fallback should keep confidence capped'
 );
 
+const luxuryWeakUnknownOnlyResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'slow', 'group'],
+    budgetLevel: 6,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'luxury-weak-unknown-price',
+      name: 'ordinary restaurant without price',
+      tags: ['restaurant'],
+      tagIds: ['meal'],
+      category: 'restaurant',
+      distanceMeters: 120,
+      openStatus: 'open',
+      rating: 4.1,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryWeakUnknownOnlyResult.candidates.length === 0, '200+ fallback should not use weak unknown-price ordinary restaurants');
+
 const premiumLowOnlyResult = recommend(
   profile({
     preferredTagIds: ['relaxed', 'group'],
@@ -356,6 +378,73 @@ const premiumLowOnlyResult = recommend(
   ]
 );
 assert(premiumLowOnlyResult.candidates.length === 0, '100-200 budget should not recommend dozens-yuan restaurants');
+
+const premiumNearBudgetFallbackResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'group', 'meal'],
+    budgetLevel: 5,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'premium-near-budget',
+      name: 'near budget bistro',
+      tags: ['bistro'],
+      tagIds: ['meal', 'relaxed'],
+      category: 'restaurant',
+      distanceMeters: 120,
+      averageCostYuan: 88,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    }
+  ]
+);
+assert(premiumNearBudgetFallbackResult.candidates[0]?.restaurantId === 'premium-near-budget', '100-200 budget may use 80-99 yuan restaurants only as fallback');
+assert(premiumNearBudgetFallbackResult.candidatePoolStats?.fallbackUsed === true, '100-200 near-budget supplement should be marked as fallback');
+assert(
+  (premiumNearBudgetFallbackResult.candidates[0]?.confidenceScore ?? 100) <= 64,
+  '100-200 near-budget fallback should not show high confidence'
+);
+assert(
+  Boolean(premiumNearBudgetFallbackResult.candidates[0]?.reason.includes('近预算补位')),
+  '100-200 near-budget fallback should explain the price mismatch'
+);
+
+const premiumInRangeBeatsNearBudgetResult = recommend(
+  profile({
+    preferredTagIds: ['relaxed', 'group', 'meal'],
+    budgetLevel: 5,
+    maxDistanceMeters: 1000
+  }),
+  [
+    {
+      id: 'premium-near-budget-with-real',
+      name: 'near budget bistro again',
+      tags: ['bistro'],
+      tagIds: ['meal', 'relaxed'],
+      category: 'restaurant',
+      distanceMeters: 120,
+      averageCostYuan: 92,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    },
+    {
+      id: 'premium-real-range',
+      name: 'real 100-200 restaurant',
+      tags: ['restaurant'],
+      tagIds: ['meal', 'relaxed'],
+      category: 'restaurant',
+      distanceMeters: 500,
+      averageCostYuan: 128,
+      openStatus: 'open',
+      rating: 4.2,
+      status: 'active'
+    }
+  ]
+);
+assert(premiumInRangeBeatsNearBudgetResult.candidates[0]?.restaurantId === 'premium-real-range', '100-200 true in-range candidates should outrank 80-99 yuan supplements');
 
 const premiumDrinkLowOnlyResult = recommend(
   profile({
@@ -2405,8 +2494,12 @@ async function runPoiCacheAndStressTests() {
   assert(premiumFallbackKeywords.length >= 2, '200+ recommendation should still supplement when the raw pool is large but premium-effective candidates are scarce');
   assert(new Set(premiumFallbackKeywords).size >= 2, 'premium supplement fetch should switch to a different high-end keyword cluster');
   assert(
-    premiumFallbackKeywords.some((keyword) => /铁板烧|GRILL|grill|主厨|Chef|私厨|牛排|西餐/.test(keyword)),
-    'premium supplement fetch should include nationwide high-ticket category keywords'
+    /黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining/.test(premiumFallbackKeywords[0] ?? ''),
+    '200+ primary fetch should start with expensive intent keywords, not broad steak or teppanyaki keywords'
+  );
+  assert(
+    premiumFallbackKeywords.some((keyword) => /酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题/.test(keyword)),
+    'premium supplement fetch should include high-ticket occasion keywords as the second layer'
   );
   assert(
     premiumFallbackRecommendations.some((candidate) => candidate.restaurantId === 'premium-teppanyaki' || candidate.restaurantId === 'premium-chef-grill'),

@@ -531,7 +531,7 @@ function recommendRestaurants(options) {
     fallbackReason = buildDistanceFallbackReason(preference);
     scored = candidateRestaurants
       .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, true).passed
+        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, true, true).passed
       )
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -546,7 +546,7 @@ function recommendRestaurants(options) {
     scored = candidateRestaurants
       .filter((restaurant) => {
         if (getNegativeConflict(restaurant, preference).severity === 'hard') return false;
-        return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, true).passed;
+        return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, true, true).passed;
       })
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
@@ -679,7 +679,15 @@ function scoreRestaurant(restaurant, preference, options = {}) {
       matchedAvoidedTagIds
     },
     reasons: buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
-    hardFilterReasons: applyHardFilters(restaurant, preference, new Set(), true, true, true).reasons,
+    hardFilterReasons: applyHardFilters(
+      restaurant,
+      preference,
+      new Set(),
+      true,
+      true,
+      true,
+      options.fallbackReason !== undefined
+    ).reasons,
     penaltyReasons: [
       ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
       ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
@@ -693,7 +701,15 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   };
 }
 
-function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDistanceFallback, allowNegativeFallback, allowUnknownPriceFallback) {
+function applyHardFilters(
+  restaurant,
+  preference,
+  excludeRestaurantIds,
+  allowDistanceFallback,
+  allowNegativeFallback,
+  allowUnknownPriceFallback,
+  allowUnderBudgetFallback = false
+) {
   const reasons = [];
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
@@ -711,8 +727,9 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, allowDis
     reasons.push(`距离 ${restaurant.distanceMeters} 米，超出 ${preference.maxDistanceMeters} 米偏好`);
   }
   if (isClearlyOverBudget(restaurant, preference)) reasons.push('价格明显超出预算');
-  if (isClearlyUnderBudget(restaurant, preference)) reasons.push('price clearly below requested budget');
+  if (isClearlyUnderBudget(restaurant, preference, allowUnderBudgetFallback)) reasons.push('price clearly below requested budget');
   if (!allowUnknownPriceFallback && isPriceUnknownForStrictBudget(restaurant, preference)) reasons.push('price unknown for strict high budget');
+  if (allowUnknownPriceFallback && isWeakUnknownPriceForPremiumFallback(restaurant, preference)) reasons.push('price unknown without premium evidence for 200+ budget');
   if (preference && preference.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) reasons.push('预计耗时明显超出偏好');
   if (!allowNegativeFallback && negativeConflict.severity === 'hard') reasons.push(`命中明确负向偏好：${negativeConflict.labels.join('、')}`);
 
@@ -734,14 +751,27 @@ function isAcceptableBrandCandidate(restaurant, preference) {
   const tagIds = getRestaurantTagIds(restaurant);
   const hasBrandTag = CHAIN_BRAND_TAGS.some((tag) => tagIds.includes(tag));
   const text = getRestaurantText(restaurant);
-  const estimatedCost = getEstimatedCost(restaurant) || 0;
+  const estimatedCost = getEstimatedCost(restaurant);
   if (hasBrandTag) return true;
   if (hasKnownChainBrandEvidence(text)) return true;
-  if (((preference && preference.budgetLevel) || 3) >= 6) return estimatedCost >= 200;
+  if (((preference && preference.budgetLevel) || 3) >= 6) {
+    return (estimatedCost !== undefined && estimatedCost >= 200) || hasPremiumCandidateEvidence(restaurant, text);
+  }
   return (
     ((preference && preference.budgetLevel) || 3) >= 5 &&
-    estimatedCost >= 80 &&
+    (estimatedCost || 0) >= 80 &&
     (hasMallStoreEvidence(text) || (restaurant.rating || 0) >= 4.3)
+  );
+}
+
+function hasPremiumCandidateEvidence(restaurant, text = getRestaurantText(restaurant)) {
+  const estimatedCost = getEstimatedCost(restaurant);
+  const tagIds = getRestaurantTagIds(restaurant);
+  return (
+    (estimatedCost !== undefined && estimatedCost >= 200) ||
+    tagIds.includes('premium_brand') ||
+    /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/.test(text) ||
+    ((restaurant.rating || 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text)))
   );
 }
 
@@ -873,8 +903,15 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
   }
   if (preference && preference.budgetLevel !== undefined && restaurant.averageCostYuan !== undefined) {
     const budgetMax = getBudgetMaxYuan(preference);
+    const budgetRange = getBudgetRange(preference);
     if (nonMealBudgetMismatch) {
       reasons.push(`人均约 ${restaurant.averageCostYuan} 元，低于你选择的预算档，按普通匹配展示`);
+    } else if (
+      preference.budgetLevel >= 5 &&
+      budgetRange.min !== undefined &&
+      restaurant.averageCostYuan < budgetRange.min
+    ) {
+      reasons.push(`人均约 ${restaurant.averageCostYuan} 元，低于所选预算档，作为近预算补位`);
     } else {
       reasons.push(restaurant.averageCostYuan <= budgetMax ? `人均约 ${restaurant.averageCostYuan} 元，符合预算` : `人均约 ${restaurant.averageCostYuan} 元，略高于预算`);
     }
@@ -1396,18 +1433,29 @@ function isClearlyOverBudget(restaurant, preference) {
   return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
 }
 
-function isClearlyUnderBudget(restaurant, preference) {
+function isClearlyUnderBudget(restaurant, preference, allowNearBudgetFallback = false) {
   if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5) return false;
   if (isFlexibleNonMealBudget(preference)) return false;
   const range = getBudgetRange(preference);
   const estimatedCost = getEstimatedCost(restaurant);
   if (range.min === undefined || estimatedCost === undefined) return false;
   if (preference.budgetLevel >= 6) return estimatedCost < range.min;
-  return estimatedCost < range.min * 0.75;
+  return allowNearBudgetFallback ? estimatedCost < 80 : estimatedCost < range.min;
 }
 
 function isPriceUnknownForStrictBudget(restaurant, preference) {
   return preference && preference.budgetLevel !== undefined && preference.budgetLevel >= 5 && !isFlexibleNonMealBudget(preference) && isPriceUnknown(restaurant);
+}
+
+function isWeakUnknownPriceForPremiumFallback(restaurant, preference) {
+  return (
+    preference &&
+    preference.budgetLevel !== undefined &&
+    preference.budgetLevel >= 6 &&
+    !isFlexibleNonMealBudget(preference) &&
+    isPriceUnknown(restaurant) &&
+    !hasPremiumCandidateEvidence(restaurant)
+  );
 }
 
 function isFlexibleNonMealBudget(preference) {
@@ -1442,6 +1490,8 @@ function getHighBudgetNonMealConfidenceCap(restaurant, preference) {
 
 function buildDistanceFallbackReason(preference) {
   const selected = new Set((preference && preference.selectedOptionIds) || []);
+  if (((preference && preference.budgetLevel) || 3) === 5) return '附近 100-200 严格匹配较少，已用近预算候选补位并下调匹配度';
+  if (((preference && preference.budgetLevel) || 3) >= 6) return '附近 200 元以上严格匹配较少，仅保留有高端信号的候选并下调匹配度';
   if (selected.has('distance_500m') || selected.has('distance_1km')) return '严格距离内符合条件较少，已放宽距离并下调匹配度';
   return '附近严格匹配候选较少，已扩大搜索范围并下调匹配度';
 }

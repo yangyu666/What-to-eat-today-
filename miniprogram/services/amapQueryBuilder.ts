@@ -12,46 +12,43 @@ const DEFAULT_RADIUS_METERS = 1500;
 const AMAP_FOOD_TYPE = '050000';
 const SAFE_FALLBACK_KEYWORDS = ['简餐', '盖饭', '粥', '轻食', '日式'];
 const PREMIUM_FALLBACK_KEYWORDS = [
-  '高端餐厅',
-  '私房菜',
-  '私厨',
-  '主厨餐厅',
-  '铁板烧',
-  '牛排',
-  '西餐',
-  '融合料理',
-  '酒店餐厅',
   '黑珍珠',
   '米其林',
   'omakase',
-  '法餐',
   '高端日料',
-  'Fine Dining'
+  '法餐',
+  'Fine Dining',
+  '酒店餐厅',
+  '私房菜',
+  '私厨',
+  '主厨餐厅',
+  '牛排馆',
+  '融合料理',
+  '海鲜放题',
+  '铁板烧',
+  '烧肉',
+  '创意菜'
 ];
 const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'LINLEE', '麒麟大口茶', '大口茶', 'KOI', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 'T9tea', 'Tamkoko', '星巴克', '瑞幸', 'Manner', 'Peet', 'Costa', 'Tims'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '小菜园', '西贝', '海底捞', '太二', '探鱼', '点都德', '陶陶居', '绿茶餐厅', '外婆家', '九毛九'];
 const LOW_BUDGET_GENERIC_KEYWORDS = ['快餐', '简餐', '盖饭', '套餐', '茶餐厅', '小吃', '包子', '煎饼', '炸鸡', '汉堡', '面'];
 const PREMIUM_CHAIN_KEYWORDS = [
-  '高端餐厅',
+  '黑珍珠',
+  '米其林',
+  'omakase',
+  '高端日料',
+  '法餐',
+  'Fine Dining',
+  '酒店餐厅',
+  '星级酒店',
   '私房菜',
   '私厨',
   '主厨餐厅',
   'Chef',
   '主厨',
-  '铁板烧',
-  '烧肉',
-  '牛排',
-  '西餐',
+  '牛排馆',
   '融合料理',
-  '创意菜',
-  '酒店餐厅',
-  '星级酒店',
-  '黑珍珠',
-  '米其林',
-  'omakase',
-  '法餐',
-  '高端日料',
-  'Fine Dining',
+  '海鲜放题',
   'GRILL',
   'grill',
   '炳胜',
@@ -62,7 +59,12 @@ const PREMIUM_CHAIN_KEYWORDS = [
   '莆田',
   '松鹤楼',
   '广州酒家',
-  '白天鹅'
+  '白天鹅',
+  '铁板烧',
+  '烧肉',
+  '牛排',
+  '西餐',
+  '创意菜'
 ];
 const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[] }> = [
   {

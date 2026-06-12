@@ -98,8 +98,8 @@ function applyLegacyAnswer(draft, answer) {
             draft.maxDistanceMeters = answer.value;
         }
         else if (answer.value === 'any') {
-            draft.maxDistanceMeters = 5000;
-            draft.maxEstimatedMinutes = 90;
+            draft.maxDistanceMeters = 10000;
+            draft.maxEstimatedMinutes = 120;
         }
     }
     if (answer.questionId === 'flavor') {

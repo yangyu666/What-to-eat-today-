@@ -263,19 +263,30 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
         brandChainKeywords.length > 0;
     const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
     const scopedLocation = getScopedKeywordSearchLocation(preferenceSnapshot);
-    const keywordAttempts = [
-        ...luxuryFocusedKeywords,
-        relaxedKeyword || baseKeyword,
-        ...midHighBudgetKeywords,
-        ...premiumKeywords,
-        ...nonMealPremiumKeywords,
-        ...brandChainKeywords,
-        ...mallKeywords
-    ].filter(Boolean);
+    const isLuxuryMealSearch = (preferenceSnapshot.budgetLevel ?? 3) >= 6 && luxuryFocusedKeywords.length > 0;
+    const keywordAttempts = (isLuxuryMealSearch
+        ? [
+            ...luxuryFocusedKeywords,
+            ...brandChainKeywords,
+            ...premiumKeywords,
+            ...mallKeywords,
+            relaxedKeyword || baseKeyword
+        ]
+        : [
+            ...luxuryFocusedKeywords,
+            relaxedKeyword || baseKeyword,
+            ...midHighBudgetKeywords,
+            ...premiumKeywords,
+            ...nonMealPremiumKeywords,
+            ...brandChainKeywords,
+            ...mallKeywords
+        ]).filter(Boolean);
     const attempts = [];
     const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
     const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
-    const secondaryPolygonKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
+    const secondaryPolygonKeyword = fallbackKeyword !== primaryKeyword
+        ? fallbackKeyword
+        : keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
     attempts.push({
         mode: 'polygon',
         radiusMeters: maxRadius,
@@ -368,7 +379,7 @@ function countEffectivePremiumCandidates(restaurants) {
         const tagIds = new Set(restaurant.tagIds ?? []);
         const text = `${restaurant.name ?? ''} ${restaurant.category ?? ''} ${(restaurant.tags ?? []).join(' ')}`;
         const hasPremiumSignal = tagIds.has('premium_brand') ||
-            /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|铁板烧|牛排|法餐|西餐|日料|酒店餐厅|星级酒店|GRILL|grill|烧肉|融合料理|创意菜/.test(text);
+            /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|GRILL|grill|烧肉|融合料理|创意菜/.test(text);
         return (cost !== undefined && cost >= 180) || (cost === undefined && hasPremiumSignal) || tagIds.has('premium_brand');
     }).length;
 }
@@ -392,8 +403,8 @@ function getLuxuryFocusedKeywordAttempts(preferenceSnapshot) {
         return [];
     }
     return [
-        '铁板烧|牛排|西餐',
-        'GRILL|grill|主厨|Chef|私厨|私房菜'
+        '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
+        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题'
     ];
 }
 function estimateCostFromPriceLevel(priceLevel) {
@@ -481,9 +492,10 @@ function getBrandChainKeywordAttempts(preferenceSnapshot) {
     }
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
         return [
-            '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|酒店餐厅',
-            '铁板烧|GRILL|grill|主厨|Chef|私厨|私房菜|牛排|西餐|烧肉|融合料理|创意菜',
-            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅'
+            '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
+            '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题',
+            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
+            '铁板烧|GRILL|grill|烧肉|创意菜'
         ];
     }
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 5) {
@@ -517,8 +529,8 @@ function getMallKeywordAttempts(preferenceSnapshot) {
     }
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
         return [
-            '商场|购物中心|高端餐厅|黑珍珠|米其林',
-            '购物中心|商场|铁板烧|牛排|西餐|主厨|私厨|酒店餐厅',
+            '商场|购物中心|黑珍珠|米其林|高端日料|法餐',
+            '购物中心|商场|酒店餐厅|私房菜|主厨餐厅|融合料理',
             '购物中心|商场|炳胜|利苑|广州酒家|白天鹅'
         ];
     }
@@ -576,10 +588,10 @@ function getPremiumKeywordAttempts(keyword) {
         return [];
     }
     return [
-        '铁板烧|GRILL|grill|主厨|Chef|私厨|私房菜|牛排|西餐|烧肉|融合料理|创意菜',
-        '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|酒店餐厅',
+        '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
+        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题',
         '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
-        '高端餐厅|私房菜|私厨|主厨餐厅|酒店餐厅'
+        '铁板烧|GRILL|grill|烧肉|创意菜'
     ];
 }
 function getStrictCategoryKeyword(keyword) {
@@ -593,7 +605,7 @@ function getStrictCategoryKeyword(keyword) {
         return '甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|哈根达斯|贝果|双皮奶';
     }
     if (/高端餐厅|私房菜|私厨|主厨|Chef|铁板烧|牛排|西餐|融合料理|创意菜|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL|炳胜|利苑/.test(keyword)) {
-        return '高端餐厅|私房菜|私厨|主厨餐厅|铁板烧|牛排|西餐|融合料理|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL';
+        return '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining';
     }
     return '';
 }

@@ -145,12 +145,12 @@ const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
 assert(luxuryBudgetProfile.budgetLevel === 6, '200+ budget should map to luxury budget level');
 const luxuryAmapQuery = buildAmapRestaurantQuery(luxuryBudgetProfile);
 assert(
-  /高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining/.test(luxuryAmapQuery.keywords ?? ''),
-  '200+ budget should search broad premium restaurant keywords'
+  /黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should search premium intent keywords first'
 );
 assert(
-  /铁板烧|GRILL|主厨|私厨|牛排|西餐|融合料理|酒店餐厅/.test(luxuryAmapQuery.keywords ?? ''),
-  '200+ budget should include nationwide high-ticket category and occasion keywords'
+  /酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should include high-ticket occasion keywords before broad categories'
 );
 assert(/炳胜|利苑/.test(luxuryAmapQuery.keywords ?? ''), '200+ budget should keep known premium brand keywords as supplements');
 assert(
@@ -234,6 +234,17 @@ const luxuryDrinkProfile = mapAnswersToPreferenceProfile([
 const luxuryDrinkQuery = buildAmapRestaurantQuery(luxuryDrinkProfile);
 assert(/饮品|奶茶|茶饮|咖啡/.test(luxuryDrinkQuery.keywords ?? ''), '200+ drink intent should still search drink keywords');
 assert(!/omakase|Fine Dining|高端餐厅|私房菜/.test(luxuryDrinkQuery.keywords ?? ''), '200+ drink intent should not drift into premium meal keywords');
+
+const distanceAnyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'distance',
+    type: 'single',
+    value: 'any',
+    optionIds: ['distance_any'],
+    answeredAt: '2026-06-02T04:10:00.300Z'
+  }
+]);
+assert(distanceAnyProfile.maxDistanceMeters === 10000, 'distance_any should map to the 10km user-facing range');
 
 const dessertProfile = mapAnswersToPreferenceProfile([
   {
@@ -346,7 +357,7 @@ const premiumBrandMealProfile = mapAnswersToPreferenceProfile([
 ]);
 const premiumBrandMealQuery = buildAmapRestaurantQuery(premiumBrandMealProfile);
 
-assert(/高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑/.test(premiumBrandMealQuery.keywords ?? ''), 'premium brand meal query should include high-end brand recall keywords');
+assert(/黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining|炳胜|利苑/.test(premiumBrandMealQuery.keywords ?? ''), 'premium brand meal query should include high-end brand recall keywords');
 assert(!/奶茶|咖啡|甜品/.test(premiumBrandMealQuery.keywords ?? ''), 'premium brand meal query should not drift into non-meal keywords');
 
 const allOptions = questions.flatMap((question) => question.options ?? []);
