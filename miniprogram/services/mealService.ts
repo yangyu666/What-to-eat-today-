@@ -1,13 +1,12 @@
 import type { MealCandidate } from '../models/meal';
 import type { Restaurant } from '../types/restaurant';
-import type { UserQuestionnaireResult } from '../types/userPreference';
+import type { UserPreferenceProfile, UserQuestionnaireResult } from '../types/userPreference';
 import { buildAmapRestaurantQuery } from './amapQueryBuilder';
+import type { AmapRestaurantQuery } from './amapQueryBuilder';
 import {
-  getNearbyRestaurantsWithMeta,
-  type AmapPoiSearchMode,
-  type NearbyRestaurantsResult,
-  type PoiFetchMeta
+  getNearbyRestaurantsWithMeta
 } from './amapPoiService';
+import type { AmapPoiSearchMode, NearbyRestaurantsResult, PoiFetchMeta } from './amapPoiService';
 import type { HistoryFilterContext } from './historyService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
@@ -16,6 +15,12 @@ const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
 const MIN_PREMIUM_POOL_BEFORE_FALLBACK = 6;
+const EMPTY_QUESTIONNAIRE_RESULT: UserQuestionnaireResult = {
+  version: 'empty',
+  source: 'recommendation_filter',
+  answers: [],
+  submittedAt: ''
+};
 
 interface AmapQueryAttempt {
   mode: AmapPoiSearchMode;
@@ -29,7 +34,7 @@ interface AmapQueryAttempt {
 }
 
 export async function getTodayRecommendation(): Promise<MealCandidate> {
-  const [candidate] = await getRecommendations(undefined, 1);
+  const [candidate] = await getRecommendations(EMPTY_QUESTIONNAIRE_RESULT, 1);
 
   if (!candidate) {
     throw new Error('No recommendation candidates available.');
@@ -42,11 +47,11 @@ export async function getLocalRecommendations(
   questionnaire?: UserQuestionnaireResult,
   historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
-  return getRecommendations(questionnaire, 4, historyFilterContext);
+  return getRecommendations(questionnaire || EMPTY_QUESTIONNAIRE_RESULT, 4, historyFilterContext);
 }
 
 async function getRecommendations(
-  questionnaire: UserQuestionnaireResult | undefined,
+  questionnaire: UserQuestionnaireResult,
   limit: number,
   historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
@@ -60,11 +65,11 @@ async function getRecommendations(
 }
 
 async function getAmapRecommendations(
-  questionnaire: UserQuestionnaireResult | undefined,
+  questionnaire: UserQuestionnaireResult,
   limit: number,
   historyFilterContext?: HistoryFilterContext
 ): Promise<MealCandidate[]> {
-  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire?.answers ?? []);
+  const preferenceSnapshot = mapAnswersToPreferenceProfile(questionnaire.answers || []);
   const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
   const attempts = buildAmapQueryAttempts(amapQuery, preferenceSnapshot);
@@ -180,15 +185,15 @@ async function getAmapRecommendations(
 }
 
 function isAmapDailyQuotaError(error: unknown): boolean {
-  const payload = error as { message?: string; code?: string; details?: unknown } | undefined;
+  const payload = (error || {}) as { message?: string; code?: string; details?: unknown };
   const text = `${payload?.message ?? ''} ${payload?.code ?? ''} ${JSON.stringify(payload?.details ?? {})}`;
 
   return /USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|AMAP_KEYS_UNAVAILABLE|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(text);
 }
 
 function buildAmapQueryAttempts(
-  amapQuery: ReturnType<typeof buildAmapRestaurantQuery>,
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  amapQuery: AmapRestaurantQuery,
+  preferenceSnapshot: UserPreferenceProfile
 ): AmapQueryAttempt[] {
   const baseRadius = amapQuery.radiusMeters;
   const polygonRadius = Math.max(baseRadius, 3000);
@@ -262,7 +267,7 @@ function buildAmapQueryAttempts(
 
 function shouldSkipFallbackAttempt(
   restaurantPool: Map<string, Restaurant>,
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): boolean {
   const restaurants = [...restaurantPool.values()];
 
@@ -287,7 +292,7 @@ function countEffectivePremiumCandidates(restaurants: Restaurant[]): number {
 }
 
 function getLuxuryFocusedKeywordAttempts(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): string[] {
   if ((preferenceSnapshot.budgetLevel ?? 3) < 6) {
     return [];
@@ -317,9 +322,9 @@ function getLuxuryFocusedKeywordAttempts(
   ];
 }
 
-function estimateCostFromPriceLevel(priceLevel: number | undefined): number | undefined {
+function estimateCostFromPriceLevel(priceLevel?: number): number {
   if (priceLevel === undefined) {
-    return undefined;
+    return 0;
   }
 
   if (priceLevel >= 5) {
@@ -342,7 +347,7 @@ function estimateCostFromPriceLevel(priceLevel: number | undefined): number | un
 }
 
 function getScopedKeywordSearchLocation(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): { city?: string; adcode?: string } {
   const city = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapCity ?? preferenceSnapshot.constraints?.city);
   const adcode = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapAdcode ?? preferenceSnapshot.constraints?.adcode);
@@ -353,12 +358,12 @@ function getScopedKeywordSearchLocation(
   };
 }
 
-function getStringPreferenceValue(value: unknown): string | undefined {
-  return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+function getStringPreferenceValue(value: unknown): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 
 function getNonMealPremiumKeywordAttempts(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): string[] {
   if ((preferenceSnapshot.budgetLevel ?? 3) < 5) {
     return [];
@@ -385,7 +390,7 @@ function getNonMealPremiumKeywordAttempts(
 }
 
 function getBrandChainKeywordAttempts(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): string[] {
   const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
 
@@ -412,7 +417,7 @@ function getBrandChainKeywordAttempts(
 }
 
 function getMallKeywordAttempts(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+  preferenceSnapshot: UserPreferenceProfile
 ): string[] {
   const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
   const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
@@ -471,7 +476,7 @@ function mergePoiFetchMeta(metaList: PoiFetchMeta[]): PoiFetchMeta {
     poiCacheAgeMs: cacheAges.length > 0 ? Math.min(...cacheAges) : undefined,
     poiFetchReason: metaList.map((meta) => meta.poiFetchReason).join(',') || 'no-poi-fetch',
     amapApiCallCount: apiCallCount,
-    poiFetchMode: modes[0] as AmapPoiSearchMode | undefined,
+    poiFetchMode: getFirstPoiFetchMode(modes),
     aroundCallCount,
     polygonCallCount,
     keywordCallCount,
@@ -482,8 +487,18 @@ function mergePoiFetchMeta(metaList: PoiFetchMeta[]): PoiFetchMeta {
   };
 }
 
-function uniqueText(values: Array<string | undefined>): string[] {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))];
+function uniqueText(values: unknown[]): string[] {
+  return [...new Set(values.filter((value): value is string => typeof value === 'string' && Boolean(value)))];
+}
+
+function getFirstPoiFetchMode(modes: string[]): AmapPoiSearchMode {
+  const mode = modes[0];
+
+  if (mode === 'around' || mode === 'polygon' || mode === 'keyword' || mode === 'id') {
+    return mode;
+  }
+
+  return 'polygon';
 }
 
 function normalizeRestaurantPoolKey(restaurant: Restaurant): string {
@@ -510,7 +525,7 @@ function getPremiumKeywordAttempts(keyword: string): string[] {
   ];
 }
 
-function getStrictCategoryKeyword(keyword: string): string | undefined {
+function getStrictCategoryKeyword(keyword: string): string {
   if (/奶茶|茶饮|饮品|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗|茉莉奶白|爷爷不泡茶|茶理宜世/.test(keyword)) {
     return '奶茶|茶饮|霸王茶姬|喜茶|奈雪|一点点|1点点|阿嬷手作|去茶山|KOI|古茗|茉莉奶白|爷爷不泡茶|茶理宜世';
   }
@@ -527,11 +542,11 @@ function getStrictCategoryKeyword(keyword: string): string | undefined {
     return '高端餐厅|私房菜|私厨|主厨餐厅|铁板烧|牛排|西餐|融合料理|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL';
   }
 
-  return undefined;
+  return '';
 }
 
 function buildRecommendationContext(
-  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>,
+  preferenceSnapshot: UserPreferenceProfile,
   historyFilterContext?: HistoryFilterContext
 ) {
   const historyFilterEnabled = historyFilterContext?.historyFilterEnabled === true;
