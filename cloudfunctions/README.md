@@ -36,12 +36,15 @@
 
 - `wx.getLocation` only obtains device latitude/longitude and does not consume AMap search quota.
 - Quota is consumed by AMap WebService requests: place/around, reverse geocode (`regeo`), and IP location.
-- V3.0 POI fetch order is cache -> polygon -> keyword supplement -> around fallback. Around search is not the primary path.
+- V3.0 POI fetch order in production is mini-program session/storage cache -> one primary polygon/keyword-shaped request -> at most one keyword/around fallback when the primary candidate pool is too small. Around search is not the primary path.
 - `amapPoi` supports `mode: "around" | "polygon" | "keyword" | "id"`. Polygon search receives a rectangle generated from the user's location and radius; keyword search requires `city` or `adcode` to avoid nationwide searches.
-- `amapPoi` caches normalized POI candidate pools in `amap_poi_cache` for quota optimization. This is not a business collection and does not replace `users` or `recommendation_history`.
+- Production mini-program calls pass `cache: false`; `amap_poi_cache` is not used as the normal user recommendation cache.
+- `.cache/amap-poi` files are retained for offline stress tests and algorithm comparison so repeated pressure tests do not consume AMap quota.
+- `amapPoi` can still support explicit cache reads/writes only when a caller intentionally passes `cache: true`, but the user-facing recommendation flow does not do this.
+- `amap_poi_cache`, if kept in the environment, is only a quota-optimization/testing cache and is not a business collection. It does not replace `users` or `recommendation_history`.
 - Cache key dimensions include rounded location bucket, search `mode`, radius bucket, `types`, normalized `keyword`, `city/adcode`, polygon hash, POI id, and page profile.
 - Cache TTL is 1 hour in the cloud function. A single cached candidate pool stores at most 250 normalized restaurant records and never stores the raw AMap response.
-- The mini program also keeps a session/storage cache under `nearby_restaurants_amap_cache`; recommendation flows prefer that cache before calling `amapPoi`.
+- The mini program keeps a session/storage cache under `nearby_restaurants_amap_cache`; recommendation flows prefer that local cache before calling `amapPoi`.
 - POI response meta includes `poiFetchMode`, `poiCacheHit`, `poiCacheKey`, `poiFetchReason`, `aroundCallCount`, `polygonCallCount`, `keywordCallCount`, `idCallCount`, `cacheHitCount`, `totalAmapApiCallCount`, `quotaBucket`, `amapKeyIndex`, `amapKeyCount`, `amapKeySwitchCount`, and `quotaErrorCount`.
 - Stress testing is cache-first only. `npm.cmd run stress:recommendation` reads `.cache/amap-poi/*.json`; when the cache file is missing it requires an explicit seed run and still does not make live AMap calls.
 - Seed examples:

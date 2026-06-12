@@ -1,5 +1,6 @@
 import type { ApiResponse } from '../types/recommendation';
 import type { GeoPoint, Restaurant } from '../types/restaurant';
+import { requireLocationConsent } from './privacyConsent';
 
 interface AmapPoiCloudData {
   restaurants: Restaurant[];
@@ -162,6 +163,8 @@ export async function getNearbyRestaurants(
 export async function getNearbyRestaurantsWithMeta(
   options: NearbyRestaurantOptions = {}
 ): Promise<NearbyRestaurantsResult> {
+  requireLocationConsent();
+
   const location = options.location ?? (await getUserLocation());
   const request = buildPoiCacheRequest(location, options);
   const cached = readNearbyRestaurantsCache(request);
@@ -275,6 +278,8 @@ const PREFETCH_KEYWORD_GROUPS: Array<{ keyword: string; pageCount: number }> = [
 export async function prefetchNearbyRestaurantCandidates(
   options: NearbyRestaurantOptions = {}
 ): Promise<PoiFetchMeta> {
+  requireLocationConsent();
+
   const location = options.location ?? (await getUserLocation());
   // 预取半径至少为 PREFETCH_RADIUS_METERS，确保缓存能覆盖推荐可能用到的较大半径（如距离不限）
   const radiusMeters = Math.max(options.radiusMeters ?? PREFETCH_RADIUS_METERS, PREFETCH_RADIUS_METERS);
@@ -375,6 +380,8 @@ async function getUserLocation(): Promise<GeoPoint> {
     return locationProviderForTest();
   }
 
+  requireLocationConsent();
+
   return new Promise((resolve, reject) => {
     wx.getLocation({
       type: 'gcj02',
@@ -428,6 +435,8 @@ async function fetchNearbyRestaurantsFromCloud(
     return cloudFetcherForTest(location, options);
   }
 
+  requireLocationConsent();
+
   const app = getApp() as { globalData?: { cloudReady?: boolean } };
 
   if (!wx.cloud || !app.globalData?.cloudReady) {
@@ -452,7 +461,8 @@ async function fetchNearbyRestaurantsFromCloud(
         id: options.id,
         types: options.types,
         fetchReason: options.fetchReason,
-        maxAmapApiCalls: options.maxAmapApiCalls
+        maxAmapApiCalls: options.maxAmapApiCalls,
+        cache: false
       }
     })
   );

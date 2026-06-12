@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const historyService_1 = require("../../services/historyService");
-const amapPoiService_1 = require("../../services/amapPoiService");
+const privacyConsent_1 = require("../../services/privacyConsent");
 const MAX_RECENT_MEALS = 3;
 const DEFAULT_USER_NAME = '朋友';
 const USER_PROFILE_STORAGE_KEY = 'meal_user_profile';
@@ -18,13 +18,15 @@ Page({
         userName: DEFAULT_USER_NAME,
         locationStatus: '定位中',
         locationAuthDenied: false,
+        privacyConsentVisible: false,
+        privacyRejectMessage: '',
         historyFilterEnabled: true,
         recentMeals: []
     },
     onLoad() {
         this.initUserName();
-        this.initLocation();
         this.initHistoryFilter();
+        this.initPrivacyConsent();
     },
     onShow() {
         this.initUserName();
@@ -41,7 +43,27 @@ Page({
             userName: getStoredUserName()
         });
     },
+    initPrivacyConsent() {
+        if ((0, privacyConsent_1.hasLocationConsent)()) {
+            this.setData({
+                privacyConsentVisible: false,
+                privacyRejectMessage: ''
+            });
+            this.initLocation();
+            return;
+        }
+        this.setData({
+            privacyConsentVisible: true,
+            privacyRejectMessage: '',
+            locationStatus: '定位授权待确认',
+            locationAuthDenied: false
+        });
+    },
     initLocation() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.showPrivacyConsent('同意后才能使用附近推荐');
+            return;
+        }
         if (this.data.locationAuthDenied) {
             this.openLocationSetting();
             return;
@@ -49,11 +71,14 @@ Page({
         this.requestLocation();
     },
     requestLocation() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.showPrivacyConsent('同意后才能获取当前位置');
+            return;
+        }
         this.setData({ locationStatus: '定位中' });
         wx.getLocation({
             type: 'gcj02',
             success: async (result) => {
-                this.prefetchNearbyRestaurants(result.latitude, result.longitude);
                 const locationLabel = await getLocationLabel(result.latitude, result.longitude);
                 this.setData({
                     locationStatus: locationLabel || '位置未授权',
@@ -68,20 +93,11 @@ Page({
             }
         });
     },
-    prefetchNearbyRestaurants(latitude, longitude) {
-        void (0, amapPoiService_1.prefetchNearbyRestaurantCandidates)({
-            location: { latitude, longitude },
-            mode: 'polygon',
-            radiusMeters: 5000,
-            pageSize: 25,
-            pageCount: 3,
-            fetchReason: 'home-location-success-polygon-prefetch',
-            maxAmapApiCalls: 3
-        }).catch((error) => {
-            console.warn('Nearby restaurant prefetch failed.', error);
-        });
-    },
     openLocationSetting() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.showPrivacyConsent('同意后才能开启定位');
+            return;
+        }
         wx.openSetting({
             success: (result) => {
                 if (result.authSetting['scope.userLocation']) {
@@ -102,6 +118,43 @@ Page({
             }
         });
     },
+    acceptPrivacyConsent() {
+        (0, privacyConsent_1.grantLocationConsent)();
+        this.setData({
+            privacyConsentVisible: false,
+            privacyRejectMessage: '',
+            locationStatus: '定位中',
+            locationAuthDenied: false
+        });
+        this.initLocation();
+    },
+    rejectPrivacyConsent() {
+        const stayOnPrivacyNotice = () => {
+            this.setData({
+                privacyConsentVisible: true,
+                privacyRejectMessage: '需要同意后才能使用附近推荐功能。',
+                locationStatus: '未开启推荐'
+            });
+            wx.showToast({
+                title: '需要同意后才能使用推荐功能',
+                icon: 'none'
+            });
+        };
+        if (typeof wx.exitMiniProgram === 'function') {
+            wx.exitMiniProgram({
+                fail: stayOnPrivacyNotice
+            });
+            return;
+        }
+        stayOnPrivacyNotice();
+    },
+    showPrivacyConsent(message) {
+        this.setData({
+            privacyConsentVisible: true,
+            privacyRejectMessage: message ?? ''
+        });
+    },
+    noop() { },
     async loadRecentMeals() {
         try {
             const history = await (0, historyService_1.getHistory)();
@@ -116,6 +169,10 @@ Page({
         }
     },
     startQuestionnaire() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.showPrivacyConsent('同意后才能开始附近美食推荐');
+            return;
+        }
         (0, historyService_1.setHistoryFilterEnabled)(this.data.historyFilterEnabled);
         wx.setStorageSync('meal_questionnaire_draft', {
             startedAt: new Date().toISOString(),
@@ -167,7 +224,7 @@ function getStoredUserName() {
     return DEFAULT_USER_NAME;
 }
 async function getLocationLabel(latitude, longitude) {
-    if (!wx.cloud) {
+    if (!(0, privacyConsent_1.hasLocationConsent)() || !wx.cloud) {
         return undefined;
     }
     try {

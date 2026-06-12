@@ -3,8 +3,8 @@ import {
   getHistoryFilterEnabled,
   setHistoryFilterEnabled
 } from '../../services/historyService';
-import { prefetchNearbyRestaurantCandidates } from '../../services/amapPoiService';
 import type { MealHistoryItem } from '../../models/meal';
+import { grantLocationConsent, hasLocationConsent } from '../../services/privacyConsent';
 
 interface RecentMealItem {
   id: string;
@@ -31,14 +31,16 @@ Page({
     userName: DEFAULT_USER_NAME,
     locationStatus: '定位中',
     locationAuthDenied: false,
+    privacyConsentVisible: false,
+    privacyRejectMessage: '',
     historyFilterEnabled: true,
     recentMeals: [] as RecentMealItem[]
   },
 
   onLoad() {
     this.initUserName();
-    this.initLocation();
     this.initHistoryFilter();
+    this.initPrivacyConsent();
   },
 
   onShow() {
@@ -59,7 +61,30 @@ Page({
     });
   },
 
+  initPrivacyConsent() {
+    if (hasLocationConsent()) {
+      this.setData({
+        privacyConsentVisible: false,
+        privacyRejectMessage: ''
+      });
+      this.initLocation();
+      return;
+    }
+
+    this.setData({
+      privacyConsentVisible: true,
+      privacyRejectMessage: '',
+      locationStatus: '定位授权待确认',
+      locationAuthDenied: false
+    });
+  },
+
   initLocation() {
+    if (!hasLocationConsent()) {
+      this.showPrivacyConsent('同意后才能使用附近推荐');
+      return;
+    }
+
     if (this.data.locationAuthDenied) {
       this.openLocationSetting();
       return;
@@ -69,12 +94,16 @@ Page({
   },
 
   requestLocation() {
+    if (!hasLocationConsent()) {
+      this.showPrivacyConsent('同意后才能获取当前位置');
+      return;
+    }
+
     this.setData({ locationStatus: '定位中' });
 
     wx.getLocation({
       type: 'gcj02',
       success: async (result) => {
-        this.prefetchNearbyRestaurants(result.latitude, result.longitude);
         const locationLabel = await getLocationLabel(result.latitude, result.longitude);
 
         this.setData({
@@ -91,21 +120,12 @@ Page({
     });
   },
 
-  prefetchNearbyRestaurants(latitude: number, longitude: number) {
-    void prefetchNearbyRestaurantCandidates({
-      location: { latitude, longitude },
-      mode: 'polygon',
-      radiusMeters: 5000,
-      pageSize: 25,
-      pageCount: 3,
-      fetchReason: 'home-location-success-polygon-prefetch',
-      maxAmapApiCalls: 3
-    }).catch((error) => {
-      console.warn('Nearby restaurant prefetch failed.', error);
-    });
-  },
-
   openLocationSetting() {
+    if (!hasLocationConsent()) {
+      this.showPrivacyConsent('同意后才能开启定位');
+      return;
+    }
+
     wx.openSetting({
       success: (result) => {
         if (result.authSetting['scope.userLocation']) {
@@ -128,6 +148,49 @@ Page({
     });
   },
 
+  acceptPrivacyConsent() {
+    grantLocationConsent();
+    this.setData({
+      privacyConsentVisible: false,
+      privacyRejectMessage: '',
+      locationStatus: '定位中',
+      locationAuthDenied: false
+    });
+    this.initLocation();
+  },
+
+  rejectPrivacyConsent() {
+    const stayOnPrivacyNotice = () => {
+      this.setData({
+        privacyConsentVisible: true,
+        privacyRejectMessage: '需要同意后才能使用附近推荐功能。',
+        locationStatus: '未开启推荐'
+      });
+      wx.showToast({
+        title: '需要同意后才能使用推荐功能',
+        icon: 'none'
+      });
+    };
+
+    if (typeof wx.exitMiniProgram === 'function') {
+      wx.exitMiniProgram({
+        fail: stayOnPrivacyNotice
+      });
+      return;
+    }
+
+    stayOnPrivacyNotice();
+  },
+
+  showPrivacyConsent(message?: string) {
+    this.setData({
+      privacyConsentVisible: true,
+      privacyRejectMessage: message ?? ''
+    });
+  },
+
+  noop() {},
+
   async loadRecentMeals() {
     try {
       const history = await getHistory();
@@ -143,6 +206,11 @@ Page({
   },
 
   startQuestionnaire() {
+    if (!hasLocationConsent()) {
+      this.showPrivacyConsent('同意后才能开始附近美食推荐');
+      return;
+    }
+
     setHistoryFilterEnabled(this.data.historyFilterEnabled);
 
     wx.setStorageSync('meal_questionnaire_draft', {
@@ -215,7 +283,7 @@ function getStoredUserName(): string {
 }
 
 async function getLocationLabel(latitude: number, longitude: number): Promise<string | undefined> {
-  if (!wx.cloud) {
+  if (!hasLocationConsent() || !wx.cloud) {
     return undefined;
   }
 

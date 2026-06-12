@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 const historyService_1 = require("../../services/historyService");
 const mealService_1 = require("../../services/mealService");
+const privacyConsent_1 = require("../../services/privacyConsent");
 const MAX_SWITCH_COUNT = 3;
 const TAG_LABEL_MAP = {
     coffee: '咖啡',
@@ -80,6 +81,20 @@ Page({
         quotaBucket: ''
     },
     onLoad() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.setData({
+                loading: false,
+                errorText: '请先同意位置使用说明'
+            });
+            wx.showToast({
+                title: '请先同意位置使用说明',
+                icon: 'none'
+            });
+            wx.switchTab({
+                url: '/pages/home/index'
+            });
+            return;
+        }
         const result = wx.getStorageSync('meal_questionnaire_result');
         this.setData({
             answerCount: result?.answers?.length || 0
@@ -87,6 +102,13 @@ Page({
         this.loadRecommendation(result);
     },
     async loadRecommendation(result) {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            this.setData({
+                loading: false,
+                errorText: '请先同意位置使用说明'
+            });
+            return;
+        }
         this.setData({ loading: true, errorText: '' });
         try {
             const historyFilterContext = (0, historyService_1.getRecentHistoryFilterContext)();

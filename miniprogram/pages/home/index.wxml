@@ -75,4 +75,24 @@
       </view>
     </view>
   </view>
+
+  <view class="privacy-mask" wx:if="{{privacyConsentVisible}}" catchtouchmove="noop">
+    <view class="privacy-dialog">
+      <view class="privacy-badge">
+        <text class="privacy-badge-dot"></text>
+      </view>
+      <text class="privacy-title">位置使用说明</text>
+      <text class="privacy-intro">我们会在你同意后获取当前位置，仅用于查询附近美食。</text>
+      <view class="privacy-points">
+        <text>位置信息仅用于当次推荐美食和附近美食查询，不会用于广告追踪。</text>
+        <text>我们不会保存你的精确定位到用户资料中。</text>
+        <text>为获取附近美食信息，系统可能会基于当前位置请求地图服务。</text>
+      </view>
+      <text class="privacy-warning" wx:if="{{privacyRejectMessage}}">{{privacyRejectMessage}}</text>
+      <view class="privacy-actions">
+        <button class="privacy-button secondary" bindtap="rejectPrivacyConsent">拒绝并退出</button>
+        <button class="privacy-button primary" bindtap="acceptPrivacyConsent">接受并进入</button>
+      </view>
+    </view>
+  </view>
 </view>

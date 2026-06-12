@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const questionBank_1 = require("../../data/questionBank");
+const privacyConsent_1 = require("../../services/privacyConsent");
 const questionSelector_1 = require("../../services/questionSelector");
 const INITIAL_QUESTIONS = (0, questionSelector_1.selectQuestionSet)();
 function buildProgressSegments(questions, currentIndex) {
@@ -19,6 +20,16 @@ Page({
         answers: []
     },
     onLoad() {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            wx.showToast({
+                title: '请先同意位置使用说明',
+                icon: 'none'
+            });
+            wx.switchTab({
+                url: '/pages/home/index'
+            });
+            return;
+        }
         this.resetQuestionnaire();
     },
     resetQuestionnaire() {
@@ -93,6 +104,16 @@ Page({
         return [...this.data.answers.filter((item) => item.questionId !== question.id), answer];
     },
     finishQuestionnaire(answers) {
+        if (!(0, privacyConsent_1.hasLocationConsent)()) {
+            wx.showToast({
+                title: '请先同意位置使用说明',
+                icon: 'none'
+            });
+            wx.switchTab({
+                url: '/pages/home/index'
+            });
+            return;
+        }
         const result = {
             version: questionBank_1.QUESTION_BANK_VERSION,
             source: 'onboarding',

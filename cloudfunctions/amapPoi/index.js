@@ -221,7 +221,8 @@ exports.main = async (event = {}, context = {}) => {
       polygon,
       poiId
     });
-    const cached = event.cache !== false ? await readCloudPoiCache(cacheKey) : null;
+    const useCloudCache = event.cache === true;
+    const cached = useCloudCache ? await readCloudPoiCache(cacheKey) : null;
 
     if (cached) {
       const searchMeta = buildSearchMeta({
@@ -342,7 +343,7 @@ exports.main = async (event = {}, context = {}) => {
       keyMeta: pageResult.keyMeta
     });
 
-    if (restaurants.length > 0 && event.cache !== false) {
+    if (restaurants.length > 0 && useCloudCache) {
       await writeCloudPoiCache(cacheKey, {
         restaurants,
         createdAt: Date.now(),

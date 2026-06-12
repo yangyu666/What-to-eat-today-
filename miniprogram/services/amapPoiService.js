@@ -9,6 +9,7 @@ exports.__resetNearbyRestaurantCacheForTest = __resetNearbyRestaurantCacheForTes
 exports.__setAmapPoiStorageAdapterForTest = __setAmapPoiStorageAdapterForTest;
 exports.__setAmapPoiLocationProviderForTest = __setAmapPoiLocationProviderForTest;
 exports.__setAmapPoiCloudFetcherForTest = __setAmapPoiCloudFetcherForTest;
+const privacyConsent_1 = require("./privacyConsent");
 const CLOUD_FUNCTION_NAME = 'amapPoi';
 const DEFAULT_RADIUS_METERS = 1500;
 const PREFETCH_RADIUS_METERS = 10000;
@@ -32,6 +33,7 @@ async function getNearbyRestaurants(options = {}) {
     return result.restaurants;
 }
 async function getNearbyRestaurantsWithMeta(options = {}) {
+    (0, privacyConsent_1.requireLocationConsent)();
     const location = options.location ?? (await getUserLocation());
     const request = buildPoiCacheRequest(location, options);
     const cached = readNearbyRestaurantsCache(request);
@@ -134,6 +136,7 @@ const PREFETCH_KEYWORD_GROUPS = [
     { keyword: '', pageCount: PREFETCH_BROAD_PAGE_COUNT }
 ];
 async function prefetchNearbyRestaurantCandidates(options = {}) {
+    (0, privacyConsent_1.requireLocationConsent)();
     const location = options.location ?? (await getUserLocation());
     // 预取半径至少为 PREFETCH_RADIUS_METERS，确保缓存能覆盖推荐可能用到的较大半径（如距离不限）
     const radiusMeters = Math.max(options.radiusMeters ?? PREFETCH_RADIUS_METERS, PREFETCH_RADIUS_METERS);
@@ -218,6 +221,7 @@ async function getUserLocation() {
     if (locationProviderForTest) {
         return locationProviderForTest();
     }
+    (0, privacyConsent_1.requireLocationConsent)();
     return new Promise((resolve, reject) => {
         wx.getLocation({
             type: 'gcj02',
@@ -256,6 +260,7 @@ async function fetchNearbyRestaurantsFromCloud(location, options) {
     if (cloudFetcherForTest) {
         return cloudFetcherForTest(location, options);
     }
+    (0, privacyConsent_1.requireLocationConsent)();
     const app = getApp();
     if (!wx.cloud || !app.globalData?.cloudReady) {
         throw new Error('Cloud is not ready.');
@@ -277,7 +282,8 @@ async function fetchNearbyRestaurantsFromCloud(location, options) {
             id: options.id,
             types: options.types,
             fetchReason: options.fetchReason,
-            maxAmapApiCalls: options.maxAmapApiCalls
+            maxAmapApiCalls: options.maxAmapApiCalls,
+            cache: false
         }
     }));
     const result = response.result;

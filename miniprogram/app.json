@@ -44,7 +44,7 @@
   "style": "v2",
   "permission": {
     "scope.userLocation": {
-      "desc": "用于获取附近餐厅推荐"
+      "desc": "用于获取附近美食推荐"
     }
   },
   "requiredPrivateInfos": ["getLocation"],

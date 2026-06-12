@@ -10,9 +10,9 @@ import type { HistoryFilterContext } from './historyService';
 import { mapAnswersToPreferenceProfile } from './preferenceMapper';
 import { recommendRestaurants } from './recommendationEngine';
 
-const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 4;
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
-const MIN_POOL_BEFORE_AROUND_FALLBACK = 30;
+const MIN_POOL_BEFORE_FALLBACK = 12;
 
 interface AmapQueryAttempt {
   mode: AmapPoiSearchMode;
@@ -79,15 +79,12 @@ async function getAmapRecommendations(
       continue;
     }
 
-    if (
-      restaurantPool.size >= MIN_POOL_BEFORE_AROUND_FALLBACK &&
-      attempt.reason.includes('supplement')
-    ) {
+    if (restaurantPool.size >= MIN_POOL_BEFORE_FALLBACK && attempt.reason.includes('fallback')) {
       continue;
     }
 
     if (attempt.mode === 'around') {
-      if (restaurantPool.size >= MIN_POOL_BEFORE_AROUND_FALLBACK || remainingAroundCalls <= 0) {
+      if (restaurantPool.size >= MIN_POOL_BEFORE_FALLBACK || remainingAroundCalls <= 0) {
         continue;
       }
     }
@@ -103,7 +100,7 @@ async function getAmapRecommendations(
       pageCount: attempt.pageCount,
       fetchProfile: 'recommendation',
       fetchReason: attempt.reason,
-      maxAmapApiCalls: remainingAmapApiCalls
+      maxAmapApiCalls: Math.min(1, remainingAmapApiCalls)
     }).catch((error) => {
       console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
       return {
@@ -194,57 +191,38 @@ function buildAmapQueryAttempts(
     ...mallKeywords
   ].filter(Boolean);
   const attempts: AmapQueryAttempt[] = [];
-
-  if (baseKeyword) {
-    attempts.push({
-      mode: 'polygon',
-      radiusMeters: polygonRadius,
-      keyword: baseKeyword,
-      types: amapQuery.types,
-      pageCount: 1,
-      reason: 'recommendation-polygon-keyword-primary'
-    });
-  }
+  const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
 
   attempts.push({
     mode: 'polygon',
     radiusMeters: polygonRadius,
-    keyword: '',
-    types: amapQuery.types,
-    pageCount: 2,
-    reason: 'recommendation-polygon-broad-primary'
-  });
-
-  attempts.push({
-    mode: 'around',
-    radiusMeters: maxRadius,
-    keyword: relaxedKeyword || baseKeyword,
+    keyword: primaryKeyword || '',
     types: amapQuery.types,
     pageCount: 1,
-    reason: 'recommendation-around-last-resort'
+    reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'
   });
 
-  keywordAttempts.forEach((keyword) => {
-    attempts.push({
-      mode: 'polygon',
-      radiusMeters: maxRadius,
-      keyword,
-      types: amapQuery.types,
-      pageCount: premiumSearch ? 2 : 1,
-      reason: 'recommendation-polygon-keyword-supplement'
-    });
-
+  if (primaryKeyword && (scopedLocation.city || scopedLocation.adcode)) {
     attempts.push({
       mode: 'keyword',
       radiusMeters: maxRadius,
-      keyword,
+      keyword: primaryKeyword,
       city: scopedLocation.city,
       adcode: scopedLocation.adcode,
       types: amapQuery.types,
       pageCount: 1,
-      reason: 'recommendation-keyword-scoped-supplement'
+      reason: 'recommendation-keyword-fallback'
     });
-  });
+  } else {
+    attempts.push({
+      mode: 'around',
+      radiusMeters: maxRadius,
+      keyword: primaryKeyword || '',
+      types: amapQuery.types,
+      pageCount: 1,
+      reason: 'recommendation-around-fallback'
+    });
+  }
 
   return attempts.filter((attempt, index, allAttempts) => {
     return allAttempts.findIndex((item) => {

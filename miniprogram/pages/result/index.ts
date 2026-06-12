@@ -4,6 +4,7 @@ import {
   trackRecommendationAction
 } from '../../services/historyService';
 import { getLocalRecommendations } from '../../services/mealService';
+import { hasLocationConsent } from '../../services/privacyConsent';
 import type { RecommendationAction } from '../../types/recommendation';
 import type { UserQuestionnaireResult } from '../../types/userPreference';
 
@@ -94,6 +95,21 @@ Page({
   },
 
   onLoad() {
+    if (!hasLocationConsent()) {
+      this.setData({
+        loading: false,
+        errorText: '请先同意位置使用说明'
+      });
+      wx.showToast({
+        title: '请先同意位置使用说明',
+        icon: 'none'
+      });
+      wx.switchTab({
+        url: '/pages/home/index'
+      });
+      return;
+    }
+
     const result = wx.getStorageSync('meal_questionnaire_result') as
       | UserQuestionnaireResult
       | undefined;
@@ -106,6 +122,14 @@ Page({
   },
 
   async loadRecommendation(result?: UserQuestionnaireResult) {
+    if (!hasLocationConsent()) {
+      this.setData({
+        loading: false,
+        errorText: '请先同意位置使用说明'
+      });
+      return;
+    }
+
     this.setData({ loading: true, errorText: '' });
 
     try {

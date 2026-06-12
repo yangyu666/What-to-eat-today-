@@ -2209,6 +2209,60 @@ async function runPoiCacheAndStressTests() {
   assert(serviceRecommendations.length > 0, 'mealService should recommend from polygon candidate pool');
   assert(serviceRequestedModes.includes('polygon'), 'mealService should use polygon mode for the primary pool');
   assert(!serviceRequestedModes.includes('around'), 'mealService should not call around when polygon pool is sufficient');
+  assert(serviceRequestedModes.length === 1, 'mealService should spend one live POI call when the primary pool is sufficient');
+
+  __resetNearbyRestaurantCacheForTest();
+  const fallbackRequestedModes: string[] = [];
+  const smallPrimaryPool: Restaurant[] = cachedRestaurants.slice(0, 2);
+  const generatedFallbackRestaurants: Restaurant[] = Array.from({ length: 14 }).map((_, index) => ({
+    id: `fallback-pool-${index}`,
+    name: `Fallback Rice ${index}`,
+    tags: ['rice'],
+    tagIds: ['quick', 'rice', 'meal', 'staple'],
+    category: 'rice',
+    distanceMeters: 500 + index * 20,
+    averageCostYuan: 42,
+    openStatus: 'open',
+    rating: 4.3,
+    source: 'amap',
+    status: 'active'
+  }));
+  const fallbackPool: Restaurant[] = [
+    ...smallPrimaryPool,
+    ...generatedFallbackRestaurants
+  ];
+
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    const mode = options.mode ?? 'polygon';
+    fallbackRequestedModes.push(mode);
+
+    return {
+      restaurants: fallbackRequestedModes.length === 1 ? smallPrimaryPool : fallbackPool,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: `fallback-${mode}-fetch`,
+        poiFetchMode: mode,
+        aroundCallCount: mode === 'around' ? 1 : 0,
+        polygonCallCount: mode === 'polygon' ? 1 : 0,
+        keywordCallCount: mode === 'keyword' ? 1 : 0,
+        totalAmapApiCallCount: 1
+      }
+    };
+  });
+
+  const fallbackRecommendations = await getLocalRecommendations(undefined);
+  assert(fallbackRecommendations.length > 0, 'mealService should still recommend after one fallback fetch');
+  assert(fallbackRequestedModes.length === 2, 'mealService should spend at most two live POI calls when the primary pool is small');
+  assert(fallbackRequestedModes[0] === 'polygon', 'mealService should use polygon as the primary fetch');
+  assert(
+    fallbackRequestedModes[1] === 'around' || fallbackRequestedModes[1] === 'keyword',
+    'mealService fallback should use around or scoped keyword'
+  );
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({

@@ -1,4 +1,5 @@
 import { QUESTION_BANK_VERSION, type QuestionBankItem, type QuestionBankOption } from '../../data/questionBank';
+import { hasLocationConsent } from '../../services/privacyConsent';
 import { selectQuestionSet } from '../../services/questionSelector';
 import type { UserPreferenceAnswer, UserQuestionnaireResult } from '../../types/userPreference';
 
@@ -22,6 +23,17 @@ Page({
   },
 
   onLoad() {
+    if (!hasLocationConsent()) {
+      wx.showToast({
+        title: '请先同意位置使用说明',
+        icon: 'none'
+      });
+      wx.switchTab({
+        url: '/pages/home/index'
+      });
+      return;
+    }
+
     this.resetQuestionnaire();
   },
 
@@ -115,6 +127,17 @@ Page({
   },
 
   finishQuestionnaire(answers: UserPreferenceAnswer[]) {
+    if (!hasLocationConsent()) {
+      wx.showToast({
+        title: '请先同意位置使用说明',
+        icon: 'none'
+      });
+      wx.switchTab({
+        url: '/pages/home/index'
+      });
+      return;
+    }
+
     const result: UserQuestionnaireResult = {
       version: QUESTION_BANK_VERSION,
       source: 'onboarding',
