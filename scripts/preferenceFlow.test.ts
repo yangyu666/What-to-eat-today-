@@ -122,6 +122,10 @@ assert(
   /高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining/.test(luxuryAmapQuery.keywords ?? ''),
   '200+ budget should search broad premium restaurant keywords'
 );
+assert(
+  /铁板烧|GRILL|主厨|私厨|牛排|西餐|融合料理|酒店餐厅/.test(luxuryAmapQuery.keywords ?? ''),
+  '200+ budget should include nationwide high-ticket category and occasion keywords'
+);
 assert(/炳胜|利苑/.test(luxuryAmapQuery.keywords ?? ''), '200+ budget should keep known premium brand keywords as supplements');
 assert(
   !/肯德基|麦当劳|费大厨|霸王茶姬/.test(luxuryAmapQuery.keywords ?? ''),

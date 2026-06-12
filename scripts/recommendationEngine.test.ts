@@ -2264,6 +2264,102 @@ async function runPoiCacheAndStressTests() {
     'mealService fallback should use around or scoped keyword'
   );
 
+  __resetNearbyRestaurantCacheForTest();
+  const premiumFallbackKeywords: string[] = [];
+  const cheapButLargePool: Restaurant[] = Array.from({ length: 14 }).map((_, index) => ({
+    id: `cheap-large-pool-${index}`,
+    name: `Cheap Regular Meal ${index}`,
+    tags: ['rice'],
+    tagIds: ['quick', 'rice', 'meal', 'staple'],
+    category: 'rice',
+    distanceMeters: 600 + index * 30,
+    averageCostYuan: 45,
+    openStatus: 'open',
+    rating: 4.4,
+    source: 'amap',
+    status: 'active'
+  }));
+  const premiumSupplementPool: Restaurant[] = [
+    ...cheapButLargePool,
+    {
+      id: 'premium-teppanyaki',
+      name: 'Premium Teppanyaki',
+      tags: ['teppanyaki'],
+      tagIds: ['meal', 'premium_brand', 'relaxed', 'slow'],
+      category: 'teppanyaki',
+      distanceMeters: 4200,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.7,
+      source: 'amap',
+      status: 'active'
+    },
+    {
+      id: 'premium-chef-grill',
+      name: 'Chef Grill',
+      tags: ['grill'],
+      tagIds: ['meal', 'premium_brand', 'relaxed', 'slow'],
+      category: 'western restaurant',
+      distanceMeters: 3900,
+      averageCostYuan: 288,
+      openStatus: 'open',
+      rating: 4.6,
+      source: 'amap',
+      status: 'active'
+    }
+  ];
+
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    premiumFallbackKeywords.push(options.keyword ?? '');
+
+    return {
+      restaurants: premiumFallbackKeywords.length === 1 ? cheapButLargePool : premiumSupplementPool,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: `premium-${options.mode ?? 'polygon'}-fetch`,
+        poiFetchMode: options.mode ?? 'polygon',
+        aroundCallCount: (options.mode ?? 'polygon') === 'around' ? 1 : 0,
+        polygonCallCount: (options.mode ?? 'polygon') === 'polygon' ? 1 : 0,
+        keywordCallCount: (options.mode ?? 'polygon') === 'keyword' ? 1 : 0,
+        totalAmapApiCallCount: 1
+      }
+    };
+  });
+
+  const premiumFallbackRecommendations = await getLocalRecommendations({
+    version: 'test',
+    source: 'recommendation_filter',
+    submittedAt: '2026-06-02T04:00:00.000Z',
+    answers: [
+      {
+        questionId: 'budget',
+        type: 'single',
+        value: 'over_200',
+        optionIds: ['budget_over_200'],
+        answeredAt: '2026-06-02T04:00:01.000Z'
+      },
+      {
+        questionId: 'distance',
+        type: 'single',
+        value: 'any',
+        optionIds: ['distance_any'],
+        answeredAt: '2026-06-02T04:00:02.000Z'
+      }
+    ]
+  });
+  assert(premiumFallbackKeywords.length === 2, '200+ recommendation should still supplement when the raw pool is large but premium-effective candidates are scarce');
+  assert(premiumFallbackKeywords[1] !== premiumFallbackKeywords[0], 'premium supplement fetch should switch to a different high-end keyword cluster');
+  assert(/铁板烧|GRILL|主厨|Chef|私厨|牛排|西餐/.test(premiumFallbackKeywords[1]), 'premium supplement fetch should include nationwide high-ticket category keywords');
+  assert(
+    premiumFallbackRecommendations.some((candidate) => candidate.restaurantId === 'premium-teppanyaki' || candidate.restaurantId === 'premium-chef-grill'),
+    '200+ recommendations should include premium candidates recovered by the supplement fetch'
+  );
+
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({
     cacheFileExists: false,

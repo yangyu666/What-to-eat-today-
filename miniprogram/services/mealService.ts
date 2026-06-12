@@ -13,6 +13,7 @@ import { recommendRestaurants } from './recommendationEngine';
 const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
+const MIN_PREMIUM_POOL_BEFORE_FALLBACK = 6;
 
 interface AmapQueryAttempt {
   mode: AmapPoiSearchMode;
@@ -79,12 +80,12 @@ async function getAmapRecommendations(
       continue;
     }
 
-    if (restaurantPool.size >= MIN_POOL_BEFORE_FALLBACK && attempt.reason.includes('fallback')) {
+    if (attempt.reason.includes('fallback') && shouldSkipFallbackAttempt(restaurantPool, preferenceSnapshot)) {
       continue;
     }
 
     if (attempt.mode === 'around') {
-      if (restaurantPool.size >= MIN_POOL_BEFORE_FALLBACK || remainingAroundCalls <= 0) {
+      if (shouldSkipFallbackAttempt(restaurantPool, preferenceSnapshot) || remainingAroundCalls <= 0) {
         continue;
       }
     }
@@ -192,6 +193,7 @@ function buildAmapQueryAttempts(
   ].filter(Boolean);
   const attempts: AmapQueryAttempt[] = [];
   const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
+  const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
 
   attempts.push({
     mode: 'polygon',
@@ -202,11 +204,11 @@ function buildAmapQueryAttempts(
     reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'
   });
 
-  if (primaryKeyword && (scopedLocation.city || scopedLocation.adcode)) {
+  if (fallbackKeyword && (scopedLocation.city || scopedLocation.adcode)) {
     attempts.push({
       mode: 'keyword',
       radiusMeters: maxRadius,
-      keyword: primaryKeyword,
+      keyword: fallbackKeyword,
       city: scopedLocation.city,
       adcode: scopedLocation.adcode,
       types: amapQuery.types,
@@ -217,7 +219,7 @@ function buildAmapQueryAttempts(
     attempts.push({
       mode: 'around',
       radiusMeters: maxRadius,
-      keyword: primaryKeyword || '',
+      keyword: fallbackKeyword || primaryKeyword || '',
       types: amapQuery.types,
       pageCount: 1,
       reason: 'recommendation-around-fallback'
@@ -236,6 +238,58 @@ function buildAmapQueryAttempts(
       );
     }) === index;
   });
+}
+
+function shouldSkipFallbackAttempt(
+  restaurantPool: Map<string, Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>,
+  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+): boolean {
+  const restaurants = [...restaurantPool.values()];
+
+  if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
+    return countEffectivePremiumCandidates(restaurants) >= MIN_PREMIUM_POOL_BEFORE_FALLBACK;
+  }
+
+  return restaurants.length >= MIN_POOL_BEFORE_FALLBACK;
+}
+
+function countEffectivePremiumCandidates(
+  restaurants: Array<Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>
+): number {
+  return restaurants.filter((restaurant) => {
+    const cost = restaurant.averageCostYuan ?? estimateCostFromPriceLevel(restaurant.priceLevel);
+    const tagIds = new Set(restaurant.tagIds ?? []);
+    const text = `${restaurant.name ?? ''} ${restaurant.category ?? ''} ${(restaurant.tags ?? []).join(' ')}`;
+    const hasPremiumSignal =
+      tagIds.has('premium_brand') ||
+      /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|铁板烧|牛排|法餐|西餐|日料|酒店餐厅|星级酒店|GRILL|grill|烧肉|融合料理|创意菜/.test(text);
+
+    return (cost !== undefined && cost >= 180) || hasPremiumSignal;
+  }).length;
+}
+
+function estimateCostFromPriceLevel(priceLevel: number | undefined): number | undefined {
+  if (priceLevel === undefined) {
+    return undefined;
+  }
+
+  if (priceLevel >= 5) {
+    return 260;
+  }
+
+  if (priceLevel >= 4) {
+    return 160;
+  }
+
+  if (priceLevel >= 3) {
+    return 90;
+  }
+
+  if (priceLevel >= 2) {
+    return 50;
+  }
+
+  return 25;
 }
 
 function getScopedKeywordSearchLocation(
@@ -292,8 +346,9 @@ function getBrandChainKeywordAttempts(
 
   if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
     return [
-      '炳胜|利苑|广州酒家|白天鹅|黑珍珠|米其林',
-      '高端餐厅|私房菜|omakase|Fine Dining'
+      '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|酒店餐厅',
+      '铁板烧|GRILL|grill|主厨|Chef|私厨|私房菜|牛排|西餐|烧肉|融合料理|创意菜',
+      '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅'
     ];
   }
 
@@ -337,7 +392,11 @@ function getMallKeywordAttempts(
   }
 
   if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
-    return ['商场|购物中心|高端餐厅|黑珍珠', '购物中心|商场|炳胜|利苑|广州酒家'];
+    return [
+      '商场|购物中心|高端餐厅|黑珍珠|米其林',
+      '购物中心|商场|铁板烧|牛排|西餐|主厨|私厨|酒店餐厅',
+      '购物中心|商场|炳胜|利苑|广州酒家|白天鹅'
+    ];
   }
 
   return ['商场|购物中心|广场|mall|餐厅', '购物中心|商场|连锁餐厅|品牌餐厅'];
@@ -390,14 +449,15 @@ function normalizeRestaurantPoolKey(restaurant: Awaited<ReturnType<typeof getNea
 }
 
 function getPremiumKeywordAttempts(keyword: string): string[] {
-  if (!/高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑/.test(keyword)) {
+  if (!/高端餐厅|私房菜|私厨|主厨|Chef|铁板烧|牛排|西餐|融合料理|创意菜|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL|炳胜|利苑/.test(keyword)) {
     return [];
   }
 
   return [
-    '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining',
+    '铁板烧|GRILL|grill|主厨|Chef|私厨|私房菜|牛排|西餐|烧肉|融合料理|创意菜',
+    '黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|酒店餐厅',
     '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
-    '高端餐厅|私房菜'
+    '高端餐厅|私房菜|私厨|主厨餐厅|酒店餐厅'
   ];
 }
 
@@ -414,8 +474,8 @@ function getStrictCategoryKeyword(keyword: string): string | undefined {
     return '甜品|蛋糕|面包|烘焙|西点|Gelato|冰淇淋|Bakery|哈根达斯|贝果|双皮奶';
   }
 
-  if (/高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑/.test(keyword)) {
-    return '高端餐厅|私房菜|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|炳胜|利苑';
+  if (/高端餐厅|私房菜|私厨|主厨|Chef|铁板烧|牛排|西餐|融合料理|创意菜|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL|炳胜|利苑/.test(keyword)) {
+    return '高端餐厅|私房菜|私厨|主厨餐厅|铁板烧|牛排|西餐|融合料理|酒店餐厅|黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining|GRILL';
   }
 
   return undefined;
