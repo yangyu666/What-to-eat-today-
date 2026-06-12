@@ -51,6 +51,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
     const metaList = [];
     let remainingAmapApiCalls = MAX_AMAP_API_CALLS_PER_RECOMMENDATION;
     let remainingAroundCalls = MAX_AROUND_API_CALLS_PER_RECOMMENDATION;
+    let quotaErrorSeen = false;
     for (const attempt of attempts) {
         if (remainingAmapApiCalls <= 0) {
             break;
@@ -88,25 +89,26 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         catch (error) {
             console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
             if (isAmapDailyQuotaError(error)) {
+                quotaErrorSeen = true;
+                metaList.push({
+                    poiCacheHit: false,
+                    poiCacheKey: '',
+                    poiCacheAgeMs: 0,
+                    poiFetchReason: `amap-quota-exhausted-${attempt.mode}-try-next`,
+                    amapApiCallCount: 0,
+                    poiFetchMode: attempt.mode,
+                    aroundCallCount: 0,
+                    polygonCallCount: 0,
+                    keywordCallCount: 0,
+                    idCallCount: 0,
+                    cacheHitCount: 0,
+                    totalAmapApiCallCount: 0,
+                    quotaBucket: ''
+                });
                 if (restaurantPool.size > 0) {
-                    metaList.push({
-                        poiCacheHit: false,
-                        poiCacheKey: '',
-                        poiCacheAgeMs: 0,
-                        poiFetchReason: 'amap-quota-exhausted-after-partial-pool',
-                        amapApiCallCount: 0,
-                        poiFetchMode: attempt.mode,
-                        aroundCallCount: 0,
-                        polygonCallCount: 0,
-                        keywordCallCount: 0,
-                        idCallCount: 0,
-                        cacheHitCount: 0,
-                        totalAmapApiCallCount: 0,
-                        quotaBucket: ''
-                    });
                     break;
                 }
-                throw new Error('AMAP_DAILY_QUOTA_EXHAUSTED');
+                continue;
             }
             meta = {
                 poiCacheHit: false,
@@ -142,6 +144,9 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         });
     }
     if (restaurantPool.size === 0) {
+        if (quotaErrorSeen) {
+            throw new Error('AMAP_DAILY_QUOTA_EXHAUSTED');
+        }
         return [];
     }
     const result = (0, recommendationEngine_1.recommendRestaurants)({

@@ -2361,6 +2361,57 @@ async function runPoiCacheAndStressTests() {
   );
 
   __resetNearbyRestaurantCacheForTest();
+  const quotaRecoveryRequestedModes: string[] = [];
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    const mode = options.mode ?? 'polygon';
+    quotaRecoveryRequestedModes.push(mode);
+
+    if (quotaRecoveryRequestedModes.length === 1) {
+      throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
+    }
+
+    return {
+      restaurants: premiumSupplementPool,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: `quota-recovered-${mode}-fetch`,
+        poiFetchMode: mode,
+        aroundCallCount: mode === 'around' ? 1 : 0,
+        polygonCallCount: mode === 'polygon' ? 1 : 0,
+        keywordCallCount: mode === 'keyword' ? 1 : 0,
+        totalAmapApiCallCount: 1
+      }
+    };
+  });
+
+  const quotaRecoveredRecommendations = await getLocalRecommendations({
+    version: 'test',
+    source: 'recommendation_filter',
+    submittedAt: '2026-06-02T04:00:00.000Z',
+    answers: [
+      {
+        questionId: 'budget',
+        type: 'single',
+        value: 'over_200',
+        optionIds: ['budget_over_200'],
+        answeredAt: '2026-06-02T04:00:01.000Z'
+      }
+    ]
+  });
+  assert(quotaRecoveryRequestedModes.length === 2, 'quota error on the primary search should try one fallback search before failing');
+  assert(quotaRecoveryRequestedModes[0] === 'polygon', 'quota recovery should fail from the primary polygon fetch first');
+  assert(
+    quotaRecoveryRequestedModes[1] === 'around' || quotaRecoveryRequestedModes[1] === 'keyword',
+    'quota recovery should switch to around or scoped keyword fallback'
+  );
+  assert(quotaRecoveredRecommendations.length > 0, 'quota recovery fallback should still return restaurant recommendations');
+
+  __resetNearbyRestaurantCacheForTest();
   let quotaFailureCallCount = 0;
   __setAmapPoiStorageAdapterForTest({
     get: () => undefined,
@@ -2391,8 +2442,8 @@ async function runPoiCacheAndStressTests() {
   } catch (error) {
     quotaErrorMessage = error instanceof Error ? error.message : String(error);
   }
-  assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'daily quota exhaustion should surface as a clear recommendation error');
-  assert(quotaFailureCallCount === 1, 'daily quota exhaustion should stop fallback attempts and avoid extra AMap calls');
+  assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'quota exhaustion should surface only after fallback searches are also unavailable');
+  assert(quotaFailureCallCount === 2, 'quota exhaustion should try the primary and one fallback search, not stop after the first mode');
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({
