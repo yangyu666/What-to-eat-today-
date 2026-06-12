@@ -8,7 +8,7 @@ const amapQueryBuilder_1 = require("./amapQueryBuilder");
 const amapPoiService_1 = require("./amapPoiService");
 const preferenceMapper_1 = require("./preferenceMapper");
 const recommendationEngine_1 = require("./recommendationEngine");
-const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 2;
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
 const MIN_PREMIUM_POOL_BEFORE_FALLBACK = 6;
@@ -81,6 +81,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
                 pageCount: attempt.pageCount,
                 fetchProfile: 'recommendation',
                 fetchReason: attempt.reason,
+                cacheOnly: attempt.cacheOnly === true,
                 maxAmapApiCalls: Math.min(1, remainingAmapApiCalls)
             });
             restaurants = result.restaurants.map((restaurant) => normalizeRestaurantShape(restaurant));
@@ -90,6 +91,10 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
             console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
             if (isAmapDailyQuotaError(error)) {
                 quotaErrorSeen = true;
+                if (!attempt.cacheOnly) {
+                    remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - 1);
+                    remainingAroundCalls = Math.max(0, remainingAroundCalls - (attempt.mode === 'around' ? 1 : 0));
+                }
                 metaList.push({
                     poiCacheHit: false,
                     poiCacheKey: '',
@@ -130,7 +135,7 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
         remainingAmapApiCalls = Math.max(0, remainingAmapApiCalls - meta.amapApiCallCount);
         remainingAroundCalls = Math.max(0, remainingAroundCalls - (meta.aroundCallCount ?? (attempt.mode === 'around' ? meta.amapApiCallCount : 0)));
         if (restaurants.length === 0) {
-            if (remainingAmapApiCalls <= 0) {
+            if (!attempt.cacheOnly && remainingAmapApiCalls <= 0) {
                 console.warn('AMap POI recommendation live request budget exhausted.', {
                     attempt,
                     maxAmapApiCalls: MAX_AMAP_API_CALLS_PER_RECOMMENDATION
@@ -235,16 +240,21 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const baseKeyword = amapQuery.keywords ?? '';
     const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
     const premiumKeywords = (preferenceSnapshot.budgetLevel ?? 3) >= 6 ? getPremiumKeywordAttempts(baseKeyword) : [];
+    const midHighBudgetKeywords = getMidHighBudgetKeywordAttempts(preferenceSnapshot);
     const nonMealPremiumKeywords = getNonMealPremiumKeywordAttempts(preferenceSnapshot);
     const brandChainKeywords = getBrandChainKeywordAttempts(preferenceSnapshot);
     const mallKeywords = getMallKeywordAttempts(preferenceSnapshot);
     const luxuryFocusedKeywords = getLuxuryFocusedKeywordAttempts(preferenceSnapshot);
-    const premiumSearch = premiumKeywords.length > 0 || nonMealPremiumKeywords.length > 0 || brandChainKeywords.length > 0;
+    const premiumSearch = premiumKeywords.length > 0 ||
+        midHighBudgetKeywords.length > 0 ||
+        nonMealPremiumKeywords.length > 0 ||
+        brandChainKeywords.length > 0;
     const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
     const scopedLocation = getScopedKeywordSearchLocation(preferenceSnapshot);
     const keywordAttempts = [
         ...luxuryFocusedKeywords,
         relaxedKeyword || baseKeyword,
+        ...midHighBudgetKeywords,
         ...premiumKeywords,
         ...nonMealPremiumKeywords,
         ...brandChainKeywords,
@@ -253,6 +263,18 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const attempts = [];
     const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
     const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
+    const secondaryPolygonKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
+    attempts.push({
+        mode: 'polygon',
+        radiusMeters: maxRadius,
+        keyword: '',
+        types: amapQuery.types,
+        pageCount: 1,
+        city: '',
+        adcode: '',
+        reason: 'recommendation-broad-cache-first',
+        cacheOnly: true
+    });
     attempts.push({
         mode: 'polygon',
         radiusMeters: polygonRadius,
@@ -262,6 +284,28 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
         city: '',
         adcode: '',
         reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'
+    });
+    if (secondaryPolygonKeyword && secondaryPolygonKeyword !== primaryKeyword) {
+        attempts.push({
+            mode: 'polygon',
+            radiusMeters: maxRadius,
+            keyword: secondaryPolygonKeyword,
+            types: amapQuery.types,
+            pageCount: 1,
+            city: '',
+            adcode: '',
+            reason: 'recommendation-polygon-keyword-secondary'
+        });
+    }
+    attempts.push({
+        mode: 'polygon',
+        radiusMeters: maxRadius,
+        keyword: '',
+        types: amapQuery.types,
+        pageCount: 1,
+        city: '',
+        adcode: '',
+        reason: 'recommendation-polygon-broad-fallback'
     });
     if (fallbackKeyword && (scopedLocation.city || scopedLocation.adcode)) {
         attempts.push({
@@ -294,7 +338,8 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
                 item.keyword === attempt.keyword &&
                 item.types === attempt.types &&
                 (item.city ?? '') === (attempt.city ?? '') &&
-                (item.adcode ?? '') === (attempt.adcode ?? ''));
+                (item.adcode ?? '') === (attempt.adcode ?? '') &&
+                Boolean(item.cacheOnly) === Boolean(attempt.cacheOnly));
         }) === index;
     });
 }
@@ -367,6 +412,36 @@ function getScopedKeywordSearchLocation(preferenceSnapshot) {
 }
 function getStringPreferenceValue(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : '';
+}
+function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
+    const budgetLevel = preferenceSnapshot.budgetLevel ?? 3;
+    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
+    const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
+    const isExplicitNonMeal = selected.has('prefer_milk_tea') ||
+        selected.has('prefer_coffee') ||
+        selected.has('prefer_bakery_dessert') ||
+        selected.has('intent_drink') ||
+        selected.has('intent_dessert') ||
+        preferred.has('non_meal') ||
+        preferred.has('drink') ||
+        preferred.has('coffee') ||
+        preferred.has('milk_tea') ||
+        preferred.has('dessert');
+    if (budgetLevel < 5 || budgetLevel >= 6 || isExplicitNonMeal) {
+        return [];
+    }
+    if (selected.has('brand_chain')) {
+        return [
+            '粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理',
+            '费大厨|小菜园|西贝|海底捞|太二|探鱼|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九',
+            '商场餐厅|购物中心餐厅|品牌餐厅|连锁餐厅'
+        ];
+    }
+    return [
+        '粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理',
+        '本帮菜|湘菜|川菜|东南亚菜|韩餐|牛排|烧肉',
+        '品牌餐厅|商场餐厅|购物中心餐厅'
+    ];
 }
 function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {
     if ((preferenceSnapshot.budgetLevel ?? 3) < 5) {

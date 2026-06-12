@@ -2260,8 +2260,8 @@ async function runPoiCacheAndStressTests() {
   assert(fallbackRequestedModes.length === 2, 'mealService should spend at most two live POI calls when the primary pool is small');
   assert(fallbackRequestedModes[0] === 'polygon', 'mealService should use polygon as the primary fetch');
   assert(
-    fallbackRequestedModes[1] === 'around' || fallbackRequestedModes[1] === 'keyword',
-    'mealService fallback should use around or scoped keyword'
+    fallbackRequestedModes[1] === 'polygon' || fallbackRequestedModes[1] === 'around' || fallbackRequestedModes[1] === 'keyword',
+    'mealService fallback should try another polygon, around, or scoped keyword'
   );
 
   __resetNearbyRestaurantCacheForTest();
@@ -2352,9 +2352,12 @@ async function runPoiCacheAndStressTests() {
       }
     ]
   });
-  assert(premiumFallbackKeywords.length === 2, '200+ recommendation should still supplement when the raw pool is large but premium-effective candidates are scarce');
-  assert(premiumFallbackKeywords[1] !== premiumFallbackKeywords[0], 'premium supplement fetch should switch to a different high-end keyword cluster');
-  assert(/铁板烧|GRILL|主厨|Chef|私厨|牛排|西餐/.test(premiumFallbackKeywords[1]), 'premium supplement fetch should include nationwide high-ticket category keywords');
+  assert(premiumFallbackKeywords.length >= 2, '200+ recommendation should still supplement when the raw pool is large but premium-effective candidates are scarce');
+  assert(new Set(premiumFallbackKeywords).size >= 2, 'premium supplement fetch should switch to a different high-end keyword cluster');
+  assert(
+    premiumFallbackKeywords.some((keyword) => /铁板烧|GRILL|grill|主厨|Chef|私厨|牛排|西餐/.test(keyword)),
+    'premium supplement fetch should include nationwide high-ticket category keywords'
+  );
   assert(
     premiumFallbackRecommendations.some((candidate) => candidate.restaurantId === 'premium-teppanyaki' || candidate.restaurantId === 'premium-chef-grill'),
     '200+ recommendations should include premium candidates recovered by the supplement fetch'
@@ -2403,13 +2406,67 @@ async function runPoiCacheAndStressTests() {
       }
     ]
   });
-  assert(quotaRecoveryRequestedModes.length === 2, 'quota error on the primary search should try one fallback search before failing');
+  assert(
+    quotaRecoveryRequestedModes.length >= 2 && quotaRecoveryRequestedModes.length <= 3,
+    'quota error on the primary search should try bounded fallback searches before failing'
+  );
   assert(quotaRecoveryRequestedModes[0] === 'polygon', 'quota recovery should fail from the primary polygon fetch first');
   assert(
-    quotaRecoveryRequestedModes[1] === 'around' || quotaRecoveryRequestedModes[1] === 'keyword',
-    'quota recovery should switch to around or scoped keyword fallback'
+    quotaRecoveryRequestedModes[1] === 'polygon' || quotaRecoveryRequestedModes[1] === 'around' || quotaRecoveryRequestedModes[1] === 'keyword',
+    'quota recovery should switch to another polygon, around, or scoped keyword fallback'
   );
   assert(quotaRecoveredRecommendations.length > 0, 'quota recovery fallback should still return restaurant recommendations');
+
+  __resetNearbyRestaurantCacheForTest();
+  const midHighBudgetQuotaAttempts: Array<{ mode: string; keyword: string }> = [];
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    midHighBudgetQuotaAttempts.push({
+      mode: options.mode ?? 'polygon',
+      keyword: options.keyword ?? ''
+    });
+    throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
+  });
+
+  try {
+    await getLocalRecommendations({
+      version: 'test',
+      source: 'recommendation_filter',
+      submittedAt: '2026-06-02T04:00:00.000Z',
+      answers: [
+        {
+          questionId: 'budget',
+          type: 'single',
+          value: '100_200',
+          optionIds: ['budget_100_200'],
+          answeredAt: '2026-06-02T04:00:01.000Z'
+        },
+        {
+          questionId: 'brand_preference',
+          type: 'single',
+          value: 'chain',
+          optionIds: ['brand_chain'],
+          answeredAt: '2026-06-02T04:00:02.000Z'
+        }
+      ]
+    });
+  } catch {
+    // Expected: this scenario intentionally makes every live fetch fail.
+  }
+  assert(midHighBudgetQuotaAttempts.length >= 2, '100-200 brand path should try multiple live fetches before surfacing failure');
+  assert(midHighBudgetQuotaAttempts[0]?.mode === 'polygon', '100-200 brand path should start with polygon, not around');
+  assert(
+    /粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理|费大厨|海底捞|点都德|陶陶居/.test(midHighBudgetQuotaAttempts[0]?.keyword ?? ''),
+    '100-200 brand path should use concrete mid-high meal keywords before generic mall keywords'
+  );
+  assert(
+    midHighBudgetQuotaAttempts.some((attempt) => attempt.mode === 'polygon' && attempt.keyword === ''),
+    '100-200 brand path should try a broad polygon fallback before around-only fallback'
+  );
 
   __resetNearbyRestaurantCacheForTest();
   let quotaFailureCallCount = 0;
@@ -2443,7 +2500,7 @@ async function runPoiCacheAndStressTests() {
     quotaErrorMessage = error instanceof Error ? error.message : String(error);
   }
   assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'quota exhaustion should surface only after fallback searches are also unavailable');
-  assert(quotaFailureCallCount === 2, 'quota exhaustion should try the primary and one fallback search, not stop after the first mode');
+  assert(quotaFailureCallCount === 3, 'quota exhaustion should spend the bounded recommendation budget, not stop after the first mode or loop indefinitely');
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({
