@@ -403,6 +403,7 @@ function recommendRestaurants(options) {
         historyPenaltyRestaurantIds,
         historyPenaltyReasons
     };
+    const afterHistoryFilter = candidateRestaurants.length;
     const baseHardFiltered = candidateRestaurants.filter((restaurant) => {
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
             allowDistanceFallback: false,
@@ -440,6 +441,9 @@ function recommendRestaurants(options) {
         fallbackReason = buildNegativeFallbackReason(preference);
         scored = candidateRestaurants
             .filter((restaurant) => {
+            if (getNegativeConflict(restaurant, preference).severity === 'hard') {
+                return false;
+            }
             return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
                 allowDistanceFallback: true,
                 allowNegativeFallback: true,
@@ -454,7 +458,7 @@ function recommendRestaurants(options) {
     const poolStats = {
         totalFetched,
         afterHardFilter: baseHardFiltered.length,
-        afterHistoryFilter: primaryHardFiltered.length,
+        afterHistoryFilter,
         afterNegativeFilter,
         finalCandidateCount: Math.min(limit, scored.length),
         fallbackUsed: fallbackReason !== undefined,

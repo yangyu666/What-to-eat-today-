@@ -516,12 +516,14 @@ function recommendRestaurants(options) {
   };
   const experimentId = (options.context && options.context.experimentId) || DEFAULT_EXPERIMENT_ID;
   const candidateRestaurants = deduplicateRestaurants(options.restaurants || []);
+  const afterHistoryFilter = candidateRestaurants.length;
   const baseHardFiltered = candidateRestaurants.filter((restaurant) => {
-    return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, false).passed;
+    return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, true, false).passed;
   });
   const primaryHardFiltered = candidateRestaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, false, false).passed;
   });
+  const afterNegativeFilter = primaryHardFiltered.length;
   let fallbackReason;
   let scored = primaryHardFiltered.map((restaurant) => scoreRestaurant(restaurant, preference, scoreOptionsBase));
 
@@ -542,9 +544,10 @@ function recommendRestaurants(options) {
   if (scored.length === 0) {
     fallbackReason = buildNegativeFallbackReason(preference);
     scored = candidateRestaurants
-      .filter((restaurant) =>
-        applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, true).passed
-      )
+      .filter((restaurant) => {
+        if (getNegativeConflict(restaurant, preference).severity === 'hard') return false;
+        return applyHardFilters(restaurant, preference, excludeRestaurantIds, true, true, true).passed;
+      })
       .map((restaurant) =>
         scoreRestaurant(restaurant, preference, {
           ...scoreOptionsBase,
@@ -556,8 +559,8 @@ function recommendRestaurants(options) {
   const poolStats = {
     totalFetched: options.restaurants.length,
     afterHardFilter: baseHardFiltered.length,
-    afterHistoryFilter: primaryHardFiltered.length,
-    afterNegativeFilter: primaryHardFiltered.length,
+    afterHistoryFilter,
+    afterNegativeFilter,
     finalCandidateCount: Math.min(limit, scored.length),
     fallbackUsed: fallbackReason !== undefined,
     historyFallbackUsed: false

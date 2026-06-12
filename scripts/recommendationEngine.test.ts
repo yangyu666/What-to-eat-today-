@@ -923,9 +923,13 @@ assert(fallbackResult.candidates[0]?.fallbackReason !== undefined, 'fallback 候
 assert((fallbackResult.candidates[0]?.confidenceScore ?? 100) <= 70, 'fallback 后匹配度不能虚高');
 
 const spicyOnlyFallback = recommend(noSpicy, [
-  mockRestaurants.find((restaurant) => restaurant.id === 'r-chongqing-noodle') as Restaurant
+  mockRestaurants.find((restaurant) => restaurant.id === 'r-chongqing-noodle') as Restaurant,
+  mockRestaurants.find((restaurant) => restaurant.id === 'r-malatang') as Restaurant
 ]);
-assert((spicyOnlyFallback.candidates[0]?.confidenceScore ?? 100) <= 45, '负向冲突 fallback 匹配度不能虚高');
+assert(spicyOnlyFallback.candidates.length === 0, '明确不吃辣时，即使候选池只有辣味冲突项，也不能 fallback 出明显辣味 Top1');
+assert(spicyOnlyFallback.candidatePoolStats?.afterHardFilter === 2, '不吃辣冲突池的 afterHardFilter 应表示非负向硬过滤后的候选数');
+assert(spicyOnlyFallback.candidatePoolStats?.afterNegativeFilter === 0, '不吃辣冲突池的 afterNegativeFilter 应为 0');
+assert(spicyOnlyFallback.candidatePoolStats?.finalCandidateCount === 0, '不吃辣冲突池最终候选数应为 0');
 
 const spicyKeywordRestaurants: Restaurant[] = [
   {
@@ -1966,6 +1970,52 @@ void runPoiCacheAndStressTests().catch((error) => {
 });
 
 async function runPoiCacheAndStressTests() {
+  const cloudRecommendRestaurant = require('../../../cloudfunctions/recommendRestaurant/index.js') as unknown as {
+    main: (event: Record<string, unknown>, cloudContext: Record<string, unknown>) => Promise<{
+      ok: boolean;
+      data: { recommendation: ReturnType<typeof recommendRestaurants> };
+    }>;
+  };
+  const cloudNoSpicyResponse = await cloudRecommendRestaurant.main(
+    {
+      restaurants: [
+        {
+          id: 'cloud-xiaomian',
+          name: 'Chongqing Noodle',
+          tags: ['noodle'],
+          tagIds: ['spicy', 'strong_flavor', 'chongqing_noodle', 'noodle', 'hot'],
+          category: 'noodle',
+          distanceMeters: 300,
+          averageCostYuan: 28,
+          openStatus: 'open',
+          rating: 4.4,
+          status: 'active'
+        },
+        {
+          id: 'cloud-malatang',
+          name: 'Malatang',
+          tags: ['hotpot'],
+          tagIds: ['spicy', 'strong_flavor', 'malatang', 'hotpot', 'hot'],
+          category: 'hotpot',
+          distanceMeters: 400,
+          averageCostYuan: 35,
+          openStatus: 'open',
+          rating: 4.3,
+          status: 'active'
+        }
+      ],
+      context: { preferenceSnapshot: noSpicy },
+      limit: 3
+    },
+    {}
+  );
+  const cloudNoSpicyRecommendation = cloudNoSpicyResponse.data.recommendation;
+  assert(cloudNoSpicyResponse.ok === true, 'cloud recommendation should return ok for no-spicy conflict regression');
+  assert(cloudNoSpicyRecommendation.candidates.length === 0, 'cloud no-spicy hard-negative pool should not fallback to spicy top1');
+  assert(cloudNoSpicyRecommendation.candidatePoolStats !== undefined, 'cloud no-spicy regression should expose candidatePoolStats');
+  assert(cloudNoSpicyRecommendation.candidatePoolStats.afterHardFilter === 2, 'cloud afterHardFilter should match front-end non-negative hard-filter count');
+  assert(cloudNoSpicyRecommendation.candidatePoolStats.afterNegativeFilter === 0, 'cloud afterNegativeFilter should match front-end negative-filter count');
+
   const storage: Record<string, unknown> = {};
   const baseLocation = { latitude: 39.909, longitude: 116.455 };
   let amapCallCount = 0;
