@@ -469,7 +469,13 @@ async function fetchNearbyRestaurantsFromCloud(
   const result = response.result as AmapPoiCloudResponse | undefined;
 
   if (!result?.ok) {
-    throw new Error(result?.error.message ?? 'Failed to fetch nearby restaurants.');
+    const error = new Error(result?.error.message ?? 'Failed to fetch nearby restaurants.') as Error & {
+      code?: string;
+      details?: unknown;
+    };
+    error.code = result?.error.code;
+    error.details = result?.error.details;
+    throw error;
   }
 
   const searchMeta = result.data.searchMeta;

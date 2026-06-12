@@ -2360,6 +2360,40 @@ async function runPoiCacheAndStressTests() {
     '200+ recommendations should include premium candidates recovered by the supplement fetch'
   );
 
+  __resetNearbyRestaurantCacheForTest();
+  let quotaFailureCallCount = 0;
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async () => {
+    quotaFailureCallCount += 1;
+    throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
+  });
+
+  let quotaErrorMessage = '';
+  try {
+    await getLocalRecommendations({
+      version: 'test',
+      source: 'recommendation_filter',
+      submittedAt: '2026-06-02T04:00:00.000Z',
+      answers: [
+        {
+          questionId: 'budget',
+          type: 'single',
+          value: 'over_200',
+          optionIds: ['budget_over_200'],
+          answeredAt: '2026-06-02T04:00:01.000Z'
+        }
+      ]
+    });
+  } catch (error) {
+    quotaErrorMessage = error instanceof Error ? error.message : String(error);
+  }
+  assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'daily quota exhaustion should surface as a clear recommendation error');
+  assert(quotaFailureCallCount === 1, 'daily quota exhaustion should stop fallback attempts and avoid extra AMap calls');
+
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({
     cacheFileExists: false,

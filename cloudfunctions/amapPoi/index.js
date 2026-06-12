@@ -320,6 +320,10 @@ exports.main = async (event = {}, context = {}) => {
       return fail(requestId, 'AMAP_REQUEST_FAILED', amapResponse.info || 'AMap request failed.', {
         infocode: amapResponse.infocode,
         status: amapResponse.status,
+        apiCallCount: amapApiCallCount,
+        totalAmapApiCallCount: amapApiCallCount,
+        mode,
+        quotaBucket,
         ...pageResult.keyMeta
       });
     }

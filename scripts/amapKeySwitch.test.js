@@ -90,6 +90,21 @@ const cloudSecondKey = cloudManager.getCurrentKey();
 assert.notStrictEqual(cloudSecondKey.index, cloudFirstKey.index, 'cloud QPS errors should switch to another key');
 assert.strictEqual(cloudManager.getMeta().quotaErrorCount, 0, 'cloud QPS errors should not be counted as daily quota errors');
 
+const cloudQuotaManager = cloudAmap.createAmapKeyManager({
+  env: { AMAP_KEYS: `${SECRET_1},${SECRET_2}` },
+  requestId: 'stable-quota-request',
+  now: () => 60000
+});
+const cloudQuotaFirstKey = cloudQuotaManager.getCurrentKey();
+cloudQuotaManager.markFailure(
+  cloudQuotaFirstKey.index,
+  cloudAmap.classifyAmapFailure({ status: '0', infocode: '10003', info: 'USER_DAILY_QUERY_OVER_LIMIT' })
+);
+const cloudQuotaSecondKey = cloudQuotaManager.getCurrentKey();
+assert(cloudQuotaSecondKey, 'cloud quota errors should try another configured key before failing');
+assert.notStrictEqual(cloudQuotaSecondKey.index, cloudQuotaFirstKey.index, 'cloud quota errors should switch to another key');
+assert.strictEqual(cloudQuotaManager.getMeta().quotaErrorCount, 1, 'cloud quota errors should be counted per exhausted key');
+
 const failingManager = createSeedAmapKeyManager({ env: { AMAP_KEYS: `${SECRET_1},${SECRET_2}` } });
 for (let index = 0; index < 2; index += 1) {
   const keyEntry = failingManager.getCurrentKey();

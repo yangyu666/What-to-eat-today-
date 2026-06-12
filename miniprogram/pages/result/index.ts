@@ -163,14 +163,15 @@ Page({
       this.trackCurrentRecommendation('shown', candidates[0], 0, result);
     } catch (error) {
       console.error('Failed to load recommendation.', error);
+      const errorText = getRecommendationErrorText(error);
       this.setData({
         loading: false,
         candidates: [],
         recommendation: null,
-        errorText: '推荐加载失败，请稍后重试'
+        errorText
       });
       wx.showToast({
-        title: '推荐加载失败',
+        title: isAmapQuotaError(error) ? '高德额度已满' : '推荐加载失败',
         icon: 'none'
       });
     }
@@ -480,6 +481,19 @@ function getStableCoverImageUrl(recommendation: MealCandidate | null): string {
 
 function normalizeImageUrl(url: string | undefined): string {
   return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : '';
+}
+
+function getRecommendationErrorText(error: unknown): string {
+  if (isAmapQuotaError(error)) {
+    return '高德今日搜索额度已用完，暂时无法获取附近真实餐厅。请稍后再试，或更换可用的高德 WebService Key。';
+  }
+
+  return '推荐加载失败，请稍后重试';
+}
+
+function isAmapQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /AMAP_DAILY_QUOTA_EXHAUSTED|USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(message);
 }
 
 function getFallbackCoverImageUrl(recommendation: MealCandidate | null): string {

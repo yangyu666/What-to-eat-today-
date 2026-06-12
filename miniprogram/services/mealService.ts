@@ -90,21 +90,29 @@ async function getAmapRecommendations(
       }
     }
 
-    const result = await getNearbyRestaurantsWithMeta({
-      mode: attempt.mode,
-      radiusMeters: attempt.radiusMeters,
-      keyword: attempt.keyword,
-      city: attempt.city,
-      adcode: attempt.adcode,
-      types: attempt.types,
-      pageSize: 25,
-      pageCount: attempt.pageCount,
-      fetchProfile: 'recommendation',
-      fetchReason: attempt.reason,
-      maxAmapApiCalls: Math.min(1, remainingAmapApiCalls)
-    }).catch((error) => {
+    let result: Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>;
+
+    try {
+      result = await getNearbyRestaurantsWithMeta({
+        mode: attempt.mode,
+        radiusMeters: attempt.radiusMeters,
+        keyword: attempt.keyword,
+        city: attempt.city,
+        adcode: attempt.adcode,
+        types: attempt.types,
+        pageSize: 25,
+        pageCount: attempt.pageCount,
+        fetchProfile: 'recommendation',
+        fetchReason: attempt.reason,
+        maxAmapApiCalls: Math.min(1, remainingAmapApiCalls)
+      });
+    } catch (error) {
       console.warn('Nearby AMap POI recommendation attempt failed.', attempt, error);
-      return {
+      if (isAmapDailyQuotaError(error)) {
+        throw new Error('AMAP_DAILY_QUOTA_EXHAUSTED');
+      }
+
+      result = {
         restaurants: [],
         meta: {
           poiCacheHit: false,
@@ -120,7 +128,7 @@ async function getAmapRecommendations(
           totalAmapApiCallCount: 0
         }
       };
-    });
+    }
     const restaurants = result.restaurants;
 
     metaList.push(result.meta);
@@ -167,6 +175,13 @@ async function getAmapRecommendations(
     ...candidate,
     ...poiMeta
   }));
+}
+
+function isAmapDailyQuotaError(error: unknown): boolean {
+  const payload = error as { message?: string; code?: string; details?: unknown } | undefined;
+  const text = `${payload?.message ?? ''} ${payload?.code ?? ''} ${JSON.stringify(payload?.details ?? {})}`;
+
+  return /USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|AMAP_KEYS_UNAVAILABLE|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(text);
 }
 
 function buildAmapQueryAttempts(
