@@ -1,9 +1,11 @@
 import type { MealCandidate } from '../models/meal';
+import type { Restaurant } from '../types/restaurant';
 import type { UserQuestionnaireResult } from '../types/userPreference';
 import { buildAmapRestaurantQuery } from './amapQueryBuilder';
 import {
   getNearbyRestaurantsWithMeta,
   type AmapPoiSearchMode,
+  type NearbyRestaurantsResult,
   type PoiFetchMeta
 } from './amapPoiService';
 import type { HistoryFilterContext } from './historyService';
@@ -66,7 +68,7 @@ async function getAmapRecommendations(
   const recommendationContext = buildRecommendationContext(preferenceSnapshot, historyFilterContext);
   const amapQuery = buildAmapRestaurantQuery(preferenceSnapshot);
   const attempts = buildAmapQueryAttempts(amapQuery, preferenceSnapshot);
-  const restaurantPool = new Map<string, Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>();
+  const restaurantPool = new Map<string, Restaurant>();
   const metaList: PoiFetchMeta[] = [];
   let remainingAmapApiCalls = MAX_AMAP_API_CALLS_PER_RECOMMENDATION;
   let remainingAroundCalls = MAX_AROUND_API_CALLS_PER_RECOMMENDATION;
@@ -90,7 +92,7 @@ async function getAmapRecommendations(
       }
     }
 
-    let result: Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>;
+    let result: NearbyRestaurantsResult;
 
     try {
       result = await getNearbyRestaurantsWithMeta({
@@ -259,7 +261,7 @@ function buildAmapQueryAttempts(
 }
 
 function shouldSkipFallbackAttempt(
-  restaurantPool: Map<string, Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>,
+  restaurantPool: Map<string, Restaurant>,
   preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
 ): boolean {
   const restaurants = [...restaurantPool.values()];
@@ -271,9 +273,7 @@ function shouldSkipFallbackAttempt(
   return restaurants.length >= MIN_POOL_BEFORE_FALLBACK;
 }
 
-function countEffectivePremiumCandidates(
-  restaurants: Array<Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]>
-): number {
+function countEffectivePremiumCandidates(restaurants: Restaurant[]): number {
   return restaurants.filter((restaurant) => {
     const cost = restaurant.averageCostYuan ?? estimateCostFromPriceLevel(restaurant.priceLevel);
     const tagIds = new Set(restaurant.tagIds ?? []);
@@ -486,7 +486,7 @@ function uniqueText(values: Array<string | undefined>): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
 }
 
-function normalizeRestaurantPoolKey(restaurant: Awaited<ReturnType<typeof getNearbyRestaurantsWithMeta>>['restaurants'][number]): string {
+function normalizeRestaurantPoolKey(restaurant: Restaurant): string {
   const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');
   const location = restaurant.location;
   const locationKey =
