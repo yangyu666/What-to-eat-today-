@@ -192,14 +192,17 @@ function buildAmapQueryAttempts(
   const polygonRadius = Math.max(baseRadius, 3000);
   const baseKeyword = amapQuery.keywords ?? '';
   const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
-  const premiumKeywords = getPremiumKeywordAttempts(baseKeyword);
+  const premiumKeywords =
+    (preferenceSnapshot.budgetLevel ?? 3) >= 6 ? getPremiumKeywordAttempts(baseKeyword) : [];
   const nonMealPremiumKeywords = getNonMealPremiumKeywordAttempts(preferenceSnapshot);
   const brandChainKeywords = getBrandChainKeywordAttempts(preferenceSnapshot);
   const mallKeywords = getMallKeywordAttempts(preferenceSnapshot);
+  const luxuryFocusedKeywords = getLuxuryFocusedKeywordAttempts(preferenceSnapshot);
   const premiumSearch = premiumKeywords.length > 0 || nonMealPremiumKeywords.length > 0 || brandChainKeywords.length > 0;
   const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
   const scopedLocation = getScopedKeywordSearchLocation(preferenceSnapshot);
   const keywordAttempts = [
+    ...luxuryFocusedKeywords,
     relaxedKeyword || baseKeyword,
     ...premiumKeywords,
     ...nonMealPremiumKeywords,
@@ -279,8 +282,39 @@ function countEffectivePremiumCandidates(
       tagIds.has('premium_brand') ||
       /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|铁板烧|牛排|法餐|西餐|日料|酒店餐厅|星级酒店|GRILL|grill|烧肉|融合料理|创意菜/.test(text);
 
-    return (cost !== undefined && cost >= 180) || hasPremiumSignal;
+    return (cost !== undefined && cost >= 180) || (cost === undefined && hasPremiumSignal) || tagIds.has('premium_brand');
   }).length;
+}
+
+function getLuxuryFocusedKeywordAttempts(
+  preferenceSnapshot: ReturnType<typeof mapAnswersToPreferenceProfile>
+): string[] {
+  if ((preferenceSnapshot.budgetLevel ?? 3) < 6) {
+    return [];
+  }
+
+  const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
+  const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
+  const isExplicitNonMeal =
+    selected.has('prefer_milk_tea') ||
+    selected.has('prefer_coffee') ||
+    selected.has('prefer_bakery_dessert') ||
+    selected.has('intent_drink') ||
+    selected.has('intent_dessert') ||
+    preferred.has('non_meal') ||
+    preferred.has('drink') ||
+    preferred.has('coffee') ||
+    preferred.has('milk_tea') ||
+    preferred.has('dessert');
+
+  if (isExplicitNonMeal) {
+    return [];
+  }
+
+  return [
+    '铁板烧|牛排|西餐',
+    'GRILL|grill|主厨|Chef|私厨|私房菜'
+  ];
 }
 
 function estimateCostFromPriceLevel(priceLevel: number | undefined): number | undefined {

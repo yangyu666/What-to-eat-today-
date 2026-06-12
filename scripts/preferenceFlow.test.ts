@@ -106,6 +106,32 @@ const premiumBudgetProfile = mapAnswersToPreferenceProfile([
 
 assert(premiumBudgetProfile.budgetLevel === 5, '100-200 budget should map to premium budget level');
 
+const premiumBrandBudgetProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'budget',
+    type: 'single',
+    value: '100_200',
+    optionIds: ['budget_100_200'],
+    answeredAt: '2026-06-02T04:00:06.000Z'
+  },
+  {
+    questionId: 'brand_preference',
+    type: 'single',
+    value: 'chain',
+    optionIds: ['brand_chain'],
+    answeredAt: '2026-06-02T04:00:06.500Z'
+  }
+]);
+const premiumBrandBudgetQuery = buildAmapRestaurantQuery(premiumBrandBudgetProfile);
+assert(
+  !/高端餐厅|黑珍珠|米其林|omakase|Fine Dining|炳胜|利苑|白天鹅/.test(premiumBrandBudgetQuery.keywords ?? ''),
+  '100-200 brand preference should not use 200+ premium-only keywords'
+);
+assert(
+  !/肯德基|麦当劳|快餐|简餐|盖饭|套餐/.test(premiumBrandBudgetQuery.keywords ?? ''),
+  '100-200 brand preference should not actively search low-budget fast-food keywords'
+);
+
 const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
   {
     questionId: 'budget',
