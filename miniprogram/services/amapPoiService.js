@@ -162,10 +162,11 @@ const PREFETCH_BROAD_PAGE_COUNT = 8;
 const PREFETCH_PREMIUM_PAGE_COUNT = 4;
 const PREFETCH_CATEGORY_PAGE_COUNT = 2;
 const PREFETCH_KEYWORD_GROUPS = [
-    { keyword: '高端餐厅|私房菜|黑珍珠|米其林|炳胜|利苑|大董|新荣记|广州酒家|白天鹅', pageCount: PREFETCH_PREMIUM_PAGE_COUNT },
+    { keyword: '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining', pageCount: PREFETCH_PREMIUM_PAGE_COUNT },
+    { keyword: '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题', pageCount: PREFETCH_PREMIUM_PAGE_COUNT },
     { keyword: '快餐|简餐|盖饭|面|套餐|小吃|粥|粉', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
     { keyword: '火锅|烧烤|川菜|湘菜|粤菜|江浙|日料|西餐|东北菜', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
-    { keyword: '奶茶|咖啡|茶饮|甜品|烘焙', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
+    { keyword: '奶茶|咖啡|茶饮|甜品|烘焙|酒店下午茶|精品咖啡', pageCount: PREFETCH_CATEGORY_PAGE_COUNT },
     { keyword: '', pageCount: PREFETCH_BROAD_PAGE_COUNT }
 ];
 async function prefetchNearbyRestaurantCandidates(options = {}) {

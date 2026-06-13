@@ -204,6 +204,7 @@ const milkTeaProfile = mapAnswersToPreferenceProfile([
 
 assert(milkTeaProfile.preferredTagIds.includes('milk_tea'), 'milk tea preference should map to milk_tea tag');
 assert(milkTeaProfile.preferredTagIds.includes('non_meal'), 'milk tea preference should map to non_meal tag');
+assert(!milkTeaProfile.preferredTagIds.includes('staple'), 'milk tea preference should remove default staple preference');
 assert(milkTeaProfile.avoidedTagIds.includes('meal'), 'milk tea preference should avoid meal candidates');
 const milkTeaKeywords = milkTeaProfile.softPreferences?.amapKeywords;
 assert(
@@ -214,6 +215,46 @@ assert(
 const milkTeaQuery = buildAmapRestaurantQuery(milkTeaProfile);
 assert(/奶茶|茶饮|霸王茶姬/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should keep milk tea recall keywords');
 assert(!/咖啡|甜品|蛋糕|面包|盖饭|虾饺/.test(milkTeaQuery.keywords ?? ''), 'milk tea query should not drift into coffee, dessert, or meal keywords');
+
+const coffeeOnlyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'category_preference',
+    type: 'single',
+    value: 'coffee',
+    optionIds: ['prefer_coffee'],
+    answeredAt: '2026-06-02T04:10:00.050Z'
+  }
+]);
+assert(coffeeOnlyProfile.preferredTagIds.includes('coffee'), 'coffee preference should map to coffee tag');
+assert(coffeeOnlyProfile.preferredTagIds.includes('non_meal'), 'coffee preference should infer non_meal');
+assert(!coffeeOnlyProfile.preferredTagIds.includes('staple'), 'coffee preference should remove default staple preference');
+assert(coffeeOnlyProfile.avoidedTagIds.includes('meal'), 'coffee preference should avoid meal candidates');
+
+const bakeryOnlyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'category_preference',
+    type: 'single',
+    value: 'bakery_dessert',
+    optionIds: ['prefer_bakery_dessert'],
+    answeredAt: '2026-06-02T04:10:00.060Z'
+  }
+]);
+assert(bakeryOnlyProfile.preferredTagIds.includes('dessert'), 'bakery dessert preference should map to dessert tag');
+assert(bakeryOnlyProfile.preferredTagIds.includes('non_meal'), 'bakery dessert preference should infer non_meal');
+assert(!bakeryOnlyProfile.preferredTagIds.includes('staple'), 'bakery dessert preference should remove default staple preference');
+
+const afternoonTeaOnlyProfile = mapAnswersToPreferenceProfile([
+  {
+    questionId: 'time_slot',
+    type: 'single',
+    value: 'afternoon_tea',
+    optionIds: ['time_afternoon_tea'],
+    answeredAt: '2026-06-02T04:10:00.070Z'
+  }
+]);
+assert(afternoonTeaOnlyProfile.preferredTagIds.includes('afternoon_tea'), 'afternoon tea should map to afternoon_tea tag');
+assert(afternoonTeaOnlyProfile.preferredTagIds.includes('non_meal'), 'afternoon tea should infer non_meal');
+assert(!afternoonTeaOnlyProfile.preferredTagIds.includes('staple'), 'afternoon tea should remove default staple preference');
 
 const luxuryDrinkProfile = mapAnswersToPreferenceProfile([
   {

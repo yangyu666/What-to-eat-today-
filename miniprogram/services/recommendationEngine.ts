@@ -55,6 +55,8 @@ interface ScoreOptions {
   fallbackReason?: string;
   relativeLeadScore?: number;
   candidatePoolWeak?: boolean;
+  confidenceCap?: number;
+  finalScoreCap?: number;
   historyFilterEnabled?: boolean;
   excludedHistoryRestaurantIds?: RestaurantId[];
   historyPenaltyRestaurantIds?: RestaurantId[];
@@ -488,12 +490,16 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
   const afterNegativeFilter = primaryHardFiltered.length;
 
   let fallbackReason: string | undefined;
+  let fallbackConfidenceCap: number | undefined;
+  let fallbackFinalScoreCap: number | undefined;
   let scored = primaryHardFiltered.map((restaurant) =>
     scoreRestaurant(restaurant, preference, scoreOptionsBase)
   );
 
   if (scored.length < Math.min(limit, MIN_PRIMARY_POOL_SIZE)) {
     fallbackReason = buildDistanceFallbackReason(preference);
+    fallbackConfidenceCap = undefined;
+    fallbackFinalScoreCap = undefined;
     scored = candidateRestaurants
       .filter((restaurant) => {
         return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
@@ -514,6 +520,8 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
 
   if (scored.length === 0) {
     fallbackReason = buildNegativeFallbackReason(preference);
+    fallbackConfidenceCap = undefined;
+    fallbackFinalScoreCap = undefined;
     scored = candidateRestaurants
       .filter((restaurant) => {
         if (getNegativeConflict(restaurant, preference).severity === 'hard') {
@@ -531,6 +539,24 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
         scoreRestaurant(restaurant, preference, {
           ...scoreOptionsBase,
           fallbackReason
+        })
+      );
+  }
+
+  if (scored.length === 0) {
+    fallbackReason = buildLastResortFallbackReason(preference);
+    fallbackConfidenceCap = 45;
+    fallbackFinalScoreCap = 45;
+    scored = candidateRestaurants
+      .filter((restaurant) =>
+        isLastResortFallbackCandidate(restaurant, preference, excludeRestaurantIds)
+      )
+      .map((restaurant) =>
+        scoreRestaurant(restaurant, preference, {
+          ...scoreOptionsBase,
+          fallbackReason,
+          confidenceCap: fallbackConfidenceCap,
+          finalScoreCap: fallbackFinalScoreCap
         })
       );
   }
@@ -553,7 +579,9 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
       historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
       excludedHistoryRestaurantIds: scoreOptionsBase.excludedHistoryRestaurantIds,
       historyPenaltyRestaurantIds: scoreOptionsBase.historyPenaltyRestaurantIds,
-      historyPenaltyReasons: scoreOptionsBase.historyPenaltyReasons
+      historyPenaltyReasons: scoreOptionsBase.historyPenaltyReasons,
+      confidenceCap: fallbackConfidenceCap,
+      finalScoreCap: fallbackFinalScoreCap
     });
 
     return {
@@ -618,13 +646,17 @@ export function scoreRestaurant(
     MIN_SCORE,
     MAX_SCORE
   );
-  const finalScore =
+  const distanceAdjustedFinalScore =
     options.fallbackReason !== undefined &&
     preference?.maxDistanceMeters !== undefined &&
     restaurant.distanceMeters !== undefined &&
     restaurant.distanceMeters > preference.maxDistanceMeters
       ? Math.min(rawFinalScore, 54)
       : rawFinalScore;
+  const finalScore =
+    options.finalScoreCap !== undefined
+      ? Math.min(distanceAdjustedFinalScore, options.finalScoreCap)
+      : distanceAdjustedFinalScore;
   const hardConstraintScore = getHardConstraintConfidence(restaurant, preference, options.fallbackReason);
   const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
   const negativeAvoidanceScore = getNegativeAvoidanceConfidence(negativeConflict);
@@ -647,9 +679,13 @@ export function scoreRestaurant(
   const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
     ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
     : rawConfidenceScore;
-  const confidenceScore = historyPenaltyApplies
+  const historyCalibratedConfidenceScore = historyPenaltyApplies
     ? Math.min(budgetCalibratedConfidenceScore, 72)
     : budgetCalibratedConfidenceScore;
+  const confidenceScore =
+    options.confidenceCap !== undefined
+      ? Math.min(historyCalibratedConfidenceScore, options.confidenceCap)
+      : historyCalibratedConfidenceScore;
 
   return {
     restaurant,
@@ -851,6 +887,81 @@ function hasPremiumCandidateEvidence(restaurant: Restaurant, text = getRestauran
     /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/.test(text) ||
     ((restaurant.rating ?? 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text)))
   );
+}
+
+function isLastResortFallbackCandidate(
+  restaurant: Restaurant,
+  preference: UserPreferenceProfile | undefined,
+  excludeRestaurantIds: Set<RestaurantId>
+): boolean {
+  const text = getRestaurantText(restaurant);
+
+  if (restaurant.status !== 'active') {
+    return false;
+  }
+
+  if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') {
+    return false;
+  }
+
+  if (excludeRestaurantIds.has(restaurant.id)) {
+    return false;
+  }
+
+  if (isNonRestaurantSalesCandidate(text)) {
+    return false;
+  }
+
+  if (isClearlyOverBudget(restaurant, preference)) {
+    return false;
+  }
+
+  return !hasSafetyHardConflict(restaurant, preference);
+}
+
+function hasSafetyHardConflict(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
+  const avoided = new Set(getAvoidedTagIds(preference));
+  const preferred = new Set(getPreferredTagIds(preference));
+  const tagIds = getRestaurantTagIds(restaurant);
+  const text = getRestaurantText(restaurant);
+  const explicitNoSpicy = avoided.has('spicy');
+  const explicitHalal = preferred.has('halal') || avoided.has('pork');
+  const explicitVegetarian = preferred.has('vegetarian');
+  const explicitAllergy = preferred.has('allergy_sensitive');
+
+  if (
+    explicitNoSpicy &&
+    (tagIds.some((tagId) => SPICY_CONFLICT_TAGS.includes(tagId)) ||
+      [...SPICY_KEYWORDS, ...SPICY_HEAVY_KEYWORDS].some((keyword) => text.includes(keyword)))
+  ) {
+    return true;
+  }
+
+  if (
+    explicitHalal &&
+    (tagIds.some((tagId) => HALAL_CONFLICT_TAGS.includes(tagId)) ||
+      PORK_KEYWORDS.some((keyword) => text.includes(keyword)))
+  ) {
+    return true;
+  }
+
+  if (
+    explicitVegetarian &&
+    (tagIds.some((tagId) => VEGETARIAN_CONFLICT_TAGS.includes(tagId)) ||
+      MEAT_HEAVY_KEYWORDS.some((keyword) => text.includes(keyword)))
+  ) {
+    return true;
+  }
+
+  if (
+    explicitAllergy &&
+    (tagIds.some((tagId) => ALLERGY_CONFLICT_TAGS.includes(tagId)) ||
+      ALLERGY_KEYWORDS.some((keyword) => text.includes(keyword)))
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function rankWithLightRandom(scored: ScoredRestaurant[], random: () => number): ScoredRestaurant[] {
@@ -2061,6 +2172,22 @@ function buildNegativeFallbackReason(preference?: UserPreferenceProfile): string
   }
 
   return '附近符合条件较少，已放宽部分次要偏好并下调匹配度';
+}
+
+function buildLastResortFallbackReason(preference?: UserPreferenceProfile): string {
+  if ((preference?.budgetLevel ?? 3) >= 6) {
+    return '附近 200 元以上严格匹配太少，先给你一个低置信备选，可考虑放宽距离或预算';
+  }
+
+  if ((preference?.budgetLevel ?? 3) === 5) {
+    return '附近 100-200 严格匹配太少，先给你一个低置信备选，可考虑放宽距离或预算';
+  }
+
+  if (isExplicitNonMealPreference(preference)) {
+    return '同类饮品/甜品严格匹配太少，先给你一个低置信备选';
+  }
+
+  return '附近严格匹配太少，先给你一个低置信备选';
 }
 
 function isExplicitNonMealPreference(preference?: UserPreferenceProfile): boolean {

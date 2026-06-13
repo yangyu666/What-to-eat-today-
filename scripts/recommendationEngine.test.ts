@@ -299,7 +299,18 @@ const luxuryLowOnlyResult = recommend(
     }
   ]
 );
-assert(luxuryLowOnlyResult.candidates.length === 0, '200+ budget should not fallback to clearly low-price candidates');
+assert(
+  luxuryLowOnlyResult.candidates[0]?.restaurantId === 'luxury-low-only',
+  '200+ budget may return a final low-confidence fallback instead of failing empty'
+);
+assert(
+  luxuryLowOnlyResult.candidates[0]?.fallbackReason?.includes('低置信') === true,
+  '200+ low-price fallback should explain that it is low-confidence'
+);
+assert(
+  (luxuryLowOnlyResult.candidates[0]?.confidenceScore ?? 100) <= 45,
+  '200+ low-price fallback must be capped at low confidence'
+);
 
 const luxuryUnknownOnlyResult = recommend(
   profile({
@@ -354,7 +365,14 @@ const luxuryWeakUnknownOnlyResult = recommend(
     }
   ]
 );
-assert(luxuryWeakUnknownOnlyResult.candidates.length === 0, '200+ fallback should not use weak unknown-price ordinary restaurants');
+assert(
+  luxuryWeakUnknownOnlyResult.candidates[0]?.restaurantId === 'luxury-weak-unknown-price',
+  '200+ weak unknown-price ordinary restaurants may only appear as final low-confidence fallback'
+);
+assert(
+  (luxuryWeakUnknownOnlyResult.candidates[0]?.confidenceScore ?? 100) <= 45,
+  '200+ weak unknown-price final fallback must be capped at low confidence'
+);
 
 const premiumLowOnlyResult = recommend(
   profile({
@@ -377,7 +395,14 @@ const premiumLowOnlyResult = recommend(
     }
   ]
 );
-assert(premiumLowOnlyResult.candidates.length === 0, '100-200 budget should not recommend dozens-yuan restaurants');
+assert(
+  premiumLowOnlyResult.candidates[0]?.restaurantId === 'premium-low-only',
+  '100-200 budget may return a final low-confidence fallback instead of failing empty'
+);
+assert(
+  (premiumLowOnlyResult.candidates[0]?.confidenceScore ?? 100) <= 45,
+  '100-200 dozens-yuan final fallback must be capped at low confidence'
+);
 
 const premiumNearBudgetFallbackResult = recommend(
   profile({
@@ -2062,6 +2087,7 @@ async function runPoiCacheAndStressTests() {
   const cloudRecommendRestaurant = require('../../../cloudfunctions/recommendRestaurant/index.js') as unknown as {
     main: (event: Record<string, unknown>, cloudContext: Record<string, unknown>) => Promise<{
       ok: boolean;
+      error?: { code?: string; message?: string };
       data: { recommendation: ReturnType<typeof recommendRestaurants> };
     }>;
   };
@@ -2099,11 +2125,25 @@ async function runPoiCacheAndStressTests() {
     {}
   );
   const cloudNoSpicyRecommendation = cloudNoSpicyResponse.data.recommendation;
-  assert(cloudNoSpicyResponse.ok === true, 'cloud recommendation should return ok for no-spicy conflict regression');
+  assert(cloudNoSpicyResponse.ok === false, 'cloud recommendation should not report ok when no safe candidate exists');
+  assert(cloudNoSpicyResponse.error?.code === 'NO_RECOMMENDATION', 'cloud empty hard-negative pool should return NO_RECOMMENDATION');
   assert(cloudNoSpicyRecommendation.candidates.length === 0, 'cloud no-spicy hard-negative pool should not fallback to spicy top1');
   assert(cloudNoSpicyRecommendation.candidatePoolStats !== undefined, 'cloud no-spicy regression should expose candidatePoolStats');
   assert(cloudNoSpicyRecommendation.candidatePoolStats.afterHardFilter === 2, 'cloud afterHardFilter should match front-end non-negative hard-filter count');
   assert(cloudNoSpicyRecommendation.candidatePoolStats.afterNegativeFilter === 0, 'cloud afterNegativeFilter should match front-end negative-filter count');
+
+  const cloudEmptyResponse = await cloudRecommendRestaurant.main(
+    {
+      restaurants: [],
+      context: { preferenceSnapshot: profile({ preferredTagIds: ['meal'] }) },
+      limit: 3,
+      allowMock: false
+    },
+    {}
+  );
+  assert(cloudEmptyResponse.ok === false, 'cloud recommendation should not return ok=true with empty candidates');
+  assert(cloudEmptyResponse.error?.code === 'NO_RECOMMENDATION', 'cloud empty input should return NO_RECOMMENDATION');
+  assert(cloudEmptyResponse.data.recommendation.candidates.length === 0, 'cloud empty input should keep candidates empty');
 
   const storage: Record<string, unknown> = {};
   const baseLocation = { latitude: 39.909, longitude: 116.455 };

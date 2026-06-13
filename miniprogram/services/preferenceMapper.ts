@@ -51,6 +51,8 @@ export function mapAnswersToPreferenceProfile(
     applyLegacyAnswer(draft, answer);
   });
 
+  applyDefensivePreferenceInferences(draft);
+
   const preferredTagIds = [...draft.preferredTagIds];
   const avoidedTagIds = [...draft.avoidedTagIds];
 
@@ -71,6 +73,48 @@ export function mapAnswersToPreferenceProfile(
     maxDistanceMeters: draft.maxDistanceMeters,
     maxEstimatedMinutes: draft.maxEstimatedMinutes
   };
+}
+
+function applyDefensivePreferenceInferences(draft: MutablePreferenceProfile) {
+  const nonMealOptionIds = new Set([
+    'intent_drink',
+    'intent_dessert',
+    'prefer_milk_tea',
+    'prefer_coffee',
+    'prefer_bakery_dessert',
+    'time_afternoon_tea',
+    'avoid_category_heavy_meal'
+  ]);
+  const hasNonMealSignal = [...nonMealOptionIds].some((optionId) => draft.selectedOptionIds.has(optionId));
+
+  if (!hasNonMealSignal) {
+    return;
+  }
+
+  ['staple', 'rice', 'noodle', 'meal', 'set_meal'].forEach((tagId) => {
+    draft.preferredTagIds.delete(tagId as TagId);
+  });
+  ['meal', 'rice', 'set_meal', 'hotpot', 'stir_fry'].forEach((tagId) => {
+    draft.avoidedTagIds.add(tagId as TagId);
+  });
+  draft.preferredTagIds.add('non_meal');
+  draft.softPreferences = mergeSoftPreferences(draft.softPreferences, { mealWeight: 'light' });
+
+  if (draft.selectedOptionIds.has('prefer_milk_tea') || draft.selectedOptionIds.has('intent_drink')) {
+    ['drink', 'milk_tea', 'afternoon_tea'].forEach((tagId) => draft.preferredTagIds.add(tagId as TagId));
+  }
+
+  if (draft.selectedOptionIds.has('prefer_coffee')) {
+    ['drink', 'coffee', 'afternoon_tea'].forEach((tagId) => draft.preferredTagIds.add(tagId as TagId));
+  }
+
+  if (draft.selectedOptionIds.has('prefer_bakery_dessert') || draft.selectedOptionIds.has('intent_dessert')) {
+    ['dessert', 'afternoon_tea'].forEach((tagId) => draft.preferredTagIds.add(tagId as TagId));
+  }
+
+  if (draft.selectedOptionIds.has('time_afternoon_tea')) {
+    ['afternoon_tea', 'dessert', 'coffee', 'drink'].forEach((tagId) => draft.preferredTagIds.add(tagId as TagId));
+  }
 }
 
 function applyOptionEffect(

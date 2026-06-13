@@ -18,6 +18,8 @@ const CACHE_TTL_MS = 60 * 60 * 1000;
 const MAX_CACHE_RESTAURANTS = 250;
 const AMAP_QPS_COOLDOWN_MS = 45 * 1000;
 const amapKeyCooldowns = new Map();
+let cloudPoiCacheCollectionReady = false;
+let cloudPoiCacheCollectionUnavailable = false;
 
 const TAG_LABELS = {
   spicy: '辣',
@@ -124,9 +126,9 @@ const TAG_RULES = [
 
 TAG_RULES.push(
   { pattern: /咖啡|cafe|coffee|星巴克|starbucks|瑞幸|luckin|manner|peet|costa|tims|tim hortons|m stand|seesaw|arabica/i, ids: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { pattern: /奶茶|茶饮|喜茶|奈雪|一点点|1点点|霸王茶姬|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|koi|thé|阿嬷手作|去茶山|古茗|茉莉奶白|爷爷不泡茶|不泡茶|茶理宜世|茶记大咖|t9tea|tamkoko/i, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { pattern: /饮品|果茶|糖水|手打柠檬茶|麒麟大口茶|大口茶|koi|thé|混果汁|酸奶|牛奶|麦记牛奶|blueglass|茶道|茶园/i, ids: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { pattern: /甜品|蛋糕|面包|烘焙|点心|西点|gelato|pinvita|butterful|creamorous|珞珞|bakery|冰淇淋|paper stone|哈根达斯|haagen|baker|spice|bagel|贝果|zakuzaku|双皮奶|marmalade|bake land|老鼎丰/i, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { pattern: /奶茶|茶饮|冷饮店|冷饮|喜茶|奈雪|一点点|1点点|霸王茶姬|蜜雪冰城|柠檬茶|linlee|麒麟大口茶|大口茶|coco|都可|koi|thé|阿嬷手作|去茶山|古茗|茉莉奶白|爷爷不泡茶|不泡茶|茶理宜世|茶记大咖|t9tea|tamkoko/i, ids: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /饮品|饮品店|果茶|糖水|手打柠檬茶|麒麟大口茶|大口茶|coco|都可|koi|thé|混果汁|酸奶|牛奶|麦记牛奶|blueglass|茶道|茶园/i, ids: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { pattern: /甜品|甜品店|糕饼|糕饼店|蛋糕|蛋糕店|面包|面包店|烘焙|烘焙店|点心|西点|gelato|pinvita|butterful|creamorous|珞珞|bakery|冰淇淋|paper stone|哈根达斯|haagen|baker|spice|bagel|贝果|zakuzaku|双皮奶|marmalade|bake land|老鼎丰/i, ids: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { pattern: /早餐|包子|豆浆|油条|早茶/, ids: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { pattern: /粥|粥粉面/, ids: ['breakfast', 'congee', 'quick', 'hot', 'not_spicy'] },
   { pattern: /夜宵|宵夜/, ids: ['late_night', 'quick', 'hot', 'snack'] },
@@ -262,7 +264,7 @@ exports.main = async (event = {}, context = {}) => {
     }
 
     if (maxAmapApiCalls <= 0) {
-      return fail(requestId, 'AMAP_LIVE_REQUEST_LIMIT', 'Live AMap POI request is not allowed for this call.', {
+      return fail(requestId, useCloudCache ? 'AMAP_CACHE_MISS_LIVE_DISABLED' : 'AMAP_LIVE_REQUEST_LIMIT', 'Live AMap POI request is not allowed for this call.', {
         cacheKey,
         fetchReason
       });
@@ -469,6 +471,11 @@ async function requestAmapPages({
 async function readCloudPoiCache(cacheKey) {
   try {
     const db = cloud.database();
+
+    if (!(await ensureCloudPoiCacheCollection(db))) {
+      return null;
+    }
+
     const result = await db.collection(CACHE_COLLECTION).doc(cacheKey).get();
     const data = result && result.data;
 
@@ -500,6 +507,10 @@ async function writeCloudPoiCache(cacheKey, data) {
   try {
     const db = cloud.database();
 
+    if (!(await ensureCloudPoiCacheCollection(db))) {
+      return;
+    }
+
     await db.collection(CACHE_COLLECTION).doc(cacheKey).set({
       data: {
         ...data,
@@ -513,6 +524,60 @@ async function writeCloudPoiCache(cacheKey, data) {
       message: error && error.message
     });
   }
+}
+
+async function ensureCloudPoiCacheCollection(db) {
+  if (cloudPoiCacheCollectionReady) {
+    return true;
+  }
+
+  if (cloudPoiCacheCollectionUnavailable) {
+    return false;
+  }
+
+  try {
+    await db.collection(CACHE_COLLECTION).limit(1).get();
+    cloudPoiCacheCollectionReady = true;
+    return true;
+  } catch (error) {
+    if (!isCollectionMissingError(error)) {
+      console.warn('AMap cloud POI cache collection check skipped.', {
+        message: error && error.message
+      });
+      cloudPoiCacheCollectionUnavailable = true;
+      return false;
+    }
+  }
+
+  try {
+    await db.createCollection(CACHE_COLLECTION);
+    cloudPoiCacheCollectionReady = true;
+    return true;
+  } catch (error) {
+    if (isCollectionAlreadyExistsError(error)) {
+      cloudPoiCacheCollectionReady = true;
+      return true;
+    }
+
+    console.warn('AMap cloud POI cache collection create skipped.', {
+      collection: CACHE_COLLECTION,
+      message: error && error.message
+    });
+    cloudPoiCacheCollectionUnavailable = true;
+    return false;
+  }
+}
+
+function isCollectionMissingError(error) {
+  const text = `${(error && error.errCode) || ''} ${(error && error.code) || ''} ${(error && error.message) || ''}`;
+
+  return /COLLECTION_NOT_EXIST|DATABASE_COLLECTION_NOT_EXIST|collection.*not.*exist|集合.*不存在|-502005|-502003/i.test(text);
+}
+
+function isCollectionAlreadyExistsError(error) {
+  const text = `${(error && error.errCode) || ''} ${(error && error.code) || ''} ${(error && error.message) || ''}`;
+
+  return /COLLECTION_ALREADY_EXISTS|collection.*exist|集合.*存在|-502004/i.test(text);
 }
 
 function buildCloudCacheKey({
@@ -1007,6 +1072,15 @@ function mapCategoryToTagIds(text) {
     ids.add('not_spicy');
   }
 
+  if (hasStrongNonMealPoiEvidence(text)) {
+    ids.add('non_meal');
+    ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum'].forEach((id) => ids.delete(id));
+
+    if (['drink', 'milk_tea', 'coffee', 'dessert'].some((id) => ids.has(id))) {
+      ids.delete('quick');
+    }
+  }
+
   if (ids.size === 0) {
     ids.add('quick');
     ids.add('staple');
@@ -1041,6 +1115,12 @@ function addBrandTags(ids, text) {
   if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase()))) {
     ['independent_store', 'street_shop'].forEach((id) => ids.add(id));
   }
+}
+
+function hasStrongNonMealPoiEvidence(text) {
+  return /冷饮店|饮品店|饮品|奶茶|茶饮|咖啡厅|咖啡店|咖啡馆|cafe|coffee|甜品店|甜品|糕饼店|糕饼|蛋糕店|蛋糕|面包店|面包|烘焙店|烘焙|冰淇淋|gelato|星巴克|starbucks|瑞幸|luckin|manner|库迪|cotti|喜茶|奈雪|霸王茶姬|coco|都可|古茗|蜜雪冰城|茶百道|沪上阿姨/i.test(
+    String(text || '')
+  );
 }
 
 function parseAmapLocation(value) {
