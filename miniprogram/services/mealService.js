@@ -284,6 +284,8 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const attempts = [];
     const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
     const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
+    const primaryRadius = premiumSearch ? maxRadius : polygonRadius;
+    const primaryPageCount = isLuxuryMealSearch ? 2 : 1;
     const secondaryPolygonKeyword = fallbackKeyword !== primaryKeyword
         ? fallbackKeyword
         : keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
@@ -300,10 +302,10 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     });
     attempts.push({
         mode: 'polygon',
-        radiusMeters: polygonRadius,
+        radiusMeters: primaryRadius,
         keyword: primaryKeyword || '',
         types: amapQuery.types,
-        pageCount: 1,
+        pageCount: primaryPageCount,
         city: '',
         adcode: '',
         reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'

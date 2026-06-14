@@ -141,6 +141,41 @@ const LIGHT_CONFLICT_TAGS = ['spicy', 'strong_flavor', 'bbq', 'fried', 'heavy', 
 const LIGHT_HEALTHY_PREFERENCE_TAGS = ['light', 'healthy', 'low_burden', 'salad', 'fresh'];
 const NON_MEAL_TAGS = ['dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'non_meal'];
 const MEAL_TAGS = ['meal', 'rice', 'noodle', 'staple', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum'];
+const PREMIUM_MEAL_SIGNAL_KEYWORDS = [
+    '\u9152\u5e97\u9910\u5385',
+    '\u661f\u7ea7\u9152\u5e97',
+    '\u9152\u5bb6',
+    '\u4e2d\u9910\u5385',
+    '\u897f\u9910\u5385',
+    '\u7ca4\u83dc',
+    '\u79c1\u623f\u83dc',
+    '\u79c1\u53a8',
+    '\u4e3b\u53a8',
+    '\u878d\u5408\u6599\u7406',
+    '\u725b\u6392\u9986',
+    '\u70e7\u8089',
+    '\u6d77\u9c9c\u653e\u9898',
+    '\u9ed1\u73cd\u73e0',
+    '\u7c73\u5176\u6797',
+    '\u70b3\u80dc',
+    '\u5229\u82d1',
+    '\u767d\u5929\u9e45',
+    '\u5e7f\u5dde\u9152\u5bb6',
+    '\u82b1\u56ed\u9152\u5e97',
+    '\u5eb7\u83b1\u5fb7'
+];
+const PURE_NON_MEAL_BUSINESS_KEYWORDS = [
+    '\u5976\u8336',
+    '\u8336\u996e',
+    '\u51b7\u996e',
+    '\u996e\u54c1',
+    '\u5496\u5561',
+    '\u751c\u54c1\u5e97',
+    '\u7cd5\u997c\u5e97',
+    '\u86cb\u7cd5\u5e97',
+    '\u9762\u5305\u5e97',
+    '\u70d8\u7119\u5e97'
+];
 const DRINK_ONLY_OPTION_IDS = ['intent_drink', 'prefer_milk_tea', 'prefer_coffee'];
 const DESSERT_ONLY_OPTION_IDS = ['intent_dessert', 'prefer_bakery_dessert'];
 const BRAND_CHAIN_OPTION_IDS = ['brand_chain'];
@@ -473,8 +508,13 @@ function recommendRestaurants(options) {
         fallbackReason = buildDistanceFallbackReason(preference);
         fallbackConfidenceCap = undefined;
         fallbackFinalScoreCap = undefined;
-        scored = candidateRestaurants
+        const strictScored = scored;
+        const strictIds = new Set(primaryHardFiltered.map((restaurant) => restaurant.id));
+        const supplementalScored = candidateRestaurants
             .filter((restaurant) => {
+            if (strictIds.has(restaurant.id)) {
+                return false;
+            }
             return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
                 allowDistanceFallback: true,
                 allowNegativeFallback: false,
@@ -487,6 +527,7 @@ function recommendRestaurants(options) {
             ...scoreOptionsBase,
             fallbackReason
         }));
+        scored = [...strictScored, ...supplementalScored];
     }
     if (scored.length === 0) {
         fallbackReason = buildNegativeFallbackReason(preference);
@@ -549,6 +590,7 @@ function recommendRestaurants(options) {
             candidatePoolStats: poolStats
         };
     });
+    const visibleFallbackReason = candidates[0]?.fallbackReason;
     return {
         id: `rec-${now.getTime()}`,
         generatedAt: now.toISOString(),
@@ -559,7 +601,7 @@ function recommendRestaurants(options) {
         candidates,
         selectedCandidateId: candidates[0]?.id,
         reasonSummary: buildReasonSummary(candidates[0]),
-        fallbackReason,
+        fallbackReason: visibleFallbackReason,
         historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
         excludedHistoryRestaurantIds,
         historyPenaltyReasons,
@@ -1322,7 +1364,10 @@ function getRestaurantTagIds(restaurant) {
     const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
     const tagIds = new Set([...explicitTagIds, ...inferredTagIds]);
     const text = getRestaurantSignalText(restaurant);
-    if (hasStrongNonMealTextEvidence(text)) {
+    if (hasPremiumMealOverrideEvidence(restaurant, [...tagIds], text)) {
+        cleanNonMealTagsFromPremiumMealCandidate(tagIds);
+    }
+    else if (hasStrongNonMealTextEvidence(text)) {
         cleanMealTagsFromNonMealCandidate(tagIds);
     }
     if (hasColdOrRoomTemperatureTextEvidence(text)) {
@@ -1378,7 +1423,12 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     if (INDEPENDENT_STORE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()))) {
         ['independent_store', 'street_shop'].forEach((tagId) => inferred.add(tagId));
     }
-    if (hasStrongNonMealTextEvidence(text)) {
+    if (hasPremiumMealOverrideEvidence(restaurant, [...explicitTagIds, ...inferred], text)) {
+        inferred.add('meal');
+        inferred.add('premium_brand');
+        cleanNonMealTagsFromPremiumMealCandidate(inferred);
+    }
+    else if (hasStrongNonMealTextEvidence(text)) {
         cleanMealTagsFromNonMealCandidate(inferred);
     }
     return [...inferred];
@@ -1394,6 +1444,22 @@ function hasCoffeeTextEvidence(text) {
 }
 function hasDessertBakeryTextEvidence(text) {
     return DESSERT_BAKERY_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurantSignalText(restaurant)) {
+    const estimatedCost = getEstimatedCost(restaurant);
+    const hasPremiumTag = tagIds.includes('premium_brand');
+    const hasMealSignal = PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+        /grill|cantonese|hotel|chef|omakase|fine dining/i.test(text);
+    const hasPureNonMealBusiness = PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) && !hasMealSignal;
+    return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost ?? 0) >= 200);
+}
+function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
+    ['non_meal', 'dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'sweet', 'sugary_drink', 'quick'].forEach((tagId) => {
+        tagIds.delete(tagId);
+    });
+    tagIds.add('meal');
+    tagIds.add('premium_brand');
+    tagIds.add('relaxed');
 }
 function cleanMealTagsFromNonMealCandidate(tagIds) {
     ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum', 'quick'].forEach((tagId) => {

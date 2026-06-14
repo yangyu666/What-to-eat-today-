@@ -150,6 +150,41 @@ INFERRED_TAG_RULES.push(
 
 const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '冷饮店', '冷饮', '饮品', '饮品店', '甜品', '甜品店', '糕饼', '糕饼店', '蛋糕', '蛋糕店', '面包', '面包店', '烘焙', '烘焙店', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'coco', '都可', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '混果汁', '酸奶', '牛奶', 'blueglass', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋', '哈根达斯', 'bagel', '贝果', 'zakuzaku', '双皮奶'];
 const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭', '徽菜', '新徽菜', '小菜园', '茶楼', '早茶', '热卤', '卤味', '料理', '春饼', '东北菜', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '外婆小聚', '香锅'];
+const PREMIUM_MEAL_SIGNAL_KEYWORDS = [
+  '\u9152\u5e97\u9910\u5385',
+  '\u661f\u7ea7\u9152\u5e97',
+  '\u9152\u5bb6',
+  '\u4e2d\u9910\u5385',
+  '\u897f\u9910\u5385',
+  '\u7ca4\u83dc',
+  '\u79c1\u623f\u83dc',
+  '\u79c1\u53a8',
+  '\u4e3b\u53a8',
+  '\u878d\u5408\u6599\u7406',
+  '\u725b\u6392\u9986',
+  '\u70e7\u8089',
+  '\u6d77\u9c9c\u653e\u9898',
+  '\u9ed1\u73cd\u73e0',
+  '\u7c73\u5176\u6797',
+  '\u70b3\u80dc',
+  '\u5229\u82d1',
+  '\u767d\u5929\u9e45',
+  '\u5e7f\u5dde\u9152\u5bb6',
+  '\u82b1\u56ed\u9152\u5e97',
+  '\u5eb7\u83b1\u5fb7'
+];
+const PURE_NON_MEAL_BUSINESS_KEYWORDS = [
+  '\u5976\u8336',
+  '\u8336\u996e',
+  '\u51b7\u996e',
+  '\u996e\u54c1',
+  '\u5496\u5561',
+  '\u751c\u54c1\u5e97',
+  '\u7cd5\u997c\u5e97',
+  '\u86cb\u7cd5\u5e97',
+  '\u9762\u5305\u5e97',
+  '\u70d8\u7119\u5e97'
+];
 const BROAD_MEAL_KEYWORDS = [
   '餐厅',
   '餐馆',
@@ -567,8 +602,11 @@ function recommendRestaurants(options) {
     fallbackReason = buildDistanceFallbackReason(preference);
     fallbackConfidenceCap = undefined;
     fallbackFinalScoreCap = undefined;
-    scored = candidateRestaurants
+    const strictScored = scored;
+    const strictIds = new Set(primaryHardFiltered.map((restaurant) => restaurant.id));
+    const supplementalScored = candidateRestaurants
       .filter((restaurant) =>
+        !strictIds.has(restaurant.id) &&
         applyHardFilters(restaurant, preference, excludeRestaurantIds, true, false, true, true).passed
       )
       .map((restaurant) =>
@@ -577,6 +615,7 @@ function recommendRestaurants(options) {
           fallbackReason
         })
       );
+    scored = [...strictScored, ...supplementalScored];
   }
 
   if (scored.length === 0) {
@@ -639,6 +678,7 @@ function recommendRestaurants(options) {
       candidatePoolStats: poolStats
     };
   });
+  const visibleFallbackReason = candidates[0] && candidates[0].fallbackReason;
 
   return {
     id: `rec-${now.getTime()}`,
@@ -650,7 +690,7 @@ function recommendRestaurants(options) {
     candidates,
     selectedCandidateId: candidates[0] && candidates[0].id,
     reasonSummary: candidates[0] && `${candidates[0].name} 匹配度 ${candidates[0].confidenceScore || 0}%，${candidates[0].reason}`,
-    fallbackReason,
+    fallbackReason: visibleFallbackReason,
     historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
     excludedHistoryRestaurantIds,
     historyPenaltyReasons,
@@ -1287,7 +1327,9 @@ function getRestaurantTagIds(restaurant) {
   const tagIds = new Set([...explicitTagIds, ...inferredTagIds]);
   const text = getRestaurantSignalText(restaurant);
 
-  if (hasStrongNonMealTextEvidence(text)) {
+  if (hasPremiumMealOverrideEvidence(restaurant, [...tagIds], text)) {
+    cleanNonMealTagsFromPremiumMealCandidate(tagIds);
+  } else if (hasStrongNonMealTextEvidence(text)) {
     cleanMealTagsFromNonMealCandidate(tagIds);
   }
 
@@ -1358,7 +1400,11 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     ['independent_store', 'street_shop'].forEach((tag) => inferred.add(tag));
   }
 
-  if (hasStrongNonMealTextEvidence(text)) {
+  if (hasPremiumMealOverrideEvidence(restaurant, [...explicitTagIds, ...inferred], text)) {
+    inferred.add('meal');
+    inferred.add('premium_brand');
+    cleanNonMealTagsFromPremiumMealCandidate(inferred);
+  } else if (hasStrongNonMealTextEvidence(text)) {
     cleanMealTagsFromNonMealCandidate(inferred);
   }
 
@@ -1428,6 +1474,27 @@ function hasCoffeeTextEvidence(text) {
 
 function hasDessertBakeryTextEvidence(text) {
   return DESSERT_BAKERY_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurantSignalText(restaurant)) {
+  const estimatedCost = getEstimatedCost(restaurant);
+  const hasPremiumTag = tagIds.includes('premium_brand');
+  const hasMealSignal =
+    PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+    /grill|cantonese|hotel|chef|omakase|fine dining/i.test(text);
+  const hasPureNonMealBusiness =
+    PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) && !hasMealSignal;
+
+  return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost || 0) >= 200);
+}
+
+function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
+  ['non_meal', 'dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'sweet', 'sugary_drink', 'quick'].forEach((tag) => {
+    tagIds.delete(tag);
+  });
+  tagIds.add('meal');
+  tagIds.add('premium_brand');
+  tagIds.add('relaxed');
 }
 
 function cleanMealTagsFromNonMealCandidate(tagIds) {

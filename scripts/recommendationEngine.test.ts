@@ -2507,6 +2507,22 @@ async function runPoiCacheAndStressTests() {
     cloudMidHighBudgetResponse.data.recommendation.candidates[0]?.restaurantId === clientMidHighBudgetResult.candidates[0]?.restaurantId,
     'cloud and client 100-200 Top1 should stay aligned for the same candidate pool'
   );
+  assert(
+    cloudMidHighBudgetResponse.data.recommendation.candidates[0]?.fallbackReason === undefined,
+    'cloud 100-200 strict Top1 should not carry fallback wording when it is inside the requested range'
+  );
+  assert(
+    cloudMidHighBudgetResponse.data.recommendation.fallbackReason === undefined,
+    'cloud 100-200 result-level fallback wording should stay hidden when Top1 is a strict match'
+  );
+  assert(
+    clientMidHighBudgetResult.candidates[0]?.fallbackReason === undefined,
+    'client 100-200 strict Top1 should not carry fallback wording when it is inside the requested range'
+  );
+  assert(
+    clientMidHighBudgetResult.fallbackReason === undefined,
+    'client 100-200 result-level fallback wording should stay hidden when Top1 is a strict match'
+  );
 
   const realLuxuryCandidates: Restaurant[] = [
     {
@@ -2536,9 +2552,9 @@ async function runPoiCacheAndStressTests() {
     {
       id: 'cloud-white-swan-426',
       name: 'White Swan restaurant',
-      tags: ['hotel restaurant'],
-      tagIds: ['meal', 'premium_brand', 'chain_brand'],
-      category: 'hotel restaurant Cantonese',
+      tags: ['hotel restaurant', 'cake shop noise'],
+      tagIds: ['dessert', 'non_meal', 'quick', 'staple'],
+      category: 'hotel restaurant Cantonese; cake shop',
       distanceMeters: 2400,
       averageCostYuan: 426,
       openStatus: 'open',
@@ -2576,6 +2592,8 @@ async function runPoiCacheAndStressTests() {
   );
   const clientLuxuryResult = recommend(cloudLuxuryPreference, realLuxuryCandidates);
   assert(cloudLuxuryResponse.ok === true, 'cloud 200+ should accept top-level preferences and produce candidates');
+  assert(cloudLuxuryResponse.data.recommendation.candidates.length >= 3, 'cloud 200+ should keep enough premium meal candidates despite noisy tags');
+  assert(clientLuxuryResult.candidates.length >= 3, 'client 200+ should keep enough premium meal candidates despite noisy tags');
   assert(cloudLuxuryResponse.data.recommendation.candidates[0]?.restaurantId !== 'cloud-low-soup-27', 'cloud 200+ must not recommend a 27 yuan quick meal as Top1');
   assert(
     (cloudLuxuryResponse.data.recommendation.candidates[0]?.restaurant?.averageCostYuan ?? 0) >= 200,
