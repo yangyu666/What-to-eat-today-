@@ -2604,6 +2604,85 @@ async function runPoiCacheAndStressTests() {
     'cloud and client 200+ Top1 should stay aligned for the same candidate pool'
   );
 
+  const highPriceDrinkNoise: Restaurant = {
+    id: 'tongtown-high-price-drink',
+    name: '彤堂序·TONGTOWN',
+    tags: ['milk tea', 'drink'],
+    tagIds: ['milk_tea', 'drink', 'non_meal'],
+    category: '冷饮店',
+    distanceMeters: 700,
+    averageCostYuan: 320,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  };
+  const explicitLuxuryMealPreference = profile({
+    selectedOptionIds: ['intent_meal', 'budget_over_200', 'brand_chain'],
+    preferredTagIds: ['meal', 'premium_brand', 'chain_brand'],
+    avoidedTagIds: [],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000,
+    maxEstimatedMinutes: 90
+  });
+  const highPriceDrinkWithMealResult = recommend(explicitLuxuryMealPreference, [
+    highPriceDrinkNoise,
+    {
+      id: 'real-luxury-meal-against-drink',
+      name: '甬府',
+      tags: ['江浙菜'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: '江浙菜餐厅',
+      distanceMeters: 1600,
+      averageCostYuan: 388,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]);
+  assert(
+    highPriceDrinkWithMealResult.candidates[0]?.restaurantId === 'real-luxury-meal-against-drink',
+    '200+ meal intent must not rank a high-price drink shop above a real premium meal'
+  );
+  assert(
+    highPriceDrinkWithMealResult.candidates.every((candidate) => candidate.restaurantId !== 'tongtown-high-price-drink' || (candidate.confidenceScore ?? 100) <= 45),
+    'high-price drink shops may only appear as low-confidence fallback in explicit meal scenarios'
+  );
+
+  const highPriceDrinkOnlyResult = recommend(explicitLuxuryMealPreference, [highPriceDrinkNoise]);
+  assert(highPriceDrinkOnlyResult.candidates.length <= 1, 'high-price drink-only pool should not fabricate multiple meal candidates');
+  if (highPriceDrinkOnlyResult.candidates[0]) {
+    assert(
+      (highPriceDrinkOnlyResult.candidates[0].confidenceScore ?? 100) <= 45,
+      'high-price drink-only fallback must be capped at low confidence'
+    );
+    assert(
+      Boolean(highPriceDrinkOnlyResult.candidates[0].fallbackReason),
+      'high-price drink-only fallback must explain that strict meal matches were unavailable'
+    );
+  }
+
+  const cloudHighPriceDrinkResponse = await cloudRecommendRestaurant.main(
+    {
+      restaurants: [highPriceDrinkNoise],
+      preference: explicitLuxuryMealPreference,
+      allowMock: false,
+      limit: 3
+    },
+    {}
+  );
+  assert(
+    cloudHighPriceDrinkResponse.ok === true,
+    'cloud should accept event.preference as an alias for preferenceSnapshot/preferences'
+  );
+  assert(
+    (cloudHighPriceDrinkResponse.data.recommendation.candidates[0]?.confidenceScore ?? 100) <= 45,
+    'cloud high-price drink fallback should stay low confidence for explicit meal intent'
+  );
+  assert(
+    Boolean(cloudHighPriceDrinkResponse.data.recommendation.candidates[0]?.fallbackReason),
+    'cloud high-price drink fallback should carry fallbackReason'
+  );
+
   const nationalPremiumBrandResult = recommend(
     profile({
       selectedOptionIds: ['budget_over_200', 'brand_chain'],

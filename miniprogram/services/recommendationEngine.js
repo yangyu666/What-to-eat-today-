@@ -598,7 +598,7 @@ const INDEPENDENT_STORE_KEYWORDS = [
     '摊档'
 ];
 function recommendRestaurants(options) {
-    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u;
     const now = (_a = options.now) !== null && _a !== void 0 ? _a : new Date();
     const random = (_b = options.random) !== null && _b !== void 0 ? _b : Math.random;
     const limit = (_c = options.limit) !== null && _c !== void 0 ? _c : DEFAULT_LIMIT;
@@ -705,9 +705,12 @@ function recommendRestaurants(options) {
         afterNegativeFilter,
         finalCandidateCount: Math.min(limit, scored.length),
         fallbackUsed: fallbackReason !== undefined,
+        fallbackCandidateCount: scored.filter((candidate) => Boolean(candidate.fallbackReason)).length,
+        topCandidateFallbackUsed: false,
         historyFallbackUsed: false
     };
     const ranked = selectDiverseRanked(rankWithLightRandom(scored, random), limit);
+    poolStats.topCandidateFallbackUsed = Boolean((_s = ranked[0]) === null || _s === void 0 ? void 0 : _s.fallbackReason);
     const candidates = ranked.slice(0, limit).map((scoredRestaurant, index) => {
         const next = scoreRestaurant(scoredRestaurant.restaurant, preference, {
             fallbackReason: scoredRestaurant.fallbackReason,
@@ -725,7 +728,7 @@ function recommendRestaurants(options) {
             candidatePoolStats: poolStats
         };
     });
-    const visibleFallbackReason = (_s = candidates[0]) === null || _s === void 0 ? void 0 : _s.fallbackReason;
+    const visibleFallbackReason = (_t = candidates[0]) === null || _t === void 0 ? void 0 : _t.fallbackReason;
     return {
         id: `rec-${now.getTime()}`,
         generatedAt: now.toISOString(),
@@ -734,7 +737,7 @@ function recommendRestaurants(options) {
         weightProfileId: exports.WEIGHT_PROFILE_ID,
         experimentId,
         candidates,
-        selectedCandidateId: (_t = candidates[0]) === null || _t === void 0 ? void 0 : _t.id,
+        selectedCandidateId: (_u = candidates[0]) === null || _u === void 0 ? void 0 : _u.id,
         reasonSummary: buildReasonSummary(candidates[0]),
         fallbackReason: visibleFallbackReason,
         historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
@@ -957,9 +960,14 @@ function hasPremiumCandidateEvidence(restaurant, text = getRestaurantSignalText(
     var _a;
     const estimatedCost = getEstimatedCost(restaurant);
     const tagIds = getRestaurantTagIds(restaurant);
+    const hasNonMeal = hasNonMealEvidence(tagIds, text);
+    const hasMealSignal = hasPremiumMealSignal(text);
+    if (hasNonMeal && !hasMealSignal) {
+        return tagIds.includes('premium_brand') && !hasStrongNonMealEvidence(tagIds, text);
+    }
     return ((estimatedCost !== undefined && estimatedCost >= 200) ||
         tagIds.includes('premium_brand') ||
-        /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/.test(text) ||
+        hasMealSignal ||
         (((_a = restaurant.rating) !== null && _a !== void 0 ? _a : 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text))));
 }
 function isLastResortFallbackCandidate(restaurant, preference, excludeRestaurantIds) {
@@ -1610,10 +1618,17 @@ function hasDessertBakeryTextEvidence(text) {
 function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurantSignalText(restaurant)) {
     const estimatedCost = getEstimatedCost(restaurant);
     const hasPremiumTag = tagIds.includes('premium_brand');
-    const hasMealSignal = PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
-        /grill|cantonese|hotel|chef|omakase|fine dining/i.test(text);
+    const hasMealSignal = hasPremiumMealSignal(text);
+    const hasNonMeal = hasNonMealEvidence(tagIds, text);
     const hasPureNonMealBusiness = PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) && !hasMealSignal;
-    return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost !== null && estimatedCost !== void 0 ? estimatedCost : 0) >= 200);
+    if (hasPureNonMealBusiness || (hasNonMeal && !hasMealSignal)) {
+        return false;
+    }
+    return hasPremiumTag || hasMealSignal || ((estimatedCost !== null && estimatedCost !== void 0 ? estimatedCost : 0) >= 200 && !hasNonMeal);
+}
+function hasPremiumMealSignal(text) {
+    return (PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+        /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜|grill|cantonese|hotel|chef|omakase|fine dining/i.test(text));
 }
 function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
     ['non_meal', 'dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'sweet', 'sugary_drink', 'quick'].forEach((tagId) => {
@@ -1678,6 +1693,11 @@ function isLikelyMealText(text) {
 function hasNonMealEvidence(tagIds, text) {
     return (NON_MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) ||
         NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword)));
+}
+function hasStrongNonMealEvidence(tagIds, text) {
+    return (NON_MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) ||
+        PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+        ['冷饮店', '饮品店', '奶茶店', '咖啡店', '甜品店', '糕饼店', '蛋糕店', '面包店', '烘焙店'].some((keyword) => text.includes(keyword)));
 }
 function getCandidateImageUrl(restaurant, matchedPreferredTagIds) {
     return normalizeImageUrl(restaurant.coverImageUrl) || getFallbackImageUrl(restaurant, matchedPreferredTagIds);
@@ -2119,12 +2139,15 @@ function isExplicitNonMealPreference(preference) {
         selected.has('prefer_bakery_dessert'));
 }
 function isExplicitMealPreference(preference) {
-    var _a;
+    var _a, _b;
     if (!preference) {
         return false;
     }
     const selected = new Set((_a = preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
-    return selected.has('intent_meal') || selected.has('intent_staple');
+    const preferred = new Set((_b = preference.preferredTagIds) !== null && _b !== void 0 ? _b : []);
+    return (selected.has('intent_meal') ||
+        selected.has('intent_staple') ||
+        (preferred.has('meal') && !isFlexibleNonMealBudget(preference)));
 }
 function isPriceUnknown(restaurant) {
     return getEstimatedCost(restaurant) === undefined;

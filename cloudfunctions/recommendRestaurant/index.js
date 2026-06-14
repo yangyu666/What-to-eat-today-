@@ -494,7 +494,9 @@ function getPreferenceSnapshot(event, context, answers) {
   return (
     context.preferenceSnapshot ||
     event.preferenceSnapshot ||
+    event.preference ||
     event.preferences ||
+    (event.context && event.context.preference) ||
     (event.context && event.context.preferences) ||
     buildPreferenceProfile(answers)
   );
@@ -693,9 +695,12 @@ function recommendRestaurants(options) {
     afterNegativeFilter,
     finalCandidateCount: Math.min(limit, scored.length),
     fallbackUsed: fallbackReason !== undefined,
+    fallbackCandidateCount: scored.filter((candidate) => Boolean(candidate.fallbackReason)).length,
+    topCandidateFallbackUsed: false,
     historyFallbackUsed: false
   };
   const ranked = selectDiverseRanked(rankWithLightRandom(scored), limit);
+  poolStats.topCandidateFallbackUsed = Boolean(ranked[0] && ranked[0].fallbackReason);
   const candidates = ranked.slice(0, limit).map((item, index) => {
     const rescored = scoreRestaurant(item.restaurant, preference, {
       fallbackReason: item.fallbackReason,
@@ -913,10 +918,17 @@ function isAcceptableBrandCandidate(restaurant, preference) {
 function hasPremiumCandidateEvidence(restaurant, text = getRestaurantSignalText(restaurant)) {
   const estimatedCost = getEstimatedCost(restaurant);
   const tagIds = getRestaurantTagIds(restaurant);
+  const hasNonMeal = hasNonMealEvidence(tagIds, text);
+  const hasMealSignal = hasPremiumMealSignal(text);
+
+  if (hasNonMeal && !hasMealSignal) {
+    return tagIds.includes('premium_brand') && !hasStrongNonMealEvidence(tagIds, text);
+  }
+
   return (
     (estimatedCost !== undefined && estimatedCost >= 200) ||
     tagIds.includes('premium_brand') ||
-    /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/.test(text) ||
+    hasMealSignal ||
     ((restaurant.rating || 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text)))
   );
 }
@@ -1516,6 +1528,14 @@ function hasNonMealEvidence(tagIds, text) {
   );
 }
 
+function hasStrongNonMealEvidence(tagIds, text) {
+  return (
+    NON_MEAL_TAGS.some((tag) => tagIds.includes(tag)) ||
+    PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+    ['冷饮店', '饮品店', '奶茶店', '咖啡店', '甜品店', '糕饼店', '蛋糕店', '面包店', '烘焙店'].some((keyword) => text.includes(keyword))
+  );
+}
+
 function hasStrongNonMealTextEvidence(text) {
   return NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 }
@@ -1535,13 +1555,23 @@ function hasDessertBakeryTextEvidence(text) {
 function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurantSignalText(restaurant)) {
   const estimatedCost = getEstimatedCost(restaurant);
   const hasPremiumTag = tagIds.includes('premium_brand');
-  const hasMealSignal =
-    PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
-    /grill|cantonese|hotel|chef|omakase|fine dining/i.test(text);
+  const hasMealSignal = hasPremiumMealSignal(text);
+  const hasNonMeal = hasNonMealEvidence(tagIds, text);
   const hasPureNonMealBusiness =
     PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) && !hasMealSignal;
 
-  return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost || 0) >= 200);
+  if (hasPureNonMealBusiness || (hasNonMeal && !hasMealSignal)) {
+    return false;
+  }
+
+  return hasPremiumTag || hasMealSignal || ((estimatedCost || 0) >= 200 && !hasNonMeal);
+}
+
+function hasPremiumMealSignal(text) {
+  return (
+    PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
+    /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜|grill|cantonese|hotel|chef|omakase|fine dining/i.test(text)
+  );
 }
 
 function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
@@ -1876,8 +1906,13 @@ function isExplicitNonMealPreference(preference) {
 function isExplicitMealPreference(preference) {
   if (!preference) return false;
   const selected = new Set(preference.selectedOptionIds || []);
+  const preferred = new Set(preference.preferredTagIds || []);
 
-  return selected.has('intent_meal') || selected.has('intent_staple');
+  return (
+    selected.has('intent_meal') ||
+    selected.has('intent_staple') ||
+    (preferred.has('meal') && !isFlexibleNonMealBudget(preference))
+  );
 }
 
 function isPriceUnknown(restaurant) {

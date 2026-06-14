@@ -21,6 +21,8 @@ export interface CandidatePoolStats {
   afterNegativeFilter: number;
   finalCandidateCount: number;
   fallbackUsed: boolean;
+  fallbackCandidateCount?: number;
+  topCandidateFallbackUsed?: boolean;
   historyFallbackUsed?: boolean;
 }
 
