@@ -54,44 +54,40 @@ Page({
     const { optionId } = event.currentTarget.dataset as { optionId: string };
     const question = this.data.currentQuestion as QuestionBankItem;
     const option = question.options.find((item) => item.id === optionId);
+    const questions = this.data.questions as QuestionBankItem[];
 
     if (!option) {
       return;
     }
 
     const answers = this.upsertAnswer(question, option);
-    const questions = selectQuestionSet({
-      answers,
-      previousQuestions: this.data.questions as QuestionBankItem[]
-    });
+    const nextQuestions = this.refreshQuestionSet(answers, questions);
     const nextIndex = this.data.currentIndex + 1;
 
-    this.setData({ answers, questions });
+    this.setData({ answers, questions: nextQuestions });
 
-    if (nextIndex >= questions.length) {
+    if (nextIndex >= nextQuestions.length) {
       this.finishQuestionnaire(answers);
       return;
     }
 
-    this.showQuestion(nextIndex, questions);
+    this.showQuestion(nextIndex, nextQuestions);
   },
 
   skipQuestion() {
+    const questions = this.data.questions as QuestionBankItem[];
     const answers = this.upsertAnswer(this.data.currentQuestion as QuestionBankItem, null);
-    const questions = selectQuestionSet({
-      answers,
-      previousQuestions: this.data.questions as QuestionBankItem[]
-    });
+    const nextQuestions = this.refreshQuestionSet(answers, questions);
     const nextIndex = this.data.currentIndex + 1;
 
-    this.setData({ answers, questions });
+    this.setData({ answers, questions: nextQuestions });
 
-    if (nextIndex >= questions.length) {
+    if (nextIndex >= nextQuestions.length) {
       this.finishQuestionnaire(answers);
       return;
     }
 
-    this.showQuestion(nextIndex, questions);
+    this.showQuestion(nextIndex, nextQuestions);
   },
 
   goBack() {
@@ -105,12 +101,13 @@ Page({
 
   showQuestion(index: number, nextQuestions?: QuestionBankItem[]) {
     const questions = nextQuestions ?? (this.data.questions as QuestionBankItem[]);
+    const safeIndex = Math.max(0, Math.min(index, questions.length - 1));
 
     this.setData({
-      currentIndex: index,
-      currentQuestion: questions[index],
-      progressText: `${index + 1} / ${questions.length}`,
-      progressSegments: buildProgressSegments(questions, index)
+      currentIndex: safeIndex,
+      currentQuestion: questions[safeIndex],
+      progressText: `${safeIndex + 1} / ${questions.length}`,
+      progressSegments: buildProgressSegments(questions, safeIndex)
     });
   },
 
@@ -123,7 +120,21 @@ Page({
       answeredAt: new Date().toISOString()
     };
 
-    return [...this.data.answers.filter((item) => item.questionId !== question.id), answer];
+    const questions = this.data.questions as QuestionBankItem[];
+    const currentIndex = this.data.currentIndex;
+    const orderedAnswers = (this.data.answers as UserPreferenceAnswer[]).slice(0, currentIndex);
+
+    orderedAnswers[currentIndex] = answer;
+
+    return orderedAnswers.filter((item, index) => questions[index]?.id === item.questionId);
+  },
+
+  refreshQuestionSet(answers: UserPreferenceAnswer[], previousQuestions: QuestionBankItem[]): QuestionBankItem[] {
+    return selectQuestionSet({
+      answers,
+      previousQuestions,
+      count: previousQuestions.length
+    });
   },
 
   finishQuestionnaire(answers: UserPreferenceAnswer[]) {

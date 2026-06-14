@@ -34,11 +34,14 @@ function selectQuestionSet(options = {}) {
     const count = options.count ?? DEFAULT_QUESTION_COUNT;
     const random = options.random ?? Math.random;
     const selectedOptionIds = new Set(options.answers?.flatMap((answer) => answer.optionIds ?? []) ?? []);
+    const answeredQuestionIds = options.answers?.map((answer) => answer.questionId) ?? [];
+    const answeredQuestionIdSet = new Set(answeredQuestionIds);
     const selectableQuestions = questionBank_1.questionBank.filter((question) => {
         return !EXCLUDED_DIMENSIONS.includes(question.dimension);
-    }).map((question) => filterQuestionByAnswers(question, selectedOptionIds)).filter(isQuestion);
+    }).map((question) => {
+        return answeredQuestionIdSet.has(question.id) ? question : filterQuestionByAnswers(question, selectedOptionIds);
+    }).filter(isQuestion);
     const flow = QUESTION_FLOWS[Math.floor(random() * QUESTION_FLOWS.length)] ?? QUESTION_FLOWS[0];
-    const answeredQuestionIds = options.answers?.map((answer) => answer.questionId) ?? [];
     const selected = answeredQuestionIds
         .map((id) => selectableQuestions.find((question) => question.id === id))
         .filter(isQuestion)

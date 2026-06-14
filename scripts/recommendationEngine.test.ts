@@ -1498,6 +1498,74 @@ assert(
   }),
   'meal intent should remove drink and dessert follow-up options'
 );
+assert(
+  mealFollowUpQuestions.every((question) => {
+    return question.options.every((option) => option.id !== 'time_afternoon_tea');
+  }),
+  'meal intent should remove afternoon tea time option'
+);
+
+const conflictPreviousQuestions = ['meal_intent', 'category_preference', 'time_slot', 'budget', 'distance', 'brand_preference']
+  .map((id) => questionBank.find((question) => question.id === id))
+  .filter((question): question is NonNullable<typeof question> => question !== undefined);
+const mealConflictQuestions = selectQuestionSet({
+  answers: [
+    {
+      questionId: 'meal_intent',
+      type: 'single',
+      value: 'meal',
+      optionIds: ['intent_meal'],
+      answeredAt: '2026-06-02T04:00:10.000Z'
+    }
+  ],
+  previousQuestions: conflictPreviousQuestions,
+  random: () => 0.2
+});
+assert(!mealConflictQuestions.some((question) => question.id === 'category_preference'), 'meal intent should remove non-meal category question from existing queue');
+assert(
+  mealConflictQuestions.every((question) => question.options.every((option) => option.id !== 'time_afternoon_tea')),
+  'meal intent should remove afternoon tea from existing queue'
+);
+
+const drinkFollowUpQuestions = selectQuestionSet({
+  answers: [
+    {
+      questionId: 'meal_intent',
+      type: 'single',
+      value: 'drink',
+      optionIds: ['intent_drink'],
+      answeredAt: '2026-06-02T04:00:10.000Z'
+    }
+  ],
+  previousQuestions: conflictPreviousQuestions,
+  random: () => 0.2
+});
+assert(
+  drinkFollowUpQuestions.every((question) => {
+    return question.options.every((option) => !['time_lunch', 'time_dinner'].includes(option.id));
+  }),
+  'drink intent should remove lunch and dinner time options'
+);
+
+const dessertFollowUpQuestions = selectQuestionSet({
+  answers: [
+    {
+      questionId: 'meal_intent',
+      type: 'single',
+      value: 'dessert',
+      optionIds: ['intent_dessert'],
+      answeredAt: '2026-06-02T04:00:10.000Z'
+    }
+  ],
+  previousQuestions: conflictPreviousQuestions,
+  random: () => 0.2
+});
+assert(
+  dessertFollowUpQuestions.every((question) => {
+    return question.options.every((option) => !['time_lunch', 'time_dinner'].includes(option.id));
+  }),
+  'dessert intent should remove lunch and dinner time options'
+);
 
 const optionWithoutEffect = questionBank.flatMap((question) => question.options).find((option) => !option.effect);
 assert(optionWithoutEffect === undefined, '每个选项都必须有 effect');

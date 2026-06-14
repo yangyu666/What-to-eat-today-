@@ -47,35 +47,31 @@ Page({
         const { optionId } = event.currentTarget.dataset;
         const question = this.data.currentQuestion;
         const option = question.options.find((item) => item.id === optionId);
+        const questions = this.data.questions;
         if (!option) {
             return;
         }
         const answers = this.upsertAnswer(question, option);
-        const questions = (0, questionSelector_1.selectQuestionSet)({
-            answers,
-            previousQuestions: this.data.questions
-        });
+        const nextQuestions = this.refreshQuestionSet(answers, questions);
         const nextIndex = this.data.currentIndex + 1;
-        this.setData({ answers, questions });
-        if (nextIndex >= questions.length) {
+        this.setData({ answers, questions: nextQuestions });
+        if (nextIndex >= nextQuestions.length) {
             this.finishQuestionnaire(answers);
             return;
         }
-        this.showQuestion(nextIndex, questions);
+        this.showQuestion(nextIndex, nextQuestions);
     },
     skipQuestion() {
+        const questions = this.data.questions;
         const answers = this.upsertAnswer(this.data.currentQuestion, null);
-        const questions = (0, questionSelector_1.selectQuestionSet)({
-            answers,
-            previousQuestions: this.data.questions
-        });
+        const nextQuestions = this.refreshQuestionSet(answers, questions);
         const nextIndex = this.data.currentIndex + 1;
-        this.setData({ answers, questions });
-        if (nextIndex >= questions.length) {
+        this.setData({ answers, questions: nextQuestions });
+        if (nextIndex >= nextQuestions.length) {
             this.finishQuestionnaire(answers);
             return;
         }
-        this.showQuestion(nextIndex, questions);
+        this.showQuestion(nextIndex, nextQuestions);
     },
     goBack() {
         if (this.data.currentIndex === 0) {
@@ -86,11 +82,12 @@ Page({
     },
     showQuestion(index, nextQuestions) {
         const questions = nextQuestions ?? this.data.questions;
+        const safeIndex = Math.max(0, Math.min(index, questions.length - 1));
         this.setData({
-            currentIndex: index,
-            currentQuestion: questions[index],
-            progressText: `${index + 1} / ${questions.length}`,
-            progressSegments: buildProgressSegments(questions, index)
+            currentIndex: safeIndex,
+            currentQuestion: questions[safeIndex],
+            progressText: `${safeIndex + 1} / ${questions.length}`,
+            progressSegments: buildProgressSegments(questions, safeIndex)
         });
     },
     upsertAnswer(question, option) {
@@ -101,7 +98,18 @@ Page({
             optionIds: option ? [option.id] : [],
             answeredAt: new Date().toISOString()
         };
-        return [...this.data.answers.filter((item) => item.questionId !== question.id), answer];
+        const questions = this.data.questions;
+        const currentIndex = this.data.currentIndex;
+        const orderedAnswers = this.data.answers.slice(0, currentIndex);
+        orderedAnswers[currentIndex] = answer;
+        return orderedAnswers.filter((item, index) => questions[index]?.id === item.questionId);
+    },
+    refreshQuestionSet(answers, previousQuestions) {
+        return (0, questionSelector_1.selectQuestionSet)({
+            answers,
+            previousQuestions,
+            count: previousQuestions.length
+        });
     },
     finishQuestionnaire(answers) {
         if (!(0, privacyConsent_1.hasLocationConsent)()) {
