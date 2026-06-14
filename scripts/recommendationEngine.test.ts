@@ -2430,6 +2430,162 @@ async function runPoiCacheAndStressTests() {
   assert(cloudEmptyResponse.error?.code === 'NO_RECOMMENDATION', 'cloud empty input should return NO_RECOMMENDATION');
   assert(cloudEmptyResponse.data.recommendation.candidates.length === 0, 'cloud empty input should keep candidates empty');
 
+  const realMidHighBudgetCandidates: Restaurant[] = [
+    {
+      id: 'cloud-guangzhou-restaurant-120',
+      name: 'Guangzhou Restaurant',
+      tags: ['Cantonese', 'brand'],
+      tagIds: ['meal', 'chain_brand', 'mid_chain', 'mall_store'],
+      category: 'Cantonese restaurant',
+      distanceMeters: 1200,
+      averageCostYuan: 120,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'cloud-congee-hotpot-125',
+      name: 'Congee water hotpot',
+      tags: ['hotpot', 'Cantonese'],
+      tagIds: ['meal', 'hotpot', 'mid_chain'],
+      category: 'Cantonese hotpot',
+      distanceMeters: 900,
+      averageCostYuan: 125,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    },
+    {
+      id: 'cloud-diandude-86',
+      name: 'Dian Dou De',
+      tags: ['dim sum'],
+      tagIds: ['meal', 'dim_sum', 'chain_brand', 'mid_chain'],
+      category: 'Cantonese dim sum',
+      distanceMeters: 600,
+      averageCostYuan: 86,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'cloud-lei-garden-265',
+      name: 'Lei Garden',
+      tags: ['Cantonese'],
+      tagIds: ['meal', 'chain_brand', 'premium_brand'],
+      category: 'Cantonese restaurant',
+      distanceMeters: 1500,
+      averageCostYuan: 265,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ];
+  const cloudMidHighBudgetPreference = profile({
+    selectedOptionIds: ['budget_100_200'],
+    preferredTagIds: ['meal', 'mid_chain', 'chain_brand'],
+    avoidedTagIds: [],
+    budgetLevel: 5,
+    maxDistanceMeters: 5000
+  });
+  const cloudMidHighBudgetResponse = await cloudRecommendRestaurant.main(
+    {
+      restaurants: realMidHighBudgetCandidates,
+      preferences: cloudMidHighBudgetPreference,
+      allowMock: false,
+      limit: 3
+    },
+    {}
+  );
+  const clientMidHighBudgetResult = recommend(cloudMidHighBudgetPreference, realMidHighBudgetCandidates);
+  assert(cloudMidHighBudgetResponse.ok === true, 'cloud 100-200 should accept top-level preferences and produce candidates');
+  assert(cloudMidHighBudgetResponse.data.recommendation.candidates.length > 0, 'cloud 100-200 should not return empty for valid mid-high candidates');
+  assert(
+    (cloudMidHighBudgetResponse.data.recommendation.candidates[0]?.restaurant?.averageCostYuan ?? 0) >= 100,
+    'cloud 100-200 Top1 should be inside the requested budget range when strict candidates exist'
+  );
+  assert(
+    cloudMidHighBudgetResponse.data.recommendation.candidates[0]?.restaurantId === clientMidHighBudgetResult.candidates[0]?.restaurantId,
+    'cloud and client 100-200 Top1 should stay aligned for the same candidate pool'
+  );
+
+  const realLuxuryCandidates: Restaurant[] = [
+    {
+      id: 'cloud-low-soup-27',
+      name: 'Dayang original soup',
+      tags: ['quick soup'],
+      tagIds: ['quick', 'staple', 'meal'],
+      category: 'fast soup',
+      distanceMeters: 500,
+      averageCostYuan: 27,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'cloud-garden-hotel-368',
+      name: 'Garden Hotel restaurant',
+      tags: ['hotel restaurant'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'hotel restaurant Cantonese',
+      distanceMeters: 1800,
+      averageCostYuan: 368,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'cloud-white-swan-426',
+      name: 'White Swan restaurant',
+      tags: ['hotel restaurant'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'hotel restaurant Cantonese',
+      distanceMeters: 2400,
+      averageCostYuan: 426,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'cloud-bingsheng-private-432',
+      name: 'Bingsheng private kitchen',
+      tags: ['private kitchen', 'Cantonese'],
+      tagIds: ['meal', 'premium_brand', 'chain_brand'],
+      category: 'Cantonese private kitchen',
+      distanceMeters: 1500,
+      averageCostYuan: 432,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    }
+  ];
+  const cloudLuxuryPreference = profile({
+    selectedOptionIds: ['budget_over_200', 'brand_chain'],
+    preferredTagIds: ['meal', 'premium_brand', 'chain_brand'],
+    avoidedTagIds: [],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000
+  });
+  const cloudLuxuryResponse = await cloudRecommendRestaurant.main(
+    {
+      restaurants: realLuxuryCandidates,
+      preferences: cloudLuxuryPreference,
+      allowMock: false,
+      limit: 3
+    },
+    {}
+  );
+  const clientLuxuryResult = recommend(cloudLuxuryPreference, realLuxuryCandidates);
+  assert(cloudLuxuryResponse.ok === true, 'cloud 200+ should accept top-level preferences and produce candidates');
+  assert(cloudLuxuryResponse.data.recommendation.candidates[0]?.restaurantId !== 'cloud-low-soup-27', 'cloud 200+ must not recommend a 27 yuan quick meal as Top1');
+  assert(
+    (cloudLuxuryResponse.data.recommendation.candidates[0]?.restaurant?.averageCostYuan ?? 0) >= 200,
+    'cloud 200+ Top1 should be a true 200+ candidate when strict candidates exist'
+  );
+  assert(
+    cloudLuxuryResponse.data.recommendation.candidates[0]?.restaurantId === clientLuxuryResult.candidates[0]?.restaurantId,
+    'cloud and client 200+ Top1 should stay aligned for the same candidate pool'
+  );
+
   const storage: Record<string, unknown> = {};
   const baseLocation = { latitude: 39.909, longitude: 116.455 };
   let amapCallCount = 0;

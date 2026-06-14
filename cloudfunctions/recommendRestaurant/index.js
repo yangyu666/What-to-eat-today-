@@ -326,7 +326,7 @@ exports.main = async (event = {}, cloudContext = {}) => {
   try {
     const context = event.context || {};
     const answers = getAnswers(event, context);
-    const preferenceSnapshot = context.preferenceSnapshot || buildPreferenceProfile(answers);
+    const preferenceSnapshot = getPreferenceSnapshot(event, context, answers);
     const inputRestaurants = Array.isArray(event.restaurants) ? event.restaurants : [];
     const allowMock = event.allowMock === true || context.allowMock === true;
     const restaurants = inputRestaurants.length > 0 ? inputRestaurants : allowMock ? mockRestaurants : [];
@@ -418,6 +418,16 @@ function getAnswers(event, context) {
   }
 
   return [];
+}
+
+function getPreferenceSnapshot(event, context, answers) {
+  return (
+    context.preferenceSnapshot ||
+    event.preferenceSnapshot ||
+    event.preferences ||
+    (event.context && event.context.preferences) ||
+    buildPreferenceProfile(answers)
+  );
 }
 
 function normalizeLimit(limit) {
@@ -676,8 +686,12 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     restaurant.distanceMeters > preference.maxDistanceMeters
       ? Math.min(rawFinalScore, 54)
       : rawFinalScore;
+  const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
+  const underBudgetAdjustedFinalScore = underBudgetMismatch
+    ? Math.min(distanceAdjustedFinalScore, getUnderBudgetFinalScoreCap(restaurant, preference))
+    : distanceAdjustedFinalScore;
   const finalScore =
-    options.finalScoreCap !== undefined ? Math.min(distanceAdjustedFinalScore, options.finalScoreCap) : distanceAdjustedFinalScore;
+    options.finalScoreCap !== undefined ? Math.min(underBudgetAdjustedFinalScore, options.finalScoreCap) : underBudgetAdjustedFinalScore;
   const hardConstraintScore = getHardConstraintConfidence(restaurant, preference, options.fallbackReason);
   const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
   const negativeAvoidanceScore = negativeConflict.severity === 'hard' ? 0 : negativeConflict.severity === 'soft' ? 8 : 25;
@@ -700,7 +714,6 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
     ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
     : rawConfidenceScore;
-  const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
   const priceCalibratedConfidenceScore = underBudgetMismatch
     ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
     : budgetCalibratedConfidenceScore;
@@ -1685,6 +1698,17 @@ function getUnderBudgetConfidenceCap(restaurant, preference) {
   }
   if (estimatedCost >= 80) return 70;
   return 58;
+}
+
+function getUnderBudgetFinalScoreCap(restaurant, preference) {
+  const estimatedCost = getEstimatedCost(restaurant) || 0;
+  if (((preference && preference.budgetLevel) || 3) >= 6) {
+    if (estimatedCost >= 150) return 70;
+    if (estimatedCost >= 100) return 60;
+    return 42;
+  }
+  if (estimatedCost >= 80) return 82;
+  return 62;
 }
 
 function buildDistanceFallbackReason(preference) {

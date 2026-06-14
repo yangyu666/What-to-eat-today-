@@ -601,9 +601,13 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         restaurant.distanceMeters > preference.maxDistanceMeters
         ? Math.min(rawFinalScore, 54)
         : rawFinalScore;
-    const finalScore = options.finalScoreCap !== undefined
-        ? Math.min(distanceAdjustedFinalScore, options.finalScoreCap)
+    const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
+    const underBudgetAdjustedFinalScore = underBudgetMismatch
+        ? Math.min(distanceAdjustedFinalScore, getUnderBudgetFinalScoreCap(restaurant, preference))
         : distanceAdjustedFinalScore;
+    const finalScore = options.finalScoreCap !== undefined
+        ? Math.min(underBudgetAdjustedFinalScore, options.finalScoreCap)
+        : underBudgetAdjustedFinalScore;
     const hardConstraintScore = getHardConstraintConfidence(restaurant, preference, options.fallbackReason);
     const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
     const negativeAvoidanceScore = getNegativeAvoidanceConfidence(negativeConflict);
@@ -626,7 +630,6 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
         ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
         : rawConfidenceScore;
-    const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
     const priceCalibratedConfidenceScore = underBudgetMismatch
         ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
         : budgetCalibratedConfidenceScore;
@@ -1812,6 +1815,22 @@ function getUnderBudgetConfidenceCap(restaurant, preference) {
         return 70;
     }
     return 58;
+}
+function getUnderBudgetFinalScoreCap(restaurant, preference) {
+    const estimatedCost = getEstimatedCost(restaurant) ?? 0;
+    if ((preference?.budgetLevel ?? 3) >= 6) {
+        if (estimatedCost >= 150) {
+            return 70;
+        }
+        if (estimatedCost >= 100) {
+            return 60;
+        }
+        return 42;
+    }
+    if (estimatedCost >= 80) {
+        return 82;
+    }
+    return 62;
 }
 function buildDistanceFallbackReason(preference) {
     const selected = new Set(preference?.selectedOptionIds ?? []);
