@@ -20,10 +20,7 @@ export type PreferenceDimension =
   | 'mood'
   | 'scene'
   | 'meal_intent'
-  | 'dietary_restriction'
-  | 'nutrition_goal'
   | 'time_slot'
-  | 'category_avoidance'
   | 'category_preference'
   | 'brand_preference';
 

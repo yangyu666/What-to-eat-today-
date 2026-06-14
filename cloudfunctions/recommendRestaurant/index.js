@@ -1062,15 +1062,13 @@ function getAvoidedTagIds(preference) {
     selected.has('time_afternoon_tea') ||
     selected.has('prefer_milk_tea') ||
     selected.has('prefer_coffee') ||
-    selected.has('prefer_bakery_dessert') ||
-    selected.has('avoid_category_heavy_meal');
+    selected.has('prefer_bakery_dessert');
   const wantsMeal =
     selected.has('intent_meal') ||
     selected.has('meal_type_meal') ||
     selected.has('satiety_filling') ||
     selected.has('time_lunch') ||
-    selected.has('time_dinner') ||
-    selected.has('avoid_category_drinks');
+    selected.has('time_dinner');
   const wantsDrinkOnly = DRINK_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId));
   const wantsDessertOnly = DESSERT_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId));
   const wantsChainBrand = BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId));

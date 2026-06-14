@@ -1355,7 +1355,7 @@ assert(selectedQuestions.some((question) => question.id === 'distance'), '6 题�
 assert(selectedQuestions.some((question) => question.id === 'budget'), '6 题应覆盖预算');
 assert(selectedQuestions.some((question) => question.id === 'meal_intent'), '6 questions should prioritize meal intent');
 assert(
-  selectedQuestions.filter((question) => ['meal_intent', 'dietary_restriction', 'nutrition_goal', 'time_slot', 'category_avoidance', 'category_preference'].includes(question.id)).length >= 2,
+  selectedQuestions.filter((question) => ['meal_intent', 'time_slot', 'category_preference', 'flavor', 'health', 'speed'].includes(question.id)).length >= 2,
   '6 题应覆盖至少两个口味/健康/饱腹相关维度'
 );
 const selectedQuestionIds = new Set(selectedQuestions.map((question) => question.id));
@@ -1657,7 +1657,7 @@ const lateNightResult = recommend(
 assert(lateNightResult.candidates[0]?.restaurantId === 'breadth-late-snack', 'late night should prioritize quick, hot, snack-like food');
 
 const vegetarianPreference = profile({
-  selectedOptionIds: ['dietary_vegetarian'],
+  selectedOptionIds: [],
   preferredTagIds: ['vegetarian', 'healthy', 'light'],
   avoidedTagIds: ['bbq', 'meat_heavy', 'pork', 'fried', 'heavy'],
   maxDistanceMeters: 1000
@@ -1667,7 +1667,7 @@ assert((vegetarianBbqScore.confidenceScore ?? 100) <= 45, 'vegetarian restrictio
 assert(vegetarianBbqScore.matchedAvoidedTagIds.includes('meat_heavy') || vegetarianBbqScore.matchedAvoidedTagIds.includes('bbq'), 'vegetarian restriction should expose meat-heavy avoided tags');
 
 const halalPreference = profile({
-  selectedOptionIds: ['dietary_halal'],
+  selectedOptionIds: [],
   preferredTagIds: ['halal', 'high_protein'],
   avoidedTagIds: ['pork'],
   maxDistanceMeters: 1000
@@ -1678,7 +1678,7 @@ const halalResult = recommend(halalPreference, breadthRestaurants);
 assert(halalResult.candidates[0]?.restaurantId === 'breadth-halal-noodle', 'halal preference should prioritize halal candidates');
 
 const lowSugarPreference = profile({
-  selectedOptionIds: ['nutrition_low_sugar'],
+  selectedOptionIds: [],
   preferredTagIds: ['low_sugar', 'healthy', 'low_burden'],
   avoidedTagIds: ['dessert', 'milk_tea', 'sweet', 'sugary_drink'],
   maxDistanceMeters: 1000
@@ -1687,7 +1687,7 @@ const lowSugarMilkTeaScore = scoreRestaurant(breadthRestaurants.find((restaurant
 assert((lowSugarMilkTeaScore.confidenceScore ?? 100) <= 70, 'low sugar preference should strongly downgrade milk tea and desserts unless fallback');
 
 const allergyPreference = profile({
-  selectedOptionIds: ['dietary_allergy_sensitive'],
+  selectedOptionIds: [],
   preferredTagIds: ['allergy_sensitive', 'light', 'customizable'],
   avoidedTagIds: ['seafood', 'peanut', 'unclear_ingredients', 'spicy', 'strong_flavor'],
   maxDistanceMeters: 1000
@@ -1697,7 +1697,7 @@ assert((allergySeafoodScore.confidenceScore ?? 100) <= 45, 'allergy sensitive pr
 
 const proteinResult = recommend(
   profile({
-    selectedOptionIds: ['nutrition_high_protein'],
+    selectedOptionIds: [],
     preferredTagIds: ['high_protein', 'healthy', 'low_carb'],
     avoidedTagIds: ['dessert', 'milk_tea', 'sweet'],
     maxDistanceMeters: 1000
@@ -1714,20 +1714,6 @@ const mealPreference = profile({
 });
 const mealResult = recommend(mealPreference, breadthRestaurants);
 assert(mealResult.candidates[0]?.restaurantId === 'breadth-rice-meal', 'when user explicitly wants a meal, milk tea coffee and dessert should not be Top1');
-
-const avoidDrinkProfile = mapAnswersToPreferenceProfile([
-  {
-    questionId: 'category_avoidance',
-    type: 'single',
-    value: 'avoid_drinks',
-    optionIds: ['avoid_category_drinks'],
-    answeredAt: '2026-06-02T04:10:00.000Z'
-  }
-]);
-const avoidDrinkQuery = buildAmapRestaurantQuery(avoidDrinkProfile);
-assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinkQuery.keywords ?? ''), 'avoided drink or dessert categories should not be included in AMap keywords');
-const avoidDrinkResult = recommend(avoidDrinkProfile, breadthRestaurants);
-assert(!['breadth-milk-tea', 'breadth-coffee', 'breadth-dessert'].includes(avoidDrinkResult.candidates[0]?.restaurantId ?? ''), 'avoided category should not be Top1');
 
 const nonMealFallbackGuardResult = recommend(
   profile({

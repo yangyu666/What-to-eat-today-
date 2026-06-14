@@ -62,8 +62,7 @@ function applyDefensivePreferenceInferences(draft) {
         'prefer_milk_tea',
         'prefer_coffee',
         'prefer_bakery_dessert',
-        'time_afternoon_tea',
-        'avoid_category_heavy_meal'
+        'time_afternoon_tea'
     ]);
     const hasNonMealSignal = [...nonMealOptionIds].some((optionId) => draft.selectedOptionIds.has(optionId));
     if (!hasNonMealSignal) {

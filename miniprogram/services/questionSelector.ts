@@ -11,10 +11,10 @@ export interface SelectQuestionsOptions {
 const DEFAULT_QUESTION_COUNT = 6;
 const EXCLUDED_DIMENSIONS: PreferenceDimension[] = ['dining_mode'];
 const QUESTION_FLOWS = [
-  ['meal_intent', 'budget', 'distance', 'brand_preference', 'dietary_restriction', 'time_slot'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'time_slot', 'speed'],
   ['meal_intent', 'budget', 'distance', 'brand_preference', 'category_preference', 'speed'],
-  ['meal_intent', 'budget', 'distance', 'brand_preference', 'category_avoidance', 'dietary_restriction'],
-  ['meal_intent', 'budget', 'distance', 'brand_preference', 'spice_tolerance', 'nutrition_goal'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'spice_tolerance', 'flavor'],
+  ['meal_intent', 'budget', 'distance', 'brand_preference', 'health', 'speed'],
   ['meal_intent', 'budget', 'distance', 'brand_preference', 'flavor', 'time_slot']
 ];
 
@@ -29,14 +29,12 @@ const NON_MEAL_OPTION_IDS = new Set([
   'prefer_milk_tea',
   'prefer_coffee',
   'prefer_bakery_dessert',
-  'time_afternoon_tea',
-  'avoid_category_heavy_meal'
+  'time_afternoon_tea'
 ]);
 const MEAL_OPTION_IDS = new Set([
   'intent_meal',
   'time_lunch',
-  'time_dinner',
-  'avoid_category_drinks'
+  'time_dinner'
 ]);
 const MEAL_ONLY_QUESTION_IDS = new Set(['category_preference']);
 

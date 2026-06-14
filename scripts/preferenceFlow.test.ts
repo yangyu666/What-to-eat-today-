@@ -300,25 +300,6 @@ const dessertQuery = buildAmapRestaurantQuery(dessertProfile);
 assert(/甜品|蛋糕|面包|烘焙|西点/.test(dessertQuery.keywords ?? ''), 'dessert query should keep dessert recall keywords');
 assert(!/盖饭|套餐|简餐/.test(dessertQuery.keywords ?? ''), 'dessert query should not drift into meal keywords');
 
-const halalProfile = mapAnswersToPreferenceProfile([
-  {
-    questionId: 'dietary_restriction',
-    type: 'single',
-    value: 'halal',
-    optionIds: ['dietary_halal'],
-    answeredAt: '2026-06-02T04:10:01.000Z'
-  }
-]);
-
-assert(halalProfile.preferredTagIds.includes('halal'), 'halal restriction should map to halal tag');
-assert(halalProfile.avoidedTagIds.includes('pork'), 'halal restriction should avoid pork');
-const halalKeywords = halalProfile.softPreferences?.amapKeywords;
-assert(
-  Array.isArray(halalKeywords) &&
-    halalKeywords.some((keyword) => keyword === '清真'),
-  'halal restriction should add halal AMap keyword'
-);
-
 const breakfastProfile = mapAnswersToPreferenceProfile([
   {
     questionId: 'time_slot',
@@ -331,47 +312,6 @@ const breakfastProfile = mapAnswersToPreferenceProfile([
 
 assert(breakfastProfile.preferredTagIds.includes('breakfast'), 'breakfast should map to breakfast tag');
 assert(breakfastProfile.maxEstimatedMinutes === 35, 'breakfast should tighten estimated time');
-
-const allergyProfile = mapAnswersToPreferenceProfile([
-  {
-    questionId: 'dietary_restriction',
-    type: 'single',
-    value: 'allergy_sensitive',
-    optionIds: ['dietary_allergy_sensitive'],
-    answeredAt: '2026-06-02T04:10:02.500Z'
-  }
-]);
-
-assert(allergyProfile.preferredTagIds.includes('allergy_sensitive'), 'allergy option should map to allergy_sensitive tag');
-assert(allergyProfile.avoidedTagIds.includes('seafood'), 'allergy option should avoid seafood risk tags');
-assert(allergyProfile.avoidedTagIds.includes('peanut'), 'allergy option should avoid peanut risk tags');
-
-const nutritionProfile = mapAnswersToPreferenceProfile([
-  {
-    questionId: 'nutrition_goal',
-    type: 'single',
-    value: 'low_sugar',
-    optionIds: ['nutrition_low_sugar'],
-    answeredAt: '2026-06-02T04:10:02.800Z'
-  }
-]);
-
-assert(nutritionProfile.preferredTagIds.includes('low_sugar'), 'nutrition goal should map low sugar tags');
-assert(nutritionProfile.avoidedTagIds.includes('milk_tea'), 'low sugar nutrition goal should avoid sugary drinks');
-
-const avoidDrinksProfile = mapAnswersToPreferenceProfile([
-  {
-    questionId: 'category_avoidance',
-    type: 'single',
-    value: 'avoid_drinks',
-    optionIds: ['avoid_category_drinks'],
-    answeredAt: '2026-06-02T04:10:03.000Z'
-  }
-]);
-const avoidDrinksQuery = buildAmapRestaurantQuery(avoidDrinksProfile);
-
-assert(avoidDrinksProfile.avoidedTagIds.includes('milk_tea'), 'avoid drinks should map milk_tea to avoided tags');
-assert(!/奶茶|咖啡|甜品|饮品/.test(avoidDrinksQuery.keywords ?? ''), 'avoid drinks should remove conflicting AMap keywords');
 
 const premiumBrandMealProfile = mapAnswersToPreferenceProfile([
   {
