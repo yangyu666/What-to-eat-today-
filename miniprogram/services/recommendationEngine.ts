@@ -511,6 +511,140 @@ const PREMIUM_CHAIN_KEYWORDS = [
   '白天鹅',
   '黑珍珠'
 ];
+const NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS = [
+  '德克士',
+  '派乐汉堡',
+  '享哆味',
+  '萨莉亚',
+  '南城香',
+  '大米先生',
+  '米村拌饭',
+  '超意兴',
+  '杨铭宇黄焖鸡',
+  '猪角',
+  '正新鸡排',
+  '绝味鸭脖',
+  '紫燕百味鸡',
+  '周黑鸭',
+  '煌上煌',
+  '久久丫',
+  '巴比',
+  '小杨生煎',
+  '书亦烧仙草',
+  'CoCo',
+  '都可',
+  '益禾堂',
+  '甜啦啦',
+  '柠季',
+  '林里',
+  '茶颜悦色',
+  '茶话弄',
+  '悸动',
+  '快乐番薯',
+  '阿水大杯茶',
+  '700CC',
+  '库迪',
+  'cotti',
+  '幸运咖',
+  'NOWWA',
+  '挪瓦',
+  'M Stand',
+  'Seesaw'
+];
+const NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS = [
+  '呷哺呷哺',
+  '凑凑',
+  '小龙坎',
+  '朱光玉',
+  '熊喵来了',
+  '半天妖',
+  '烤匠',
+  '很久以前',
+  '西塔老太太',
+  '九田家',
+  '刘炭长',
+  '大家乐',
+  '大快活',
+  '捞王',
+  '左庭右院',
+  '八合里',
+  '润园四季',
+  '四季椰林',
+  '王品牛排',
+  '豪客来',
+  '大渔铁板烧',
+  '和府捞面',
+  '味千拉面',
+  '李先生',
+  '马记永',
+  '陈香贵',
+  '蒙自源',
+  '阿香米线',
+  '五谷渔粉',
+  '喜家德',
+  '袁记云饺',
+  '吉祥馄饨'
+];
+const NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS = [
+  '高端粤菜',
+  '潮菜',
+  '铁板烧',
+  '创意菜',
+  '鮨',
+  '花园酒店',
+  '康莱德',
+  '大渔铁板烧',
+  '1218 GRILL',
+  '中侨会',
+  '雍颐庭',
+  '菁禧荟',
+  '遇外滩',
+  '成隆行',
+  '眉州东坡1996',
+  '蓝麒麟',
+  '新长福',
+  '南景饭店',
+  '晴溪莊园',
+  '至正潮菜',
+  'AVANT',
+  'La Tablée',
+  'Stone Sal',
+  '言盐',
+  '粤海荟',
+  '齐武',
+  '晴空',
+  '水岸十里',
+  '云璟',
+  '鹏瑞莱佛士',
+  '雲鹤',
+  '雲鹤手握',
+  '鮨海老'
+];
+const pushUniqueKeyword = (target: string[], keywords: string[]) => {
+  keywords.forEach((keyword) => {
+    if (!target.includes(keyword)) {
+      target.push(keyword);
+    }
+  });
+};
+pushUniqueKeyword(LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_MEAL_SIGNAL_KEYWORDS, [
+  '潮菜',
+  '江浙菜',
+  '本帮菜',
+  '高端粤菜',
+  '高端日料',
+  '铁板烧',
+  '创意菜',
+  'GRILL',
+  '鮨',
+  ...NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS
+]);
 const INDEPENDENT_STORE_KEYWORDS = [
   '街边',
   '小店',
@@ -707,7 +841,8 @@ export function scoreRestaurant(
   const matchedPreferredTagIds = intersect(tagIds, preferredTagIds);
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
-  const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, avoidedTagIds), ...negativeConflict.tags])];
+  const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, avoidedTagIds), ...negativeConflict.tags])]
+    .filter((tagId) => !shouldSuppressPremiumChainAvoidanceTag(tagId, tagIds, preference));
   const baseScore = 32;
   const preferenceScore = getPreferenceScore(matchedPreferredTagIds);
   const negativePreferencePenalty = getNegativePenalty(negativeConflict) + temperatureConflict.penalty;
@@ -1502,6 +1637,15 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
   };
 
   tagIds.forEach((tagId) => {
+    if (
+      explicitChainBrand &&
+      (preference?.budgetLevel ?? 3) >= 6 &&
+      tagIds.includes('premium_brand') &&
+      (tagId === 'mid_chain' || tagId === 'low_chain')
+    ) {
+      return;
+    }
+
     if (avoided.has(tagId)) {
       tags.add(tagId);
       labels.add(tagId);
@@ -1654,6 +1798,21 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
     tags: [...tags],
     labels: [...labels]
   };
+}
+
+function shouldSuppressPremiumChainAvoidanceTag(
+  tagId: TagId,
+  candidateTagIds: TagId[],
+  preference?: UserPreferenceProfile
+): boolean {
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+
+  return (
+    BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId)) &&
+    (preference?.budgetLevel ?? 3) >= 6 &&
+    candidateTagIds.includes('premium_brand') &&
+    (tagId === 'mid_chain' || tagId === 'low_chain')
+  );
 }
 
 function getTemperatureConflict(restaurant: Restaurant, preference?: UserPreferenceProfile) {

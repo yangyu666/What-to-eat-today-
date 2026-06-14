@@ -179,8 +179,9 @@ function getAttemptAmapBudget(attempt, remainingAmapApiCalls) {
     return Math.max(0, Math.min(MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST, remainingAmapApiCalls));
 }
 function isAmapDailyQuotaError(error) {
+    var _a, _b, _c;
     const payload = (error || {});
-    const text = `${payload?.message ?? ''} ${payload?.code ?? ''} ${JSON.stringify(payload?.details ?? {})}`;
+    const text = `${(_a = payload === null || payload === void 0 ? void 0 : payload.message) !== null && _a !== void 0 ? _a : ''} ${(_b = payload === null || payload === void 0 ? void 0 : payload.code) !== null && _b !== void 0 ? _b : ''} ${JSON.stringify((_c = payload === null || payload === void 0 ? void 0 : payload.details) !== null && _c !== void 0 ? _c : {})}`;
     return /USER_DAILY_QUERY_OVER_LIMIT|DAILY_QUERY_OVER_LIMIT|AMAP_KEYS_UNAVAILABLE|10003|quota|daily|额度|配额|上限|耗尽|超限/i.test(text);
 }
 function normalizeRestaurantShape(restaurant) {
@@ -247,11 +248,12 @@ function isPlainRecord(value) {
     return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
+    var _a, _b, _c, _d, _e, _f;
     const baseRadius = amapQuery.radiusMeters;
     const polygonRadius = Math.max(baseRadius, 3000);
-    const baseKeyword = amapQuery.keywords ?? '';
-    const relaxedKeyword = getStrictCategoryKeyword(baseKeyword) ?? '';
-    const premiumKeywords = (preferenceSnapshot.budgetLevel ?? 3) >= 6 ? getPremiumKeywordAttempts(baseKeyword) : [];
+    const baseKeyword = (_a = amapQuery.keywords) !== null && _a !== void 0 ? _a : '';
+    const relaxedKeyword = (_b = getStrictCategoryKeyword(baseKeyword)) !== null && _b !== void 0 ? _b : '';
+    const premiumKeywords = ((_c = preferenceSnapshot.budgetLevel) !== null && _c !== void 0 ? _c : 3) >= 6 ? getPremiumKeywordAttempts(baseKeyword) : [];
     const midHighBudgetKeywords = getMidHighBudgetKeywordAttempts(preferenceSnapshot);
     const nonMealPremiumKeywords = getNonMealPremiumKeywordAttempts(preferenceSnapshot);
     const brandChainKeywords = getBrandChainKeywordAttempts(preferenceSnapshot);
@@ -263,7 +265,7 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
         brandChainKeywords.length > 0;
     const maxRadius = Math.max(baseRadius, premiumSearch ? 15000 : 10000);
     const scopedLocation = getScopedKeywordSearchLocation(preferenceSnapshot);
-    const isLuxuryMealSearch = (preferenceSnapshot.budgetLevel ?? 3) >= 6 && luxuryFocusedKeywords.length > 0;
+    const isLuxuryMealSearch = ((_d = preferenceSnapshot.budgetLevel) !== null && _d !== void 0 ? _d : 3) >= 6 && luxuryFocusedKeywords.length > 0;
     const keywordAttempts = (isLuxuryMealSearch
         ? [
             ...luxuryFocusedKeywords,
@@ -282,13 +284,13 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
             ...mallKeywords
         ]).filter(Boolean);
     const attempts = [];
-    const primaryKeyword = keywordAttempts[0] ?? baseKeyword;
-    const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
+    const primaryKeyword = (_e = keywordAttempts[0]) !== null && _e !== void 0 ? _e : baseKeyword;
+    const fallbackKeyword = (_f = keywordAttempts.find((keyword) => keyword !== primaryKeyword)) !== null && _f !== void 0 ? _f : primaryKeyword;
     const primaryRadius = premiumSearch ? maxRadius : polygonRadius;
     const primaryPageCount = isLuxuryMealSearch ? 2 : 1;
-    const secondaryPolygonKeyword = fallbackKeyword !== primaryKeyword
-        ? fallbackKeyword
-        : keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
+    const secondaryPolygonKeywords = isLuxuryMealSearch
+        ? keywordAttempts.filter((keyword) => keyword && keyword !== primaryKeyword).slice(0, 2)
+        : (fallbackKeyword && fallbackKeyword !== primaryKeyword ? [fallbackKeyword] : []);
     attempts.push({
         mode: 'polygon',
         radiusMeters: maxRadius,
@@ -310,7 +312,7 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
         adcode: '',
         reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'
     });
-    if (secondaryPolygonKeyword && secondaryPolygonKeyword !== primaryKeyword) {
+    secondaryPolygonKeywords.forEach((secondaryPolygonKeyword, index) => {
         attempts.push({
             mode: 'polygon',
             radiusMeters: maxRadius,
@@ -319,9 +321,9 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
             pageCount: 1,
             city: '',
             adcode: '',
-            reason: 'recommendation-polygon-keyword-secondary'
+            reason: index === 0 ? 'recommendation-polygon-keyword-secondary' : 'recommendation-polygon-keyword-tertiary'
         });
-    }
+    });
     attempts.push({
         mode: 'polygon',
         radiusMeters: maxRadius,
@@ -358,39 +360,43 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     }
     return attempts.filter((attempt, index, allAttempts) => {
         return allAttempts.findIndex((item) => {
+            var _a, _b, _c, _d;
             return (item.mode === attempt.mode &&
                 item.radiusMeters === attempt.radiusMeters &&
                 item.keyword === attempt.keyword &&
                 item.types === attempt.types &&
-                (item.city ?? '') === (attempt.city ?? '') &&
-                (item.adcode ?? '') === (attempt.adcode ?? '') &&
+                ((_a = item.city) !== null && _a !== void 0 ? _a : '') === ((_b = attempt.city) !== null && _b !== void 0 ? _b : '') &&
+                ((_c = item.adcode) !== null && _c !== void 0 ? _c : '') === ((_d = attempt.adcode) !== null && _d !== void 0 ? _d : '') &&
                 Boolean(item.cacheOnly) === Boolean(attempt.cacheOnly));
         }) === index;
     });
 }
 function shouldSkipFallbackAttempt(restaurantPool, preferenceSnapshot) {
+    var _a;
     const restaurants = [...restaurantPool.values()];
-    if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
+    if (((_a = preferenceSnapshot.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 6) {
         return countEffectivePremiumCandidates(restaurants) >= MIN_PREMIUM_POOL_BEFORE_FALLBACK;
     }
     return restaurants.length >= MIN_POOL_BEFORE_FALLBACK;
 }
 function countEffectivePremiumCandidates(restaurants) {
     return restaurants.filter((restaurant) => {
-        const cost = restaurant.averageCostYuan ?? estimateCostFromPriceLevel(restaurant.priceLevel);
-        const tagIds = new Set(restaurant.tagIds ?? []);
-        const text = `${restaurant.name ?? ''} ${restaurant.category ?? ''} ${(restaurant.tags ?? []).join(' ')}`;
+        var _a, _b, _c, _d, _e;
+        const cost = (_a = restaurant.averageCostYuan) !== null && _a !== void 0 ? _a : estimateCostFromPriceLevel(restaurant.priceLevel);
+        const tagIds = new Set((_b = restaurant.tagIds) !== null && _b !== void 0 ? _b : []);
+        const text = `${(_c = restaurant.name) !== null && _c !== void 0 ? _c : ''} ${(_d = restaurant.category) !== null && _d !== void 0 ? _d : ''} ${((_e = restaurant.tags) !== null && _e !== void 0 ? _e : []).join(' ')}`;
         const hasPremiumSignal = tagIds.has('premium_brand') ||
             /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|GRILL|grill|烧肉|融合料理|创意菜/.test(text);
         return (cost !== undefined && cost >= 180) || (cost === undefined && hasPremiumSignal) || tagIds.has('premium_brand');
     }).length;
 }
 function getLuxuryFocusedKeywordAttempts(preferenceSnapshot) {
-    if ((preferenceSnapshot.budgetLevel ?? 3) < 6) {
+    var _a, _b, _c;
+    if (((_a = preferenceSnapshot.budgetLevel) !== null && _a !== void 0 ? _a : 3) < 6) {
         return [];
     }
-    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
-    const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
+    const selected = new Set((_b = preferenceSnapshot.selectedOptionIds) !== null && _b !== void 0 ? _b : []);
+    const preferred = new Set((_c = preferenceSnapshot.preferredTagIds) !== null && _c !== void 0 ? _c : []);
     const isExplicitNonMeal = selected.has('prefer_milk_tea') ||
         selected.has('prefer_coffee') ||
         selected.has('prefer_bakery_dessert') ||
@@ -406,7 +412,9 @@ function getLuxuryFocusedKeywordAttempts(preferenceSnapshot) {
     }
     return [
         '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
-        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题'
+        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题|铁板烧|GRILL',
+        '新荣记|甬府|大董|莆田|松鹤楼|炳胜|利苑|广州酒家|白天鹅|大渔铁板烧',
+        '蓝麒麟|新长福|菁禧荟|遇外滩|至正潮菜|AVANT|Stone Sal|粤海荟|云璟|鹏瑞莱佛士'
     ];
 }
 function estimateCostFromPriceLevel(priceLevel) {
@@ -428,8 +436,9 @@ function estimateCostFromPriceLevel(priceLevel) {
     return 25;
 }
 function getScopedKeywordSearchLocation(preferenceSnapshot) {
-    const city = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapCity ?? preferenceSnapshot.constraints?.city);
-    const adcode = getStringPreferenceValue(preferenceSnapshot.softPreferences?.amapAdcode ?? preferenceSnapshot.constraints?.adcode);
+    var _a, _b, _c, _d, _e, _f;
+    const city = getStringPreferenceValue((_b = (_a = preferenceSnapshot.softPreferences) === null || _a === void 0 ? void 0 : _a.amapCity) !== null && _b !== void 0 ? _b : (_c = preferenceSnapshot.constraints) === null || _c === void 0 ? void 0 : _c.city);
+    const adcode = getStringPreferenceValue((_e = (_d = preferenceSnapshot.softPreferences) === null || _d === void 0 ? void 0 : _d.amapAdcode) !== null && _e !== void 0 ? _e : (_f = preferenceSnapshot.constraints) === null || _f === void 0 ? void 0 : _f.adcode);
     return {
         city,
         adcode
@@ -439,9 +448,10 @@ function getStringPreferenceValue(value) {
     return typeof value === 'string' && value.trim() ? value.trim() : '';
 }
 function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
-    const budgetLevel = preferenceSnapshot.budgetLevel ?? 3;
-    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
-    const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
+    var _a, _b, _c;
+    const budgetLevel = (_a = preferenceSnapshot.budgetLevel) !== null && _a !== void 0 ? _a : 3;
+    const selected = new Set((_b = preferenceSnapshot.selectedOptionIds) !== null && _b !== void 0 ? _b : []);
+    const preferred = new Set((_c = preferenceSnapshot.preferredTagIds) !== null && _c !== void 0 ? _c : []);
     const isExplicitNonMeal = selected.has('prefer_milk_tea') ||
         selected.has('prefer_coffee') ||
         selected.has('prefer_bakery_dessert') ||
@@ -457,8 +467,8 @@ function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
     }
     if (selected.has('brand_chain')) {
         return [
-            '粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理',
-            '费大厨|小菜园|西贝|海底捞|太二|探鱼|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九',
+            '粤菜|江浙菜|本帮菜|日料|西餐|烤肉|火锅|融合料理',
+            '费大厨|小菜园|西贝|海底捞|巴奴|太二|探鱼|半天妖|烤匠|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九|王品牛排',
             '商场餐厅|购物中心餐厅|品牌餐厅|连锁餐厅'
         ];
     }
@@ -469,10 +479,11 @@ function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
     ];
 }
 function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {
-    if ((preferenceSnapshot.budgetLevel ?? 3) < 5) {
+    var _a, _b;
+    if (((_a = preferenceSnapshot.budgetLevel) !== null && _a !== void 0 ? _a : 3) < 5) {
         return [];
     }
-    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
+    const selected = new Set((_b = preferenceSnapshot.selectedOptionIds) !== null && _b !== void 0 ? _b : []);
     if (selected.has('prefer_milk_tea') || selected.has('intent_drink')) {
         return [
             '精品咖啡|茶饮|奶茶|酒店下午茶|下午茶',
@@ -488,32 +499,34 @@ function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {
     return [];
 }
 function getBrandChainKeywordAttempts(preferenceSnapshot) {
-    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
+    var _a, _b, _c;
+    const selected = new Set((_a = preferenceSnapshot.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     if (!selected.has('brand_chain')) {
         return [];
     }
-    if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
+    if (((_b = preferenceSnapshot.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6) {
         return [
             '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
-            '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题',
-            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
-            '铁板烧|GRILL|grill|烧肉|创意菜'
+            '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题|铁板烧|GRILL|烧肉|创意菜',
+            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅|大渔铁板烧|1218 GRILL|中侨会',
+            '蓝麒麟|新长福|南景饭店|菁禧荟|遇外滩|至正潮菜|AVANT|Stone Sal|粤海荟|云璟|鹏瑞莱佛士'
         ];
     }
-    if ((preferenceSnapshot.budgetLevel ?? 3) >= 5) {
+    if (((_c = preferenceSnapshot.budgetLevel) !== null && _c !== void 0 ? _c : 3) >= 5) {
         return [
-            '费大厨|小菜园|西贝|海底捞|太二|探鱼',
-            '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九'
+            '费大厨|小菜园|西贝|海底捞|巴奴|太二|探鱼|半天妖|烤匠',
+            '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九|农耕记|王品牛排|大渔铁板烧'
         ];
     }
     return [];
 }
 function getMallKeywordAttempts(preferenceSnapshot) {
-    const selected = new Set(preferenceSnapshot.selectedOptionIds ?? []);
-    const preferred = new Set(preferenceSnapshot.preferredTagIds ?? []);
+    var _a, _b, _c, _d;
+    const selected = new Set((_a = preferenceSnapshot.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
+    const preferred = new Set((_b = preferenceSnapshot.preferredTagIds) !== null && _b !== void 0 ? _b : []);
     const shouldSearchMall = selected.has('brand_chain') ||
         selected.has('distance_any') ||
-        (preferenceSnapshot.budgetLevel ?? 3) >= 5 ||
+        ((_c = preferenceSnapshot.budgetLevel) !== null && _c !== void 0 ? _c : 3) >= 5 ||
         preferred.has('mall_store') ||
         preferred.has('premium_brand') ||
         preferred.has('mid_chain');
@@ -529,28 +542,29 @@ function getMallKeywordAttempts(preferenceSnapshot) {
     if (selected.has('prefer_bakery_dessert') || selected.has('intent_dessert')) {
         return ['商场|购物中心|广场|mall|甜品', '购物中心|商场|下午茶|蛋糕'];
     }
-    if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
+    if (((_d = preferenceSnapshot.budgetLevel) !== null && _d !== void 0 ? _d : 3) >= 6) {
         return [
             '商场|购物中心|黑珍珠|米其林|高端日料|法餐',
             '购物中心|商场|酒店餐厅|私房菜|主厨餐厅|融合料理',
-            '购物中心|商场|炳胜|利苑|广州酒家|白天鹅'
+            '购物中心|商场|炳胜|利苑|广州酒家|白天鹅|新荣记|甬府|大渔铁板烧|王品牛排'
         ];
     }
     return ['商场|购物中心|广场|mall|餐厅', '购物中心|商场|连锁餐厅|品牌餐厅'];
 }
 function mergePoiFetchMeta(metaList) {
+    var _a, _b;
     const apiCallCount = metaList.reduce((sum, meta) => sum + meta.amapApiCallCount, 0);
-    const firstKey = metaList.find((meta) => meta.poiCacheKey)?.poiCacheKey ?? '';
+    const firstKey = (_b = (_a = metaList.find((meta) => meta.poiCacheKey)) === null || _a === void 0 ? void 0 : _a.poiCacheKey) !== null && _b !== void 0 ? _b : '';
     const cacheAges = metaList
         .map((meta) => meta.poiCacheAgeMs)
         .filter((age) => typeof age === 'number');
     const modes = uniqueText(metaList.map((meta) => meta.poiFetchMode).filter(Boolean));
     const quotaBuckets = uniqueText(metaList.map((meta) => meta.quotaBucket).filter(Boolean));
-    const aroundCallCount = metaList.reduce((sum, meta) => sum + (meta.aroundCallCount ?? 0), 0);
-    const polygonCallCount = metaList.reduce((sum, meta) => sum + (meta.polygonCallCount ?? 0), 0);
-    const keywordCallCount = metaList.reduce((sum, meta) => sum + (meta.keywordCallCount ?? 0), 0);
-    const idCallCount = metaList.reduce((sum, meta) => sum + (meta.idCallCount ?? 0), 0);
-    const cacheHitCount = metaList.reduce((sum, meta) => sum + (meta.cacheHitCount ?? (meta.poiCacheHit ? 1 : 0)), 0);
+    const aroundCallCount = metaList.reduce((sum, meta) => { var _a; return sum + ((_a = meta.aroundCallCount) !== null && _a !== void 0 ? _a : 0); }, 0);
+    const polygonCallCount = metaList.reduce((sum, meta) => { var _a; return sum + ((_a = meta.polygonCallCount) !== null && _a !== void 0 ? _a : 0); }, 0);
+    const keywordCallCount = metaList.reduce((sum, meta) => { var _a; return sum + ((_a = meta.keywordCallCount) !== null && _a !== void 0 ? _a : 0); }, 0);
+    const idCallCount = metaList.reduce((sum, meta) => { var _a; return sum + ((_a = meta.idCallCount) !== null && _a !== void 0 ? _a : 0); }, 0);
+    const cacheHitCount = metaList.reduce((sum, meta) => { var _a; return sum + ((_a = meta.cacheHitCount) !== null && _a !== void 0 ? _a : (meta.poiCacheHit ? 1 : 0)); }, 0);
     return {
         poiCacheHit: apiCallCount === 0 && metaList.some((meta) => meta.poiCacheHit),
         poiCacheKey: firstKey,
@@ -578,7 +592,8 @@ function getFirstPoiFetchMode(modes) {
     return 'polygon';
 }
 function normalizeRestaurantPoolKey(restaurant) {
-    const name = (restaurant.name ?? '').toLowerCase().replace(/\s+/g, '');
+    var _a;
+    const name = ((_a = restaurant.name) !== null && _a !== void 0 ? _a : '').toLowerCase().replace(/\s+/g, '');
     const location = restaurant.location;
     const locationKey = location && typeof location.latitude === 'number' && typeof location.longitude === 'number'
         ? `${location.latitude.toFixed(5)},${location.longitude.toFixed(5)}`
@@ -612,21 +627,22 @@ function getStrictCategoryKeyword(keyword) {
     return '';
 }
 function buildRecommendationContext(preferenceSnapshot, historyFilterContext = EMPTY_HISTORY_FILTER_CONTEXT) {
-    const historyFilterEnabled = historyFilterContext?.historyFilterEnabled === true;
+    var _a, _b, _c, _d;
+    const historyFilterEnabled = (historyFilterContext === null || historyFilterContext === void 0 ? void 0 : historyFilterContext.historyFilterEnabled) === true;
     return {
         preferenceSnapshot,
         excludeRestaurantIds: historyFilterEnabled
-            ? historyFilterContext?.excludedHistoryRestaurantIds ?? []
+            ? (_a = historyFilterContext === null || historyFilterContext === void 0 ? void 0 : historyFilterContext.excludedHistoryRestaurantIds) !== null && _a !== void 0 ? _a : []
             : [],
         historyFilterEnabled,
         excludedHistoryRestaurantIds: historyFilterEnabled
-            ? historyFilterContext?.excludedHistoryRestaurantIds ?? []
+            ? (_b = historyFilterContext === null || historyFilterContext === void 0 ? void 0 : historyFilterContext.excludedHistoryRestaurantIds) !== null && _b !== void 0 ? _b : []
             : [],
         historyPenaltyRestaurantIds: historyFilterEnabled
-            ? historyFilterContext?.historyPenaltyRestaurantIds ?? []
+            ? (_c = historyFilterContext === null || historyFilterContext === void 0 ? void 0 : historyFilterContext.historyPenaltyRestaurantIds) !== null && _c !== void 0 ? _c : []
             : [],
         historyPenaltyReasons: historyFilterEnabled
-            ? historyFilterContext?.historyPenaltyReasons ?? []
+            ? (_d = historyFilterContext === null || historyFilterContext === void 0 ? void 0 : historyFilterContext.historyPenaltyReasons) !== null && _d !== void 0 ? _d : []
             : []
     };
 }

@@ -66,6 +66,32 @@ const PREMIUM_CHAIN_KEYWORDS = [
   '西餐',
   '创意菜'
 ];
+const pushUniqueKeyword = (target: string[], keywords: string[]) => {
+  keywords.forEach((keyword) => {
+    if (!target.includes(keyword)) {
+      target.push(keyword);
+    }
+  });
+};
+pushUniqueKeyword(LOW_CHAIN_KEYWORDS, [
+  '德克士', '派乐汉堡', '享哆味', '萨莉亚', '南城香', '大米先生', '米村拌饭', '超意兴', '杨铭宇黄焖鸡', '猪角',
+  '正新鸡排', '绝味鸭脖', '紫燕百味鸡', '周黑鸭', '煌上煌', '久久丫', '巴比', '小杨生煎',
+  '书亦烧仙草', 'CoCo', '都可', '益禾堂', '甜啦啦', '柠季', '林里', '茶颜悦色', '茶话弄', '悸动', '快乐番薯', '阿水大杯茶', '700CC',
+  '库迪', 'cotti', '幸运咖', 'NOWWA', '挪瓦', 'M Stand', 'Seesaw'
+]);
+pushUniqueKeyword(MID_CHAIN_KEYWORDS, [
+  '巴奴', '呷哺呷哺', '凑凑', '小龙坎', '朱光玉', '熊喵来了', '半天妖', '烤匠', '木屋烧烤', '很久以前', '西塔老太太', '九田家', '刘炭长',
+  '广州酒家', '大家乐', '大快活', '捞王', '左庭右院', '八合里', '润园四季', '四季椰林',
+  '王品牛排', '豪客来', '大渔铁板烧',
+  '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '蛙来哒', '江渔儿',
+  '杨国福', '张亮', '遇见小面', '和府捞面', '味千拉面', '李先生', '马记永', '陈香贵', '蒙自源', '阿香米线', '五谷渔粉', '喜家德', '袁记云饺', '吉祥馄饨'
+]);
+pushUniqueKeyword(PREMIUM_CHAIN_KEYWORDS, [
+  '高端粤菜', '潮菜', '鮨', '花园酒店', '康莱德', '大渔铁板烧', '1218 GRILL', '中侨会', '雍颐庭',
+  '菁禧荟', '遇外滩', '成隆行', '眉州东坡1996', '蓝麒麟', '新长福', '南景饭店', '晴溪莊园',
+  '至正潮菜', 'AVANT', 'La Tablée', 'Stone Sal', '言盐', '粤海荟', '齐武', '晴空', '水岸十里', '云璟', '鹏瑞莱佛士',
+  '雲鹤', '雲鹤手握', '鮨海老'
+]);
 const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[] }> = [
   {
     optionIds: ['prefer_milk_tea'],

@@ -215,6 +215,41 @@ const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
 const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '赛百味', 'subway', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
+const NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS = [
+  '德克士', '派乐汉堡', '享哆味', '萨莉亚', '南城香', '大米先生', '米村拌饭', '超意兴', '杨铭宇黄焖鸡', '猪角',
+  '正新鸡排', '绝味鸭脖', '紫燕百味鸡', '周黑鸭', '煌上煌', '久久丫', '巴比', '小杨生煎',
+  '书亦烧仙草', 'CoCo', '都可', '益禾堂', '甜啦啦', '柠季', '林里', '茶颜悦色', '茶话弄', '悸动', '快乐番薯', '阿水大杯茶', '700CC',
+  '库迪', 'cotti', '幸运咖', 'NOWWA', '挪瓦', 'M Stand', 'Seesaw'
+];
+const NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS = [
+  '呷哺呷哺', '凑凑', '小龙坎', '朱光玉', '熊喵来了', '半天妖', '烤匠', '很久以前', '西塔老太太', '九田家', '刘炭长',
+  '大家乐', '大快活', '捞王', '左庭右院', '八合里', '润园四季', '四季椰林',
+  '王品牛排', '豪客来', '大渔铁板烧',
+  '和府捞面', '味千拉面', '李先生', '马记永', '陈香贵', '蒙自源', '阿香米线', '五谷渔粉', '喜家德', '袁记云饺', '吉祥馄饨'
+];
+const NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS = [
+  '高端粤菜', '潮菜', '铁板烧', '创意菜', '鮨', '花园酒店', '康莱德', '大渔铁板烧', '1218 GRILL', '中侨会', '雍颐庭',
+  '菁禧荟', '遇外滩', '成隆行', '眉州东坡1996', '蓝麒麟', '新长福', '南景饭店', '晴溪莊园',
+  '至正潮菜', 'AVANT', 'La Tablée', 'Stone Sal', '言盐', '粤海荟', '齐武', '晴空', '水岸十里', '云璟', '鹏瑞莱佛士',
+  '雲鹤', '雲鹤手握', '鮨海老'
+];
+const pushUniqueKeyword = (target, keywords) => {
+  keywords.forEach((keyword) => {
+    if (!target.includes(keyword)) {
+      target.push(keyword);
+    }
+  });
+};
+pushUniqueKeyword(LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_MEAL_SIGNAL_KEYWORDS, [
+  '潮菜', '江浙菜', '本帮菜', '高端粤菜', '高端日料', '铁板烧', '创意菜', 'GRILL', '鮨',
+  ...NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS
+]);
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
 
 const DEFAULT_PREFERENCE = {
@@ -704,7 +739,8 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const negativeConflict = getNegativeConflict(restaurant, preference);
   const temperatureConflict = getTemperatureConflict(restaurant, preference);
   const matchedPreferredTagIds = intersect(tagIds, preferredTagIds);
-  const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, getAvoidedTagIds(preference)), ...negativeConflict.tags])];
+  const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, getAvoidedTagIds(preference)), ...negativeConflict.tags])]
+    .filter((tagId) => !shouldSuppressPremiumChainAvoidanceTag(tagId, tagIds, preference));
   const baseScore = 32;
   const preferenceScore = Math.min(34, matchedPreferredTagIds.reduce((sum, tag) => sum + (TAG_WEIGHTS[tag] || 6), 0));
   const negativePreferencePenalty = (negativeConflict.severity === 'hard' ? 88 : negativeConflict.severity === 'soft' ? Math.min(45, 22 + negativeConflict.tags.length * 7) : 0) + temperatureConflict.penalty;
@@ -1188,6 +1224,15 @@ function getNegativeConflict(restaurant, preference) {
   };
 
   tagIds.forEach((tagId) => {
+    if (
+      explicitChainBrand &&
+      (preference?.budgetLevel ?? 3) >= 6 &&
+      tagIds.includes('premium_brand') &&
+      (tagId === 'mid_chain' || tagId === 'low_chain')
+    ) {
+      return;
+    }
+
     if (avoided.has(tagId)) {
       tags.add(tagId);
       labels.add(tagId);
@@ -1319,6 +1364,17 @@ function getNegativeConflict(restaurant, preference) {
   }
 
   return { severity, tags: [...tags], labels: [...labels] };
+}
+
+function shouldSuppressPremiumChainAvoidanceTag(tagId, candidateTagIds, preference) {
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+
+  return (
+    BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId)) &&
+    (preference?.budgetLevel ?? 3) >= 6 &&
+    candidateTagIds.includes('premium_brand') &&
+    (tagId === 'mid_chain' || tagId === 'low_chain')
+  );
 }
 
 function getRestaurantTagIds(restaurant) {

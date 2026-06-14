@@ -445,6 +445,140 @@ const PREMIUM_CHAIN_KEYWORDS = [
     '白天鹅',
     '黑珍珠'
 ];
+const NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS = [
+    '德克士',
+    '派乐汉堡',
+    '享哆味',
+    '萨莉亚',
+    '南城香',
+    '大米先生',
+    '米村拌饭',
+    '超意兴',
+    '杨铭宇黄焖鸡',
+    '猪角',
+    '正新鸡排',
+    '绝味鸭脖',
+    '紫燕百味鸡',
+    '周黑鸭',
+    '煌上煌',
+    '久久丫',
+    '巴比',
+    '小杨生煎',
+    '书亦烧仙草',
+    'CoCo',
+    '都可',
+    '益禾堂',
+    '甜啦啦',
+    '柠季',
+    '林里',
+    '茶颜悦色',
+    '茶话弄',
+    '悸动',
+    '快乐番薯',
+    '阿水大杯茶',
+    '700CC',
+    '库迪',
+    'cotti',
+    '幸运咖',
+    'NOWWA',
+    '挪瓦',
+    'M Stand',
+    'Seesaw'
+];
+const NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS = [
+    '呷哺呷哺',
+    '凑凑',
+    '小龙坎',
+    '朱光玉',
+    '熊喵来了',
+    '半天妖',
+    '烤匠',
+    '很久以前',
+    '西塔老太太',
+    '九田家',
+    '刘炭长',
+    '大家乐',
+    '大快活',
+    '捞王',
+    '左庭右院',
+    '八合里',
+    '润园四季',
+    '四季椰林',
+    '王品牛排',
+    '豪客来',
+    '大渔铁板烧',
+    '和府捞面',
+    '味千拉面',
+    '李先生',
+    '马记永',
+    '陈香贵',
+    '蒙自源',
+    '阿香米线',
+    '五谷渔粉',
+    '喜家德',
+    '袁记云饺',
+    '吉祥馄饨'
+];
+const NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS = [
+    '高端粤菜',
+    '潮菜',
+    '铁板烧',
+    '创意菜',
+    '鮨',
+    '花园酒店',
+    '康莱德',
+    '大渔铁板烧',
+    '1218 GRILL',
+    '中侨会',
+    '雍颐庭',
+    '菁禧荟',
+    '遇外滩',
+    '成隆行',
+    '眉州东坡1996',
+    '蓝麒麟',
+    '新长福',
+    '南景饭店',
+    '晴溪莊园',
+    '至正潮菜',
+    'AVANT',
+    'La Tablée',
+    'Stone Sal',
+    '言盐',
+    '粤海荟',
+    '齐武',
+    '晴空',
+    '水岸十里',
+    '云璟',
+    '鹏瑞莱佛士',
+    '雲鹤',
+    '雲鹤手握',
+    '鮨海老'
+];
+const pushUniqueKeyword = (target, keywords) => {
+    keywords.forEach((keyword) => {
+        if (!target.includes(keyword)) {
+            target.push(keyword);
+        }
+    });
+};
+pushUniqueKeyword(LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_LOW_CHAIN_KEYWORDS, NATIONAL_LOW_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_MID_CHAIN_KEYWORDS, NATIONAL_MID_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(KNOWN_PREMIUM_CHAIN_KEYWORDS, NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS);
+pushUniqueKeyword(PREMIUM_MEAL_SIGNAL_KEYWORDS, [
+    '潮菜',
+    '江浙菜',
+    '本帮菜',
+    '高端粤菜',
+    '高端日料',
+    '铁板烧',
+    '创意菜',
+    'GRILL',
+    '鮨',
+    ...NATIONAL_PREMIUM_CHAIN_EXTENSION_KEYWORDS
+]);
 const INDEPENDENT_STORE_KEYWORDS = [
     '街边',
     '小店',
@@ -464,20 +598,21 @@ const INDEPENDENT_STORE_KEYWORDS = [
     '摊档'
 ];
 function recommendRestaurants(options) {
-    const now = options.now ?? new Date();
-    const random = options.random ?? Math.random;
-    const limit = options.limit ?? DEFAULT_LIMIT;
-    const source = options.source ?? 'mock';
-    const preference = options.context?.preferenceSnapshot;
-    const excludedHistoryRestaurantIds = options.context?.excludedHistoryRestaurantIds ?? options.context?.excludeRestaurantIds ?? [];
+    var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t;
+    const now = (_a = options.now) !== null && _a !== void 0 ? _a : new Date();
+    const random = (_b = options.random) !== null && _b !== void 0 ? _b : Math.random;
+    const limit = (_c = options.limit) !== null && _c !== void 0 ? _c : DEFAULT_LIMIT;
+    const source = (_d = options.source) !== null && _d !== void 0 ? _d : 'mock';
+    const preference = (_e = options.context) === null || _e === void 0 ? void 0 : _e.preferenceSnapshot;
+    const excludedHistoryRestaurantIds = (_j = (_g = (_f = options.context) === null || _f === void 0 ? void 0 : _f.excludedHistoryRestaurantIds) !== null && _g !== void 0 ? _g : (_h = options.context) === null || _h === void 0 ? void 0 : _h.excludeRestaurantIds) !== null && _j !== void 0 ? _j : [];
     const excludeRestaurantIds = new Set(excludedHistoryRestaurantIds);
-    const historyPenaltyRestaurantIds = options.context?.historyPenaltyRestaurantIds ?? [];
-    const historyPenaltyReasons = options.context?.historyPenaltyReasons ?? [];
-    const experimentId = options.context?.experimentId ?? exports.DEFAULT_EXPERIMENT_ID;
+    const historyPenaltyRestaurantIds = (_l = (_k = options.context) === null || _k === void 0 ? void 0 : _k.historyPenaltyRestaurantIds) !== null && _l !== void 0 ? _l : [];
+    const historyPenaltyReasons = (_o = (_m = options.context) === null || _m === void 0 ? void 0 : _m.historyPenaltyReasons) !== null && _o !== void 0 ? _o : [];
+    const experimentId = (_q = (_p = options.context) === null || _p === void 0 ? void 0 : _p.experimentId) !== null && _q !== void 0 ? _q : exports.DEFAULT_EXPERIMENT_ID;
     const totalFetched = options.restaurants.length;
     const candidateRestaurants = deduplicateRestaurants(options.restaurants);
     const scoreOptionsBase = {
-        historyFilterEnabled: options.context?.historyFilterEnabled === true,
+        historyFilterEnabled: ((_r = options.context) === null || _r === void 0 ? void 0 : _r.historyFilterEnabled) === true,
         excludedHistoryRestaurantIds,
         historyPenaltyRestaurantIds,
         historyPenaltyReasons
@@ -590,7 +725,7 @@ function recommendRestaurants(options) {
             candidatePoolStats: poolStats
         };
     });
-    const visibleFallbackReason = candidates[0]?.fallbackReason;
+    const visibleFallbackReason = (_s = candidates[0]) === null || _s === void 0 ? void 0 : _s.fallbackReason;
     return {
         id: `rec-${now.getTime()}`,
         generatedAt: now.toISOString(),
@@ -599,7 +734,7 @@ function recommendRestaurants(options) {
         weightProfileId: exports.WEIGHT_PROFILE_ID,
         experimentId,
         candidates,
-        selectedCandidateId: candidates[0]?.id,
+        selectedCandidateId: (_t = candidates[0]) === null || _t === void 0 ? void 0 : _t.id,
         reasonSummary: buildReasonSummary(candidates[0]),
         fallbackReason: visibleFallbackReason,
         historyFilterEnabled: scoreOptionsBase.historyFilterEnabled,
@@ -609,17 +744,19 @@ function recommendRestaurants(options) {
     };
 }
 function scoreRestaurant(restaurant, preference, options = {}) {
+    var _a, _b, _c;
     const tagIds = getRestaurantTagIds(restaurant);
     const preferredTagIds = getPreferredTagIds(preference);
     const avoidedTagIds = getAvoidedTagIds(preference);
     const matchedPreferredTagIds = intersect(tagIds, preferredTagIds);
     const negativeConflict = getNegativeConflict(restaurant, preference);
     const temperatureConflict = getTemperatureConflict(restaurant, preference);
-    const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, avoidedTagIds), ...negativeConflict.tags])];
+    const matchedAvoidedTagIds = [...new Set([...intersect(tagIds, avoidedTagIds), ...negativeConflict.tags])]
+        .filter((tagId) => !shouldSuppressPremiumChainAvoidanceTag(tagId, tagIds, preference));
     const baseScore = 32;
     const preferenceScore = getPreferenceScore(matchedPreferredTagIds);
     const negativePreferencePenalty = getNegativePenalty(negativeConflict) + temperatureConflict.penalty;
-    const historyPenaltyApplies = options.historyPenaltyRestaurantIds?.includes(restaurant.id) === true;
+    const historyPenaltyApplies = ((_a = options.historyPenaltyRestaurantIds) === null || _a === void 0 ? void 0 : _a.includes(restaurant.id)) === true;
     const historyPenalty = historyPenaltyApplies ? 8 : 0;
     const distanceScore = getDistanceScore(restaurant, preference, options.fallbackReason !== undefined);
     const priceScore = getPriceScore(restaurant, preference);
@@ -638,7 +775,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         openStatusScore +
         dataCompletenessScore, MIN_SCORE, MAX_SCORE);
     const distanceAdjustedFinalScore = options.fallbackReason !== undefined &&
-        preference?.maxDistanceMeters !== undefined &&
+        (preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) !== undefined &&
         restaurant.distanceMeters !== undefined &&
         restaurant.distanceMeters > preference.maxDistanceMeters
         ? Math.min(rawFinalScore, 54)
@@ -653,7 +790,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     const hardConstraintScore = getHardConstraintConfidence(restaurant, preference, options.fallbackReason);
     const positivePreferenceScore = getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds);
     const negativeAvoidanceScore = getNegativeAvoidanceConfidence(negativeConflict);
-    const relativeLeadScore = options.relativeLeadScore ?? 0;
+    const relativeLeadScore = (_b = options.relativeLeadScore) !== null && _b !== void 0 ? _b : 0;
     const rawConfidenceScore = calculateConfidenceScore({
         hardConstraintScore,
         positivePreferenceScore,
@@ -666,7 +803,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         priceUnknown: isPriceUnknown(restaurant),
         timeOverPreference: isOverTimePreference(restaurant, preference),
         fallbackUsed: options.fallbackReason !== undefined,
-        candidatePoolWeak: options.candidatePoolWeak ?? false
+        candidatePoolWeak: (_c = options.candidatePoolWeak) !== null && _c !== void 0 ? _c : false
     });
     const nonMealBudgetMismatch = isHighBudgetNonMealUnderBudget(restaurant, preference);
     const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
@@ -757,7 +894,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, options)
         reasons.push('近期已推荐过');
     }
     if (!options.allowDistanceFallback &&
-        preference?.maxDistanceMeters !== undefined &&
+        (preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) !== undefined &&
         restaurant.distanceMeters !== undefined &&
         restaurant.distanceMeters > preference.maxDistanceMeters) {
         reasons.push(`距离 ${restaurant.distanceMeters} 米，超出 ${preference.maxDistanceMeters} 米偏好`);
@@ -774,7 +911,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, options)
     if (options.allowUnknownPriceFallback && isWeakUnknownPriceForPremiumFallback(restaurant, preference)) {
         reasons.push('price unknown without premium evidence for 200+ budget');
     }
-    if (preference?.maxEstimatedMinutes !== undefined &&
+    if ((preference === null || preference === void 0 ? void 0 : preference.maxEstimatedMinutes) !== undefined &&
         estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) {
         reasons.push('预计耗时明显超出偏好');
     }
@@ -793,10 +930,12 @@ function isNonRestaurantSalesCandidate(text) {
     return NON_RESTAURANT_SALES_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 }
 function requiresBrandCandidate(preference) {
-    const selected = new Set(preference?.selectedOptionIds ?? []);
+    var _a;
+    const selected = new Set((_a = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     return BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId));
 }
 function isAcceptableBrandCandidate(restaurant, preference) {
+    var _a, _b, _c;
     const tagIds = getRestaurantTagIds(restaurant);
     const hasBrandTag = CHAIN_BRAND_TAGS.some((tagId) => tagIds.includes(tagId));
     const text = getRestaurantSignalText(restaurant);
@@ -807,20 +946,21 @@ function isAcceptableBrandCandidate(restaurant, preference) {
     if (hasKnownChainBrandEvidence(text)) {
         return true;
     }
-    if ((preference?.budgetLevel ?? 3) >= 6) {
+    if (((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 6) {
         return (estimatedCost !== undefined && estimatedCost >= 200) || hasPremiumCandidateEvidence(restaurant, text);
     }
-    return ((preference?.budgetLevel ?? 3) >= 5 &&
-        (estimatedCost ?? 0) >= 80 &&
-        (hasMallStoreEvidence(text) || (restaurant.rating ?? 0) >= 4.3));
+    return (((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 5 &&
+        (estimatedCost !== null && estimatedCost !== void 0 ? estimatedCost : 0) >= 80 &&
+        (hasMallStoreEvidence(text) || ((_c = restaurant.rating) !== null && _c !== void 0 ? _c : 0) >= 4.3));
 }
 function hasPremiumCandidateEvidence(restaurant, text = getRestaurantSignalText(restaurant)) {
+    var _a;
     const estimatedCost = getEstimatedCost(restaurant);
     const tagIds = getRestaurantTagIds(restaurant);
     return ((estimatedCost !== undefined && estimatedCost >= 200) ||
         tagIds.includes('premium_brand') ||
         /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/.test(text) ||
-        ((restaurant.rating ?? 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text))));
+        (((_a = restaurant.rating) !== null && _a !== void 0 ? _a : 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text))));
 }
 function isLastResortFallbackCandidate(restaurant, preference, excludeRestaurantIds) {
     const text = getRestaurantSignalText(restaurant);
@@ -955,7 +1095,7 @@ function getRestaurantBrandKey(restaurant) {
     ].find((keyword) => {
         return text.includes(keyword.toLowerCase());
     });
-    return brand?.toLowerCase();
+    return brand === null || brand === void 0 ? void 0 : brand.toLowerCase();
 }
 function hasKnownChainBrandEvidence(text) {
     return [
@@ -968,6 +1108,7 @@ function hasMallStoreEvidence(text) {
     return ['商场', '购物中心', '广场', 'mall', '百货', '商业中心', ...MALL_STORE_KEYWORDS].some((keyword) => text.includes(keyword.toLowerCase()));
 }
 function toRecommendationCandidate(scored, source, experimentId) {
+    var _a, _b;
     const restaurant = scored.restaurant;
     return {
         id: `candidate-${restaurant.id}`,
@@ -984,7 +1125,7 @@ function toRecommendationCandidate(scored, source, experimentId) {
             rating: restaurant.rating
         },
         name: restaurant.name,
-        mealName: restaurant.signatureDishes?.[0] ?? restaurant.name,
+        mealName: (_b = (_a = restaurant.signatureDishes) === null || _a === void 0 ? void 0 : _a[0]) !== null && _b !== void 0 ? _b : restaurant.name,
         tags: restaurant.tags,
         reason: scored.reasons.join('；'),
         estimatedMinutes: estimateMinutes(restaurant),
@@ -1009,12 +1150,14 @@ function toRecommendationCandidate(scored, source, experimentId) {
     };
 }
 function buildReasonSummary(candidate) {
+    var _a;
     if (!candidate) {
         return undefined;
     }
-    return `${candidate.name} 匹配度 ${candidate.confidenceScore ?? 0}%，${candidate.reason}`;
+    return `${candidate.name} 匹配度 ${(_a = candidate.confidenceScore) !== null && _a !== void 0 ? _a : 0}%，${candidate.reason}`;
 }
 function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, preference, fallbackReason, temperatureConflict = { severity: 'none', label: '', penalty: 0 }, nonMealBudgetMismatch = false) {
+    var _a;
     const reasons = [];
     if (matchedPreferredTagIds.length > 0) {
         reasons.push(`匹配 ${matchedPreferredTagIds.slice(0, 3).join('、')} 等偏好`);
@@ -1022,7 +1165,7 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
     if (temperatureConflict.severity !== 'none') {
         reasons.push(`temperature preference conflict: ${temperatureConflict.label}`);
     }
-    if (preference?.maxDistanceMeters !== undefined &&
+    if ((preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) !== undefined &&
         restaurant.distanceMeters !== undefined &&
         restaurant.distanceMeters <= preference.maxDistanceMeters) {
         reasons.push(`距离约 ${restaurant.distanceMeters} 米，在你的范围内`);
@@ -1030,7 +1173,7 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
     else if (restaurant.distanceMeters !== undefined) {
         reasons.push(`距离约 ${restaurant.distanceMeters} 米`);
     }
-    if (preference?.budgetLevel !== undefined && restaurant.averageCostYuan !== undefined) {
+    if ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== undefined && restaurant.averageCostYuan !== undefined) {
         const budgetMax = getBudgetMaxYuan(preference);
         const budgetRange = getBudgetRange(preference);
         if (nonMealBudgetMismatch) {
@@ -1057,7 +1200,7 @@ function buildReasons(restaurant, matchedPreferredTagIds, negativeConflict, pref
         reasons.push(fallbackReason);
     }
     if (reasons.length === 0) {
-        reasons.push(restaurant.description ?? '综合距离、价格和口味后较适合今天');
+        reasons.push((_a = restaurant.description) !== null && _a !== void 0 ? _a : '综合距离、价格和口味后较适合今天');
     }
     return reasons.slice(0, 5);
 }
@@ -1069,7 +1212,7 @@ function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackR
     if (temperatureConflict.severity !== 'none') {
         reasons.push(`温度偏好冲突：${temperatureConflict.label}`);
     }
-    if (preference?.maxDistanceMeters !== undefined &&
+    if ((preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) !== undefined &&
         restaurant.distanceMeters !== undefined &&
         restaurant.distanceMeters > preference.maxDistanceMeters) {
         reasons.push(`超出距离偏好 ${restaurant.distanceMeters - preference.maxDistanceMeters} 米`);
@@ -1086,14 +1229,15 @@ function buildPenaltyReasons(restaurant, negativeConflict, preference, fallbackR
     return reasons;
 }
 function getPreferredTagIds(preference) {
-    const preferred = new Set([...(preference?.preferredTagIds ?? []), ...(preference?.positiveTags ?? [])]);
-    const selected = new Set(preference?.selectedOptionIds ?? []);
+    var _a, _b, _c, _d, _e;
+    const preferred = new Set([...((_a = preference === null || preference === void 0 ? void 0 : preference.preferredTagIds) !== null && _a !== void 0 ? _a : []), ...((_b = preference === null || preference === void 0 ? void 0 : preference.positiveTags) !== null && _b !== void 0 ? _b : [])]);
+    const selected = new Set((_c = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _c !== void 0 ? _c : []);
     if (BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId))) {
         preferred.add('chain_brand');
-        if ((preference?.budgetLevel ?? 3) >= 6) {
+        if (((_d = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _d !== void 0 ? _d : 3) >= 6) {
             preferred.add('premium_brand');
         }
-        else if ((preference?.budgetLevel ?? 3) >= 4) {
+        else if (((_e = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _e !== void 0 ? _e : 3) >= 4) {
             preferred.add('mid_chain');
         }
         else {
@@ -1107,9 +1251,10 @@ function getPreferredTagIds(preference) {
     return [...preferred];
 }
 function getAvoidedTagIds(preference) {
-    const avoided = new Set([...(preference?.avoidedTagIds ?? []), ...(preference?.negativeTags ?? [])]);
+    var _a, _b, _c, _d, _e, _f;
+    const avoided = new Set([...((_a = preference === null || preference === void 0 ? void 0 : preference.avoidedTagIds) !== null && _a !== void 0 ? _a : []), ...((_b = preference === null || preference === void 0 ? void 0 : preference.negativeTags) !== null && _b !== void 0 ? _b : [])]);
     const preferred = new Set(getPreferredTagIds(preference));
-    const selected = new Set(preference?.selectedOptionIds ?? []);
+    const selected = new Set((_c = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _c !== void 0 ? _c : []);
     const wantsNonMeal = selected.has('intent_drink') ||
         selected.has('intent_dessert') ||
         selected.has('time_afternoon_tea') ||
@@ -1175,13 +1320,13 @@ function getAvoidedTagIds(preference) {
     }
     if (wantsChainBrand) {
         ['independent_store', 'street_shop'].forEach((tagId) => avoided.add(tagId));
-        if ((preference?.budgetLevel ?? 3) >= 6) {
+        if (((_d = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _d !== void 0 ? _d : 3) >= 6) {
             ['low_chain', 'mid_chain'].forEach((tagId) => avoided.add(tagId));
         }
-        else if ((preference?.budgetLevel ?? 3) >= 5) {
+        else if (((_e = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _e !== void 0 ? _e : 3) >= 5) {
             avoided.add('low_chain');
         }
-        else if ((preference?.budgetLevel ?? 3) <= 3) {
+        else if (((_f = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _f !== void 0 ? _f : 3) <= 3) {
             avoided.add('premium_brand');
         }
     }
@@ -1191,6 +1336,7 @@ function getAvoidedTagIds(preference) {
     return [...avoided];
 }
 function getNegativeConflict(restaurant, preference) {
+    var _a;
     const avoided = new Set(getAvoidedTagIds(preference));
     const preferred = new Set(getPreferredTagIds(preference));
     const tagIds = getRestaurantTagIds(restaurant);
@@ -1204,7 +1350,7 @@ function getNegativeConflict(restaurant, preference) {
     const explicitLowSugar = preferred.has('low_sugar') || avoided.has('sugary_drink') || avoided.has('sweet');
     const explicitHighProtein = preferred.has('high_protein');
     const explicitAllergy = preferred.has('allergy_sensitive');
-    const selected = new Set(preference?.selectedOptionIds ?? []);
+    const selected = new Set((_a = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     const explicitDrinkOnly = DRINK_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId));
     const explicitDessertOnly = DESSERT_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId));
     const explicitNonMeal = explicitDrinkOnly || explicitDessertOnly || preferred.has('non_meal');
@@ -1214,6 +1360,13 @@ function getNegativeConflict(restaurant, preference) {
         severity = severity === 'hard' || next === 'hard' ? 'hard' : 'soft';
     };
     tagIds.forEach((tagId) => {
+        var _a;
+        if (explicitChainBrand &&
+            ((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 6 &&
+            tagIds.includes('premium_brand') &&
+            (tagId === 'mid_chain' || tagId === 'low_chain')) {
+            return;
+        }
         if (avoided.has(tagId)) {
             tags.add(tagId);
             labels.add(tagId);
@@ -1342,6 +1495,14 @@ function getNegativeConflict(restaurant, preference) {
         labels: [...labels]
     };
 }
+function shouldSuppressPremiumChainAvoidanceTag(tagId, candidateTagIds, preference) {
+    var _a, _b;
+    const selected = new Set((_a = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
+    return (BRAND_CHAIN_OPTION_IDS.some((optionId) => selected.has(optionId)) &&
+        ((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6 &&
+        candidateTagIds.includes('premium_brand') &&
+        (tagId === 'mid_chain' || tagId === 'low_chain'));
+}
 function getTemperatureConflict(restaurant, preference) {
     const preferred = new Set(getPreferredTagIds(preference));
     const tagIds = getRestaurantTagIds(restaurant);
@@ -1360,7 +1521,8 @@ function getTemperatureConflict(restaurant, preference) {
     return { severity: 'none', label: '', penalty: 0 };
 }
 function getRestaurantTagIds(restaurant) {
-    const explicitTagIds = restaurant.tagIds ?? restaurant.tagRefs?.map((tag) => tag.id) ?? restaurant.tags ?? [];
+    var _a, _b, _c, _d;
+    const explicitTagIds = (_d = (_c = (_a = restaurant.tagIds) !== null && _a !== void 0 ? _a : (_b = restaurant.tagRefs) === null || _b === void 0 ? void 0 : _b.map((tag) => tag.id)) !== null && _c !== void 0 ? _c : restaurant.tags) !== null && _d !== void 0 ? _d : [];
     const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
     const tagIds = new Set([...explicitTagIds, ...inferredTagIds]);
     const text = getRestaurantSignalText(restaurant);
@@ -1451,7 +1613,7 @@ function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurant
     const hasMealSignal = PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
         /grill|cantonese|hotel|chef|omakase|fine dining/i.test(text);
     const hasPureNonMealBusiness = PURE_NON_MEAL_BUSINESS_KEYWORDS.some((keyword) => text.includes(keyword)) && !hasMealSignal;
-    return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost ?? 0) >= 200);
+    return !hasPureNonMealBusiness && (hasPremiumTag || hasMealSignal || (estimatedCost !== null && estimatedCost !== void 0 ? estimatedCost : 0) >= 200);
 }
 function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
     ['non_meal', 'dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'sweet', 'sugary_drink', 'quick'].forEach((tagId) => {
@@ -1474,38 +1636,41 @@ function cleanHotTagsFromColdCandidate(tagIds) {
     tagIds.add('cold');
 }
 function getRestaurantText(restaurant) {
+    var _a, _b;
     return [
         restaurant.name,
         restaurant.category,
         restaurant.description,
         restaurant.address,
-        ...(restaurant.tags ?? []),
-        ...(restaurant.signatureDishes ?? [])
+        ...((_a = restaurant.tags) !== null && _a !== void 0 ? _a : []),
+        ...((_b = restaurant.signatureDishes) !== null && _b !== void 0 ? _b : [])
     ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
 }
 function getRestaurantSignalText(restaurant) {
+    var _a, _b;
     return [
         restaurant.name,
         restaurant.category,
         restaurant.description,
-        ...(restaurant.tags ?? []),
-        ...(restaurant.signatureDishes ?? [])
+        ...((_a = restaurant.tags) !== null && _a !== void 0 ? _a : []),
+        ...((_b = restaurant.signatureDishes) !== null && _b !== void 0 ? _b : [])
     ]
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
 }
 function isLikelyMealCandidate(restaurant, tagIds) {
+    var _a;
     const text = getRestaurantSignalText(restaurant);
     if (hasNonMealEvidence(tagIds, text)) {
         return false;
     }
     return (MEAL_TAGS.some((tagId) => tagIds.includes(tagId)) ||
         isLikelyMealText(text) ||
-        (getEstimatedCost(restaurant) ?? 0) >= 100);
+        ((_a = getEstimatedCost(restaurant)) !== null && _a !== void 0 ? _a : 0) >= 100);
 }
 function isLikelyMealText(text) {
     return [...MEAL_KEYWORDS, ...BROAD_MEAL_KEYWORDS].some((keyword) => text.includes(keyword));
@@ -1521,9 +1686,10 @@ function normalizeImageUrl(url) {
     return typeof url === 'string' ? url.replace(/^http:\/\//i, 'https://') : undefined;
 }
 function getFallbackImageUrl(restaurant, matchedPreferredTagIds) {
+    var _a;
     const text = getRestaurantText({
         ...restaurant,
-        tags: [...(restaurant.tags ?? []), ...matchedPreferredTagIds]
+        tags: [...((_a = restaurant.tags) !== null && _a !== void 0 ? _a : []), ...matchedPreferredTagIds]
     });
     if (/premium|高端|黑珍珠|米其林|omakase|fine dining|法餐|日料|炳胜|利苑|premium_brand/.test(text)) {
         return 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=900&q=80';
@@ -1559,7 +1725,7 @@ function intersect(left, right) {
     return [...new Set(left.filter((item) => rightSet.has(item)))];
 }
 function getPreferenceScore(matchedPreferredTagIds) {
-    return Math.min(34, matchedPreferredTagIds.reduce((sum, tagId) => sum + (TAG_WEIGHTS[tagId] ?? 6), 0));
+    return Math.min(34, matchedPreferredTagIds.reduce((sum, tagId) => { var _a; return sum + ((_a = TAG_WEIGHTS[tagId]) !== null && _a !== void 0 ? _a : 6); }, 0));
 }
 function getNegativePenalty(conflict) {
     if (conflict.severity === 'hard') {
@@ -1571,11 +1737,12 @@ function getNegativePenalty(conflict) {
     return 0;
 }
 function getDistanceScore(restaurant, preference, fallbackUsed = false) {
+    var _a, _b;
     if (restaurant.distanceMeters === undefined) {
         return 0;
     }
-    const maxDistance = preference?.maxDistanceMeters ?? 1500;
-    const distanceFlexible = preference?.selectedOptionIds?.includes('distance_any') === true || maxDistance >= 5000;
+    const maxDistance = (_a = preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) !== null && _a !== void 0 ? _a : 1500;
+    const distanceFlexible = ((_b = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) === null || _b === void 0 ? void 0 : _b.includes('distance_any')) === true || maxDistance >= 5000;
     if (distanceFlexible) {
         if (restaurant.distanceMeters <= 1000) {
             return 6;
@@ -1598,7 +1765,8 @@ function getDistanceScore(restaurant, preference, fallbackUsed = false) {
     return fallbackUsed ? -42 : -30;
 }
 function getPriceScore(restaurant, preference) {
-    if (preference?.budgetLevel === undefined) {
+    var _a;
+    if ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) === undefined) {
         return 0;
     }
     const estimatedCost = getEstimatedCost(restaurant);
@@ -1627,7 +1795,7 @@ function getPriceScore(restaurant, preference) {
             // 非正餐意图（想喝饮品/吃甜品）：人均低于正餐预算属正常，不因便宜而扣分
             return estimatedCost >= range.min * 0.4 ? 14 : 6;
         }
-        if ((preference.budgetLevel ?? 3) >= 4) {
+        if (((_a = preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 4) {
             if (estimatedCost >= range.min * 0.85) {
                 return 4;
             }
@@ -1647,8 +1815,9 @@ function getPriceScore(restaurant, preference) {
     return -34;
 }
 function getTimeScore(restaurant, preference) {
+    var _a;
     const minutes = estimateMinutes(restaurant);
-    const maxMinutes = preference?.maxEstimatedMinutes ?? 45;
+    const maxMinutes = (_a = preference === null || preference === void 0 ? void 0 : preference.maxEstimatedMinutes) !== null && _a !== void 0 ? _a : 45;
     if (minutes <= Math.min(25, maxMinutes)) {
         return 8;
     }
@@ -1688,7 +1857,7 @@ function getHardConstraintConfidence(restaurant, preference, fallbackReason) {
     if (restaurant.openStatus === 'open' || restaurant.openStatus === 'busy' || restaurant.openStatus === 'unknown') {
         score += 10;
     }
-    if (preference?.maxDistanceMeters === undefined ||
+    if ((preference === null || preference === void 0 ? void 0 : preference.maxDistanceMeters) === undefined ||
         restaurant.distanceMeters === undefined ||
         restaurant.distanceMeters <= preference.maxDistanceMeters) {
         score += 10;
@@ -1708,8 +1877,8 @@ function getPositivePreferenceConfidence(preferredTagIds, matchedPreferredTagIds
     if (preferredTagIds.length === 0) {
         return 12;
     }
-    const preferredWeight = preferredTagIds.reduce((sum, tagId) => sum + (TAG_WEIGHTS[tagId] ?? 6), 0);
-    const matchedWeight = matchedPreferredTagIds.reduce((sum, tagId) => sum + (TAG_WEIGHTS[tagId] ?? 6), 0);
+    const preferredWeight = preferredTagIds.reduce((sum, tagId) => { var _a; return sum + ((_a = TAG_WEIGHTS[tagId]) !== null && _a !== void 0 ? _a : 6); }, 0);
+    const matchedWeight = matchedPreferredTagIds.reduce((sum, tagId) => { var _a; return sum + ((_a = TAG_WEIGHTS[tagId]) !== null && _a !== void 0 ? _a : 6); }, 0);
     return Math.round(clamp((matchedWeight / Math.max(1, preferredWeight)) * 25, 0, 25));
 }
 function getNegativeAvoidanceConfidence(conflict) {
@@ -1770,21 +1939,21 @@ function getConfidenceLabel(score) {
     return 'low';
 }
 function isOverBudget(restaurant, preference) {
-    if (preference?.budgetLevel === undefined) {
+    if ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) === undefined) {
         return false;
     }
     const estimatedCost = getEstimatedCost(restaurant);
     return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max;
 }
 function isClearlyOverBudget(restaurant, preference) {
-    if (preference?.budgetLevel === undefined) {
+    if ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) === undefined) {
         return false;
     }
     const estimatedCost = getEstimatedCost(restaurant);
     return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
 }
 function isClearlyUnderBudget(restaurant, preference, allowNearBudgetFallback = false) {
-    if (preference?.budgetLevel === undefined || preference.budgetLevel < 5) {
+    if ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) === undefined || preference.budgetLevel < 5) {
         return false;
     }
     if (isFlexibleNonMealBudget(preference)) {
@@ -1801,20 +1970,21 @@ function isClearlyUnderBudget(restaurant, preference, allowNearBudgetFallback = 
     return allowNearBudgetFallback ? estimatedCost < 80 : estimatedCost < range.min;
 }
 function isPriceUnknownForStrictBudget(restaurant, preference) {
-    return (preference?.budgetLevel !== undefined &&
+    return ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== undefined &&
         preference.budgetLevel >= 5 &&
         !isFlexibleNonMealBudget(preference) &&
         isPriceUnknown(restaurant));
 }
 function isWeakUnknownPriceForPremiumFallback(restaurant, preference) {
-    return (preference?.budgetLevel !== undefined &&
+    return ((preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== undefined &&
         preference.budgetLevel >= 6 &&
         !isFlexibleNonMealBudget(preference) &&
         isPriceUnknown(restaurant) &&
         !hasPremiumCandidateEvidence(restaurant));
 }
 function isHighBudgetNonMealNoise(restaurant, preference, tagIds = getRestaurantTagIds(restaurant), text = getRestaurantSignalText(restaurant)) {
-    if ((preference?.budgetLevel ?? 3) < 5 || isFlexibleNonMealBudget(preference)) {
+    var _a;
+    if (((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) < 5 || isFlexibleNonMealBudget(preference)) {
         return false;
     }
     if (!hasNonMealEvidence(tagIds, text)) {
@@ -1828,10 +1998,11 @@ function isHighBudgetNonMealNoise(restaurant, preference, tagIds = getRestaurant
     return estimatedCost === undefined || (range.min !== undefined && estimatedCost < range.min);
 }
 function isFlexibleNonMealBudget(preference) {
+    var _a;
     if (!preference) {
         return false;
     }
-    const selected = new Set(preference.selectedOptionIds ?? []);
+    const selected = new Set((_a = preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     const preferred = new Set(getPreferredTagIds(preference));
     return (DRINK_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId)) ||
         DESSERT_ONLY_OPTION_IDS.some((optionId) => selected.has(optionId)) ||
@@ -1843,8 +2014,9 @@ function isFlexibleNonMealBudget(preference) {
         preferred.has('afternoon_tea'));
 }
 function isHighBudgetNonMealUnderBudget(restaurant, preference) {
+    var _a;
     // 仅在高预算档(>=5)选了便宜非正餐时才提示"低于预算档"；低预算选便宜饮品属正常，不下调匹配度
-    if (!isFlexibleNonMealBudget(preference) || (preference?.budgetLevel ?? 3) < 5) {
+    if (!isFlexibleNonMealBudget(preference) || ((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) < 5) {
         return false;
     }
     const range = getBudgetRange(preference);
@@ -1860,15 +2032,17 @@ function isUnderRequestedBudgetRange(restaurant, preference) {
     return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
 }
 function getHighBudgetNonMealConfidenceCap(restaurant, preference) {
+    var _a;
     const estimatedCost = getEstimatedCost(restaurant);
-    if ((preference?.budgetLevel ?? 3) >= 6 && (estimatedCost ?? 0) < 100) {
+    if (((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 6 && (estimatedCost !== null && estimatedCost !== void 0 ? estimatedCost : 0) < 100) {
         return 58;
     }
     return 64;
 }
 function getUnderBudgetConfidenceCap(restaurant, preference) {
-    const estimatedCost = getEstimatedCost(restaurant) ?? 0;
-    if ((preference?.budgetLevel ?? 3) >= 6) {
+    var _a, _b;
+    const estimatedCost = (_a = getEstimatedCost(restaurant)) !== null && _a !== void 0 ? _a : 0;
+    if (((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6) {
         if (estimatedCost >= 150) {
             return 70;
         }
@@ -1883,8 +2057,9 @@ function getUnderBudgetConfidenceCap(restaurant, preference) {
     return 58;
 }
 function getUnderBudgetFinalScoreCap(restaurant, preference) {
-    const estimatedCost = getEstimatedCost(restaurant) ?? 0;
-    if ((preference?.budgetLevel ?? 3) >= 6) {
+    var _a, _b;
+    const estimatedCost = (_a = getEstimatedCost(restaurant)) !== null && _a !== void 0 ? _a : 0;
+    if (((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6) {
         if (estimatedCost >= 150) {
             return 70;
         }
@@ -1899,11 +2074,12 @@ function getUnderBudgetFinalScoreCap(restaurant, preference) {
     return 62;
 }
 function buildDistanceFallbackReason(preference) {
-    const selected = new Set(preference?.selectedOptionIds ?? []);
-    if ((preference?.budgetLevel ?? 3) === 5) {
+    var _a, _b, _c;
+    const selected = new Set((_a = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
+    if (((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) === 5) {
         return '附近 100-200 严格匹配较少，已用近预算候选补位并下调匹配度';
     }
-    if ((preference?.budgetLevel ?? 3) >= 6) {
+    if (((_c = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _c !== void 0 ? _c : 3) >= 6) {
         return '附近 200 元以上严格匹配较少，仅保留有高端信号的候选并下调匹配度';
     }
     if (selected.has('distance_500m') || selected.has('distance_1km')) {
@@ -1918,10 +2094,11 @@ function buildNegativeFallbackReason(preference) {
     return '附近符合条件较少，已放宽部分次要偏好并下调匹配度';
 }
 function buildLastResortFallbackReason(preference) {
-    if ((preference?.budgetLevel ?? 3) >= 6) {
+    var _a, _b;
+    if (((_a = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _a !== void 0 ? _a : 3) >= 6) {
         return '附近 200 元以上严格匹配太少，先给你一个低置信备选，可考虑放宽距离或预算';
     }
-    if ((preference?.budgetLevel ?? 3) === 5) {
+    if (((_b = preference === null || preference === void 0 ? void 0 : preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) === 5) {
         return '附近 100-200 严格匹配太少，先给你一个低置信备选，可考虑放宽距离或预算';
     }
     if (isExplicitNonMealPreference(preference)) {
@@ -1930,10 +2107,11 @@ function buildLastResortFallbackReason(preference) {
     return '附近严格匹配太少，先给你一个低置信备选';
 }
 function isExplicitNonMealPreference(preference) {
+    var _a;
     if (!preference) {
         return false;
     }
-    const selected = new Set(preference.selectedOptionIds ?? []);
+    const selected = new Set((_a = preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     return (selected.has('intent_drink') ||
         selected.has('intent_dessert') ||
         selected.has('prefer_milk_tea') ||
@@ -1941,23 +2119,25 @@ function isExplicitNonMealPreference(preference) {
         selected.has('prefer_bakery_dessert'));
 }
 function isExplicitMealPreference(preference) {
+    var _a;
     if (!preference) {
         return false;
     }
-    const selected = new Set(preference.selectedOptionIds ?? []);
+    const selected = new Set((_a = preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
     return selected.has('intent_meal') || selected.has('intent_staple');
 }
 function isPriceUnknown(restaurant) {
     return getEstimatedCost(restaurant) === undefined;
 }
 function isOverTimePreference(restaurant, preference) {
-    return preference?.maxEstimatedMinutes !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes;
+    return (preference === null || preference === void 0 ? void 0 : preference.maxEstimatedMinutes) !== undefined && estimateMinutes(restaurant) > preference.maxEstimatedMinutes;
 }
 function getBudgetMaxYuan(preference) {
     return getBudgetRange(preference).max;
 }
 function getBudgetRange(preference) {
-    return BUDGET_LEVEL_TO_RANGE[preference.budgetLevel ?? 3] ?? BUDGET_LEVEL_TO_RANGE[3];
+    var _a, _b;
+    return (_b = BUDGET_LEVEL_TO_RANGE[(_a = preference.budgetLevel) !== null && _a !== void 0 ? _a : 3]) !== null && _b !== void 0 ? _b : BUDGET_LEVEL_TO_RANGE[3];
 }
 function getEstimatedCost(restaurant) {
     if (restaurant.averageCostYuan !== undefined && restaurant.averageCostYuan > 0) {
@@ -1969,10 +2149,11 @@ function getEstimatedCost(restaurant) {
     return undefined;
 }
 function getPriceLevelCost(priceLevel) {
+    var _a;
     if (priceLevel === undefined) {
         return 60;
     }
-    return BUDGET_LEVEL_TO_YUAN[priceLevel] ?? 60;
+    return (_a = BUDGET_LEVEL_TO_YUAN[priceLevel]) !== null && _a !== void 0 ? _a : 60;
 }
 function estimateMinutes(restaurant) {
     const distanceMinutes = restaurant.distanceMeters === undefined ? 8 : Math.ceil(restaurant.distanceMeters / 120);

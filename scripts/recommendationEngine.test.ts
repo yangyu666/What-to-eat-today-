@@ -2604,6 +2604,88 @@ async function runPoiCacheAndStressTests() {
     'cloud and client 200+ Top1 should stay aligned for the same candidate pool'
   );
 
+  const nationalPremiumBrandResult = recommend(
+    profile({
+      selectedOptionIds: ['budget_over_200', 'brand_chain'],
+      preferredTagIds: ['meal', 'premium_brand', 'chain_brand'],
+      avoidedTagIds: [],
+      budgetLevel: 6,
+      maxDistanceMeters: 15000,
+      maxEstimatedMinutes: 90
+    }),
+    [
+      {
+        id: 'national-low-chain-noise',
+        name: 'KFC Mall',
+        tags: ['fast food'],
+        tagIds: ['quick', 'staple', 'meal', 'low_chain'],
+        category: 'fast food',
+        distanceMeters: 300,
+        averageCostYuan: 42,
+        openStatus: 'open',
+        rating: 4.8,
+        status: 'active'
+      },
+      {
+        id: 'ningbo-yongfu',
+        name: '甬府',
+        tags: ['江浙菜'],
+        tagIds: ['meal'],
+        category: '江浙菜餐厅',
+        distanceMeters: 3600,
+        averageCostYuan: 388,
+        openStatus: 'open',
+        rating: 4.8,
+        status: 'active'
+      },
+      {
+        id: 'changsha-lanqilin',
+        name: '蓝麒麟',
+        tags: ['湘菜', '黑珍珠'],
+        tagIds: ['meal'],
+        category: '中餐厅',
+        distanceMeters: 5200,
+        averageCostYuan: 268,
+        openStatus: 'open',
+        rating: 4.7,
+        status: 'active'
+      },
+      {
+        id: 'shenzhen-avant',
+        name: 'AVANT',
+        tags: ['Fine Dining'],
+        tagIds: ['meal'],
+        category: '西餐厅',
+        distanceMeters: 6800,
+        averageCostYuan: 418,
+        openStatus: 'open',
+        rating: 4.8,
+        status: 'active'
+      },
+      {
+        id: 'panyu-dayu',
+        name: '大渔铁板烧',
+        tags: ['铁板烧'],
+        tagIds: ['meal'],
+        category: '日式料理',
+        distanceMeters: 4500,
+        averageCostYuan: 238,
+        openStatus: 'open',
+        rating: 4.6,
+        status: 'active'
+      }
+    ]
+  );
+  assert(nationalPremiumBrandResult.candidates.length >= 3, '200+ nationwide brand coverage should retain multiple premium candidates');
+  assert(
+    (nationalPremiumBrandResult.candidates[0]?.restaurant?.averageCostYuan ?? 0) >= 200,
+    '200+ nationwide brand coverage should not let low-price chain noise become Top1'
+  );
+  assert(
+    nationalPremiumBrandResult.candidates.some((candidate) => candidate.matchedPreferredTagIds?.includes('premium_brand')),
+    'known regional premium names should infer premium_brand even when AMap tags are thin'
+  );
+
   const storage: Record<string, unknown> = {};
   const baseLocation = { latitude: 39.909, longitude: 116.455 };
   let amapCallCount = 0;
@@ -2999,6 +3081,10 @@ async function runPoiCacheAndStressTests() {
   assert(
     premiumFallbackKeywords.some((keyword) => /酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题/.test(keyword)),
     'premium supplement fetch should include high-ticket occasion keywords as the second layer'
+  );
+  assert(
+    premiumFallbackKeywords.some((keyword) => /新荣记|甬府|大渔铁板烧|1218 GRILL|蓝麒麟|AVANT/.test(keyword)),
+    'premium supplement fetch should include nationwide and regional high-end brand clusters'
   );
   assert(
     premiumFallbackRecommendations.some((candidate) => candidate.restaurantId === 'premium-teppanyaki' || candidate.restaurantId === 'premium-chef-grill'),

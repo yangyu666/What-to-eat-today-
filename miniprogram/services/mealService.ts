@@ -283,10 +283,9 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
     const fallbackKeyword = keywordAttempts.find((keyword) => keyword !== primaryKeyword) ?? primaryKeyword;
     const primaryRadius = premiumSearch ? maxRadius : polygonRadius;
     const primaryPageCount = isLuxuryMealSearch ? 2 : 1;
-    const secondaryPolygonKeyword =
-        fallbackKeyword !== primaryKeyword
-            ? fallbackKeyword
-            : keywordAttempts.find((keyword) => keyword !== primaryKeyword && keyword !== fallbackKeyword) ?? fallbackKeyword;
+    const secondaryPolygonKeywords = isLuxuryMealSearch
+        ? keywordAttempts.filter((keyword) => keyword && keyword !== primaryKeyword).slice(0, 2)
+        : (fallbackKeyword && fallbackKeyword !== primaryKeyword ? [fallbackKeyword] : []);
     attempts.push({
         mode: 'polygon',
         radiusMeters: maxRadius,
@@ -308,7 +307,7 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
         adcode: '',
         reason: primaryKeyword ? 'recommendation-polygon-keyword-primary' : 'recommendation-polygon-broad-primary'
     });
-    if (secondaryPolygonKeyword && secondaryPolygonKeyword !== primaryKeyword) {
+    secondaryPolygonKeywords.forEach((secondaryPolygonKeyword, index) => {
         attempts.push({
             mode: 'polygon',
             radiusMeters: maxRadius,
@@ -317,9 +316,9 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
             pageCount: 1,
             city: '',
             adcode: '',
-            reason: 'recommendation-polygon-keyword-secondary'
+            reason: index === 0 ? 'recommendation-polygon-keyword-secondary' : 'recommendation-polygon-keyword-tertiary'
         });
-    }
+    });
     attempts.push({
         mode: 'polygon',
         radiusMeters: maxRadius,
@@ -404,7 +403,9 @@ function getLuxuryFocusedKeywordAttempts(preferenceSnapshot) {
     }
     return [
         '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
-        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题'
+        '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题|铁板烧|GRILL',
+        '新荣记|甬府|大董|莆田|松鹤楼|炳胜|利苑|广州酒家|白天鹅|大渔铁板烧',
+        '蓝麒麟|新长福|菁禧荟|遇外滩|至正潮菜|AVANT|Stone Sal|粤海荟|云璟|鹏瑞莱佛士'
     ];
 }
 function estimateCostFromPriceLevel(priceLevel) {
@@ -458,8 +459,8 @@ function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
 
     if (selected.has('brand_chain')) {
         return [
-            '粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理',
-            '费大厨|小菜园|西贝|海底捞|太二|探鱼|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九',
+            '粤菜|江浙菜|本帮菜|日料|西餐|烤肉|火锅|融合料理',
+            '费大厨|小菜园|西贝|海底捞|巴奴|太二|探鱼|半天妖|烤匠|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九|王品牛排',
             '商场餐厅|购物中心餐厅|品牌餐厅|连锁餐厅'
         ];
     }
@@ -497,15 +498,15 @@ function getBrandChainKeywordAttempts(preferenceSnapshot) {
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
         return [
             '黑珍珠|米其林|omakase|高端日料|法餐|Fine Dining',
-            '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题',
-            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅',
-            '铁板烧|GRILL|grill|烧肉|创意菜'
+            '酒店餐厅|私房菜|主厨餐厅|牛排馆|融合料理|海鲜放题|铁板烧|GRILL|烧肉|创意菜',
+            '炳胜|利苑|大董|新荣记|甬府|莆田|松鹤楼|广州酒家|白天鹅|大渔铁板烧|1218 GRILL|中侨会',
+            '蓝麒麟|新长福|南景饭店|菁禧荟|遇外滩|至正潮菜|AVANT|Stone Sal|粤海荟|云璟|鹏瑞莱佛士'
         ];
     }
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 5) {
         return [
-            '费大厨|小菜园|西贝|海底捞|太二|探鱼',
-            '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九'
+            '费大厨|小菜园|西贝|海底捞|巴奴|太二|探鱼|半天妖|烤匠',
+            '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九|农耕记|王品牛排|大渔铁板烧'
         ];
     }
     return [];
@@ -535,7 +536,7 @@ function getMallKeywordAttempts(preferenceSnapshot) {
         return [
             '商场|购物中心|黑珍珠|米其林|高端日料|法餐',
             '购物中心|商场|酒店餐厅|私房菜|主厨餐厅|融合料理',
-            '购物中心|商场|炳胜|利苑|广州酒家|白天鹅'
+            '购物中心|商场|炳胜|利苑|广州酒家|白天鹅|新荣记|甬府|大渔铁板烧|王品牛排'
         ];
     }
     return ['商场|购物中心|广场|mall|餐厅', '购物中心|商场|连锁餐厅|品牌餐厅'];
