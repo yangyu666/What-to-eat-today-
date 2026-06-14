@@ -103,6 +103,27 @@ const COLD_OR_ROOM_TEMPERATURE_KEYWORDS = [
     '面包',
     '烘焙'
 ];
+const COFFEE_KEYWORDS = [
+    'coffee',
+    'cafe',
+    'starbucks',
+    'luckin',
+    'manner',
+    'peet',
+    'costa',
+    'tims',
+    'tim hortons',
+    'cotti'
+];
+const DESSERT_BAKERY_KEYWORDS = [
+    'dessert',
+    'bakery',
+    'gelato',
+    'bagel',
+    'cream',
+    'cake',
+    'bread'
+];
 const SPICY_CONFLICT_TAGS = [
     'spicy',
     'strong_flavor',
@@ -664,7 +685,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, options)
     const reasons = [];
     const negativeConflict = getNegativeConflict(restaurant, preference);
     const temperatureConflict = getTemperatureConflict(restaurant, preference);
-    const restaurantText = getRestaurantText(restaurant);
+    const restaurantText = getRestaurantSignalText(restaurant);
     if (restaurant.status !== 'active') {
         reasons.push('餐厅不可用');
     }
@@ -712,7 +733,7 @@ function applyHardFilters(restaurant, preference, excludeRestaurantIds, options)
         estimateMinutes(restaurant) > preference.maxEstimatedMinutes + 20) {
         reasons.push('预计耗时明显超出偏好');
     }
-    if (!options.allowNegativeFallback && negativeConflict.severity === 'hard') {
+    if (!options.allowNegativeFallback && negativeConflict.severity !== 'none') {
         reasons.push(`命中明确负向偏好：${negativeConflict.labels.join('、')}`);
     }
     if (!options.allowNegativeFallback && temperatureConflict.severity === 'soft') {
@@ -733,7 +754,7 @@ function requiresBrandCandidate(preference) {
 function isAcceptableBrandCandidate(restaurant, preference) {
     const tagIds = getRestaurantTagIds(restaurant);
     const hasBrandTag = CHAIN_BRAND_TAGS.some((tagId) => tagIds.includes(tagId));
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     const estimatedCost = getEstimatedCost(restaurant);
     if (hasBrandTag) {
         return true;
@@ -748,7 +769,7 @@ function isAcceptableBrandCandidate(restaurant, preference) {
         (estimatedCost ?? 0) >= 80 &&
         (hasMallStoreEvidence(text) || (restaurant.rating ?? 0) >= 4.3));
 }
-function hasPremiumCandidateEvidence(restaurant, text = getRestaurantText(restaurant)) {
+function hasPremiumCandidateEvidence(restaurant, text = getRestaurantSignalText(restaurant)) {
     const estimatedCost = getEstimatedCost(restaurant);
     const tagIds = getRestaurantTagIds(restaurant);
     return ((estimatedCost !== undefined && estimatedCost >= 200) ||
@@ -757,7 +778,7 @@ function hasPremiumCandidateEvidence(restaurant, text = getRestaurantText(restau
         ((restaurant.rating ?? 0) >= 4.6 && (hasMallStoreEvidence(text) || /餐厅|料理|酒家|饭店|restaurant|dining/.test(text))));
 }
 function isLastResortFallbackCandidate(restaurant, preference, excludeRestaurantIds) {
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     if (restaurant.status !== 'active') {
         return false;
     }
@@ -779,7 +800,7 @@ function hasSafetyHardConflict(restaurant, preference) {
     const avoided = new Set(getAvoidedTagIds(preference));
     const preferred = new Set(getPreferredTagIds(preference));
     const tagIds = getRestaurantTagIds(restaurant);
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     const explicitNoSpicy = avoided.has('spicy');
     const explicitHalal = preferred.has('halal') || avoided.has('pork');
     const explicitVegetarian = preferred.has('vegetarian');
@@ -1075,7 +1096,7 @@ function getAvoidedTagIds(preference) {
         ['milk_tea', 'dessert'].forEach((tagId) => avoided.add(tagId));
     }
     if (selected.has('prefer_bakery_dessert') || selected.has('intent_dessert')) {
-        ['milk_tea'].forEach((tagId) => avoided.add(tagId));
+        ['milk_tea', 'coffee', 'drink'].forEach((tagId) => avoided.add(tagId));
     }
     if (wantsDessertOnly) {
         ['meal', 'rice', 'noodle', 'staple', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum'].forEach((tagId) => avoided.add(tagId));
@@ -1128,7 +1149,7 @@ function getNegativeConflict(restaurant, preference) {
     const avoided = new Set(getAvoidedTagIds(preference));
     const preferred = new Set(getPreferredTagIds(preference));
     const tagIds = getRestaurantTagIds(restaurant);
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     const tags = new Set();
     const labels = new Set();
     let severity = 'none';
@@ -1243,6 +1264,15 @@ function getNegativeConflict(restaurant, preference) {
         labels.add('explicit coffee intent conflicts with milk tea candidate');
         setSeverity('hard');
     }
+    if (explicitDessertOnly &&
+        hasCoffeeTextEvidence(text) &&
+        !hasDessertBakeryTextEvidence(text) &&
+        !tagIds.includes('dessert')) {
+        tags.add('coffee');
+        tags.add('drink');
+        labels.add('dessert intent conflicts with pure coffee candidate');
+        setSeverity(selected.has('prefer_bakery_dessert') ? 'hard' : 'soft');
+    }
     if (explicitChainBrand && (tagIds.includes('independent_store') || tagIds.includes('street_shop'))) {
         ['independent_store', 'street_shop'].forEach((tagId) => {
             if (tagIds.includes(tagId)) {
@@ -1270,7 +1300,7 @@ function getNegativeConflict(restaurant, preference) {
 function getTemperatureConflict(restaurant, preference) {
     const preferred = new Set(getPreferredTagIds(preference));
     const tagIds = getRestaurantTagIds(restaurant);
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     const wantsHot = preferred.has('hot') || preferred.has('comfort') || preferred.has('congee');
     const wantsCold = preferred.has('cold') || preferred.has('salad') || preferred.has('fresh');
     const hasHot = tagIds.some((tagId) => HOT_FOOD_TAGS.includes(tagId));
@@ -1288,14 +1318,17 @@ function getRestaurantTagIds(restaurant) {
     const explicitTagIds = restaurant.tagIds ?? restaurant.tagRefs?.map((tag) => tag.id) ?? restaurant.tags ?? [];
     const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
     const tagIds = new Set([...explicitTagIds, ...inferredTagIds]);
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     if (hasStrongNonMealTextEvidence(text)) {
         cleanMealTagsFromNonMealCandidate(tagIds);
+    }
+    if (hasColdOrRoomTemperatureTextEvidence(text)) {
+        cleanHotTagsFromColdCandidate(tagIds);
     }
     return [...tagIds];
 }
 function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     const inferred = new Set();
     const explicitlyNotSpicy = explicitTagIds.includes('not_spicy') || NOT_SPICY_KEYWORDS.some((keyword) => text.includes(keyword));
     INFERRED_TAG_RULES.forEach((rule) => {
@@ -1350,11 +1383,26 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
 function hasStrongNonMealTextEvidence(text) {
     return NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 }
+function hasColdOrRoomTemperatureTextEvidence(text) {
+    return COLD_OR_ROOM_TEMPERATURE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+function hasCoffeeTextEvidence(text) {
+    return COFFEE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+function hasDessertBakeryTextEvidence(text) {
+    return DESSERT_BAKERY_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
 function cleanMealTagsFromNonMealCandidate(tagIds) {
     ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum', 'quick'].forEach((tagId) => {
         tagIds.delete(tagId);
     });
     tagIds.add('non_meal');
+}
+function cleanHotTagsFromColdCandidate(tagIds) {
+    ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'].forEach((tagId) => {
+        tagIds.delete(tagId);
+    });
+    tagIds.add('cold');
 }
 function getRestaurantText(restaurant) {
     return [
@@ -1369,8 +1417,20 @@ function getRestaurantText(restaurant) {
         .join(' ')
         .toLowerCase();
 }
+function getRestaurantSignalText(restaurant) {
+    return [
+        restaurant.name,
+        restaurant.category,
+        restaurant.description,
+        ...(restaurant.tags ?? []),
+        ...(restaurant.signatureDishes ?? [])
+    ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+}
 function isLikelyMealCandidate(restaurant, tagIds) {
-    const text = getRestaurantText(restaurant);
+    const text = getRestaurantSignalText(restaurant);
     if (hasNonMealEvidence(tagIds, text)) {
         return false;
     }
@@ -1684,7 +1744,7 @@ function isWeakUnknownPriceForPremiumFallback(restaurant, preference) {
         isPriceUnknown(restaurant) &&
         !hasPremiumCandidateEvidence(restaurant));
 }
-function isHighBudgetNonMealNoise(restaurant, preference, tagIds = getRestaurantTagIds(restaurant), text = getRestaurantText(restaurant)) {
+function isHighBudgetNonMealNoise(restaurant, preference, tagIds = getRestaurantTagIds(restaurant), text = getRestaurantSignalText(restaurant)) {
     if ((preference?.budgetLevel ?? 3) < 5 || isFlexibleNonMealBudget(preference)) {
         return false;
     }

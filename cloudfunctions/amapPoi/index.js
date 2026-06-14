@@ -978,7 +978,7 @@ function convertPoiToRestaurant(poi, center) {
   }
 
   const location = parseAmapLocation(poi.location);
-  const text = [poi.type, poi.typecode, poi.name, poi.address, poi.pname, poi.cityname, poi.adname].filter(Boolean).join(';');
+  const text = [poi.type, poi.typecode, poi.name].filter(Boolean).join(';');
 
   if (isNonRestaurantSalesPoi(text)) {
     return null;

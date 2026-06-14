@@ -2243,6 +2243,127 @@ assert(
   '100-200 brand preference should still hard-filter clearly low-budget chain restaurants'
 );
 
+const lightCheapNearPreference = profile({
+  selectedOptionIds: ['avoid_spicy', 'avoid_greasy', 'budget_under_30', 'distance_500'],
+  preferredTagIds: ['not_spicy', 'light', 'congee', 'hot', 'meal', 'staple'],
+  avoidedTagIds: ['spicy', 'strong_flavor', 'heavy', 'fried', 'bbq', 'hotpot', 'malatang'],
+  budgetLevel: 2,
+  maxDistanceMeters: 500
+});
+const lightCheapCongee: Restaurant = {
+  id: 'light-cheap-congee',
+  name: 'Cantonese congee noodle',
+  tags: ['congee noodle'],
+  tagIds: ['light', 'hot', 'congee', 'not_spicy', 'meal', 'staple'],
+  category: 'Cantonese light meal',
+  distanceMeters: 260,
+  averageCostYuan: 28,
+  openStatus: 'open',
+  rating: 4.5,
+  status: 'active'
+};
+const greasyFriedFallback: Restaurant = {
+  id: 'greasy-fried-burger',
+  name: 'Crispy fried chicken burger',
+  tags: ['fried chicken', 'burger'],
+  tagIds: ['fried', 'heavy', 'burger', 'quick', 'snack'],
+  category: 'fried chicken burger',
+  distanceMeters: 220,
+  averageCostYuan: 26,
+  openStatus: 'open',
+  rating: 4.6,
+  status: 'active'
+};
+const lightCheapSingleResult = recommend(lightCheapNearPreference, [lightCheapCongee]);
+assert(lightCheapSingleResult.candidates[0]?.restaurantId === 'light-cheap-congee', 'light/not-spicy/cheap/near exact candidate should not become NO_RECOMMENDATION');
+assert(lightCheapSingleResult.candidatePoolStats?.afterHardFilter === 1, 'exact light candidate should pass base hard filter');
+assert(lightCheapSingleResult.candidatePoolStats?.afterNegativeFilter === 1, 'exact light candidate should not be removed by negative filter');
+const lightCheapMixedResult = recommend(lightCheapNearPreference, [lightCheapCongee, greasyFriedFallback]);
+assert(lightCheapMixedResult.candidates[0]?.restaurantId === 'light-cheap-congee', 'clean congee/noodle candidate must outrank greasy fried fallback');
+assert(
+  !lightCheapMixedResult.candidates.some((candidate) => candidate.restaurantId === 'greasy-fried-burger' && !candidate.fallbackReason),
+  'greasy conflict candidate cannot enter the primary pool when clean candidates exist'
+);
+
+const noSpicySushiAddressPollution = scoreRestaurant(
+  {
+    id: 'sushi-address-pollution',
+    name: 'Kumo sushi omakase',
+    tags: ['Japanese', 'sushi'],
+    tagIds: ['meal', 'premium_brand'],
+    category: 'Japanese sushi',
+    address: '2F next to Daimei hotpot',
+    distanceMeters: 900,
+    averageCostYuan: 295,
+    openStatus: 'open',
+    rating: 4.7,
+    status: 'active'
+  },
+  noSpicy
+);
+assert(
+  !noSpicySushiAddressPollution.matchedAvoidedTagIds?.some((tagId) => ['spicy', 'hotpot', 'heavy'].includes(tagId)),
+  'address text should not infer spicy/hotpot/heavy tags for an otherwise clean sushi restaurant'
+);
+
+const dessertIntentPreference = profile({
+  selectedOptionIds: ['intent_dessert', 'prefer_bakery_dessert'],
+  preferredTagIds: ['dessert', 'sweet', 'afternoon_tea', 'non_meal'],
+  avoidedTagIds: [],
+  budgetLevel: 3,
+  maxDistanceMeters: 3000
+});
+const pureCoffeeForDessert: Restaurant = {
+  id: 'pure-coffee-dessert-noise',
+  name: 'Cotti coffee',
+  tags: ['coffee'],
+  tagIds: ['coffee', 'drink', 'non_meal'],
+  category: 'coffee shop',
+  distanceMeters: 180,
+  averageCostYuan: 18,
+  openStatus: 'open',
+  rating: 4.8,
+  status: 'active'
+};
+const bakeryDessertCandidate: Restaurant = {
+  id: 'bakery-dessert-candidate',
+  name: 'Puff bakery dessert',
+  tags: ['dessert', 'bakery'],
+  tagIds: ['dessert', 'sweet', 'non_meal', 'afternoon_tea'],
+  category: 'bakery dessert',
+  distanceMeters: 260,
+  averageCostYuan: 32,
+  openStatus: 'open',
+  rating: 4.6,
+  status: 'active'
+};
+const dessertCoffeeScore = scoreRestaurant(pureCoffeeForDessert, dessertIntentPreference);
+assert((dessertCoffeeScore.confidenceScore ?? 100) <= 70, 'pure coffee should not receive high confidence for bakery/dessert intent');
+const dessertCoffeeResult = recommend(dessertIntentPreference, [pureCoffeeForDessert, bakeryDessertCandidate]);
+assert(dessertCoffeeResult.candidates[0]?.restaurantId === 'bakery-dessert-candidate', 'bakery/dessert should outrank pure coffee for dessert intent');
+
+const staleHotSubwayScore = scoreRestaurant(
+  {
+    id: 'stale-hot-subway',
+    name: 'Subway sandwich',
+    tags: ['sandwich'],
+    tagIds: ['hot', 'staple', 'quick', 'snack'],
+    category: 'sandwich fast food',
+    distanceMeters: 180,
+    averageCostYuan: 34,
+    openStatus: 'open',
+    rating: 4.4,
+    status: 'active'
+  },
+  profile({
+    selectedOptionIds: ['temperature_hot'],
+    preferredTagIds: ['hot', 'congee', 'comfort'],
+    avoidedTagIds: [],
+    maxDistanceMeters: 1000
+  })
+);
+assert(!staleHotSubwayScore.matchedPreferredTagIds?.includes('hot'), 'cold/room-temperature Subway candidate should clean stale hot tag before matching');
+
 void runPoiCacheAndStressTests().catch((error) => {
   throw error;
 });
