@@ -493,7 +493,7 @@ export function recommendRestaurants(options: RecommendationEngineOptions): Reco
     historyPenaltyRestaurantIds,
     historyPenaltyReasons
   };
-  const afterHistoryFilter = candidateRestaurants.length;
+  const afterHistoryFilter = candidateRestaurants.filter((restaurant) => !excludeRestaurantIds.has(restaurant.id)).length;
   const baseHardFiltered = candidateRestaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, {
       allowDistanceFallback: false,
@@ -702,9 +702,13 @@ export function scoreRestaurant(
   const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
     ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
     : rawConfidenceScore;
-  const historyCalibratedConfidenceScore = historyPenaltyApplies
-    ? Math.min(budgetCalibratedConfidenceScore, 72)
+  const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
+  const priceCalibratedConfidenceScore = underBudgetMismatch
+    ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
     : budgetCalibratedConfidenceScore;
+  const historyCalibratedConfidenceScore = historyPenaltyApplies
+    ? Math.min(priceCalibratedConfidenceScore, 72)
+    : priceCalibratedConfidenceScore;
   const confidenceScore =
     options.confidenceCap !== undefined
       ? Math.min(historyCalibratedConfidenceScore, options.confidenceCap)
@@ -805,6 +809,10 @@ export function applyHardFilters(
 
   if (isExplicitMealPreference(preference) && hasNonMealEvidence(restaurantTagIds, restaurantText)) {
     reasons.push('明确正餐意图与饮品/甜点候选冲突');
+  }
+
+  if (isHighBudgetNonMealNoise(restaurant, preference, restaurantTagIds, restaurantText)) {
+    reasons.push('高预算正餐场景下的低价饮品/甜点噪声');
   }
 
   if (requiresBrandCandidate(preference) && !isAcceptableBrandCandidate(restaurant, preference)) {
@@ -1571,13 +1579,17 @@ function getNegativeConflict(restaurant: Restaurant, preference?: UserPreference
 function getTemperatureConflict(restaurant: Restaurant, preference?: UserPreferenceProfile) {
   const preferred = new Set(getPreferredTagIds(preference));
   const tagIds = getRestaurantTagIds(restaurant);
+  const text = getRestaurantText(restaurant);
   const wantsHot = preferred.has('hot') || preferred.has('comfort') || preferred.has('congee');
   const wantsCold = preferred.has('cold') || preferred.has('salad') || preferred.has('fresh');
   const hasHot = tagIds.some((tagId) => HOT_FOOD_TAGS.includes(tagId));
   const hasCold = tagIds.some((tagId) => COLD_FOOD_TAGS.includes(tagId));
+  const hasColdOrRoomTemperatureText = COLD_OR_ROOM_TEMPERATURE_KEYWORDS.some((keyword) =>
+    text.includes(keyword.toLowerCase())
+  );
 
-  if (wantsHot && hasCold && !hasHot) {
-    return { severity: 'soft' as const, label: 'wanted hot food, candidate is cold or light', penalty: 24 };
+  if (wantsHot && !hasHot && (hasCold || hasColdOrRoomTemperatureText)) {
+    return { severity: 'soft' as const, label: 'wanted hot food, candidate is cold or room-temperature', penalty: 34 };
   }
 
   if (wantsCold && hasHot && !hasCold) {
@@ -1590,8 +1602,14 @@ function getTemperatureConflict(restaurant: Restaurant, preference?: UserPrefere
 function getRestaurantTagIds(restaurant: Restaurant): TagId[] {
   const explicitTagIds = restaurant.tagIds ?? restaurant.tagRefs?.map((tag) => tag.id) ?? restaurant.tags ?? [];
   const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
+  const tagIds = new Set<TagId>([...explicitTagIds, ...inferredTagIds]);
+  const text = getRestaurantText(restaurant);
 
-  return [...new Set([...explicitTagIds, ...inferredTagIds])];
+  if (hasStrongNonMealTextEvidence(text)) {
+    cleanMealTagsFromNonMealCandidate(tagIds);
+  }
+
+  return [...tagIds];
 }
 
 function inferTagIdsFromRestaurantText(restaurant: Restaurant, explicitTagIds: TagId[]): TagId[] {
@@ -1658,7 +1676,22 @@ function inferTagIdsFromRestaurantText(restaurant: Restaurant, explicitTagIds: T
     ['independent_store', 'street_shop'].forEach((tagId) => inferred.add(tagId));
   }
 
+  if (hasStrongNonMealTextEvidence(text)) {
+    cleanMealTagsFromNonMealCandidate(inferred);
+  }
+
   return [...inferred];
+}
+
+function hasStrongNonMealTextEvidence(text: string): boolean {
+  return NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function cleanMealTagsFromNonMealCandidate(tagIds: Set<TagId>) {
+  ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum', 'quick'].forEach((tagId) => {
+    tagIds.delete(tagId as TagId);
+  });
+  tagIds.add('non_meal');
 }
 
 function getRestaurantText(restaurant: Restaurant): string {
@@ -2127,6 +2160,30 @@ function isWeakUnknownPriceForPremiumFallback(restaurant: Restaurant, preference
   );
 }
 
+function isHighBudgetNonMealNoise(
+  restaurant: Restaurant,
+  preference: UserPreferenceProfile | undefined,
+  tagIds = getRestaurantTagIds(restaurant),
+  text = getRestaurantText(restaurant)
+): boolean {
+  if ((preference?.budgetLevel ?? 3) < 5 || isFlexibleNonMealBudget(preference)) {
+    return false;
+  }
+
+  if (!hasNonMealEvidence(tagIds, text)) {
+    return false;
+  }
+
+  if (hasPremiumCandidateEvidence(restaurant, text)) {
+    return false;
+  }
+
+  const range = getBudgetRange(preference as UserPreferenceProfile);
+  const estimatedCost = getEstimatedCost(restaurant);
+
+  return estimatedCost === undefined || (range.min !== undefined && estimatedCost < range.min);
+}
+
 function isFlexibleNonMealBudget(preference?: UserPreferenceProfile): boolean {
   if (!preference) {
     return false;
@@ -2159,6 +2216,17 @@ function isHighBudgetNonMealUnderBudget(restaurant: Restaurant, preference?: Use
   return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
 }
 
+function isUnderRequestedBudgetRange(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
+  if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5 || isFlexibleNonMealBudget(preference)) {
+    return false;
+  }
+
+  const range = getBudgetRange(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+
+  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
+}
+
 function getHighBudgetNonMealConfidenceCap(restaurant: Restaurant, preference?: UserPreferenceProfile): number {
   const estimatedCost = getEstimatedCost(restaurant);
 
@@ -2167,6 +2235,28 @@ function getHighBudgetNonMealConfidenceCap(restaurant: Restaurant, preference?: 
   }
 
   return 64;
+}
+
+function getUnderBudgetConfidenceCap(restaurant: Restaurant, preference?: UserPreferenceProfile): number {
+  const estimatedCost = getEstimatedCost(restaurant) ?? 0;
+
+  if ((preference?.budgetLevel ?? 3) >= 6) {
+    if (estimatedCost >= 150) {
+      return 70;
+    }
+
+    if (estimatedCost >= 100) {
+      return 60;
+    }
+
+    return 48;
+  }
+
+  if (estimatedCost >= 80) {
+    return 70;
+  }
+
+  return 58;
 }
 
 function buildDistanceFallbackReason(preference?: UserPreferenceProfile): string {

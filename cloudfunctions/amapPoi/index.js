@@ -94,7 +94,7 @@ Object.assign(TAG_LABELS, {
   mall_store: '商场店'
 });
 
-const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '赛百味', 'subway', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
@@ -111,6 +111,7 @@ const TAG_RULES = [
   { pattern: /湘菜|湖南|小炒|剁椒/, ids: ['spicy', 'strong_flavor', 'heavy', 'hunan', 'rice'] },
   { pattern: /烧烤|烤肉|烤串|烤鱼/, ids: ['bbq', 'heavy', 'strong_flavor', 'group', 'meal'] },
   { pattern: /炸鸡|鸡柳|鸡排|肯德基|kfc|麦当劳|汉堡王|油炸|汉堡|薯条/i, ids: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
+  { pattern: /赛百味|subway|三明治|三文治/i, ids: ['cold', 'quick', 'snack', 'low_chain'] },
   { pattern: /粥|粉面|云吞|馄饨|粤菜|广式|茶餐厅/, ids: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { pattern: /茶楼|早茶/, ids: ['dim_sum', 'meal', 'snack', 'light', 'not_spicy'] },
   { pattern: /兰州|牛肉面|拉面|刀削面|米线|面馆/, ids: ['hot', 'staple', 'noodle', 'quick'] },

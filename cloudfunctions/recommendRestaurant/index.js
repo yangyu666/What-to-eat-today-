@@ -102,6 +102,7 @@ const HIGH_PROTEIN_CONFLICT_TAGS = ['dessert', 'milk_tea', 'sweet', 'sugary_drin
 const ALLERGY_CONFLICT_TAGS = ['seafood', 'peanut', 'unclear_ingredients'];
 const HOT_FOOD_TAGS = ['hot', 'comfort', 'congee', 'noodle', 'hotpot', 'malatang'];
 const COLD_FOOD_TAGS = ['cold', 'salad', 'fresh', 'light', 'healthy', 'low_burden'];
+const COLD_OR_ROOM_TEMPERATURE_KEYWORDS = ['赛百味', 'subway', '三明治', '三文治', '沙拉', '轻食', '冷餐', '冷食', '冷饮', '冰饮', '咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙'];
 const DEFAULT_SPICY_HEAVY_TAGS = ['spicy', 'strong_flavor', 'heavy'];
 const NOT_SPICY_KEYWORDS = ['不辣', '微辣可选', '清淡', '白汤', '原味', '广式', '粥', '沙拉', '轻食'];
 const SPICY_HEAVY_KEYWORDS = ['辣', '麻辣', '小面', '重庆小面', '酸辣粉', '川', '川味', '川菜', '湘', '湘菜', '麻辣烫', '冒菜', '香锅', '麻辣香锅', '火锅', '串串', '水煮', '剁椒', '干锅', '螺蛳粉'];
@@ -115,6 +116,7 @@ const INFERRED_TAG_RULES = [
   { keywords: ['酸辣粉'], tags: ['spicy', 'strong_flavor', 'heavy', 'chongqing', 'noodle', 'hot'], skipWhenNotSpicy: true },
   { keywords: ['火锅', '串串'], tags: ['spicy', 'strong_flavor', 'heavy', 'hotpot', 'hot'], skipWhenNotSpicy: true },
   { keywords: ['炸鸡', '鸡柳', '鸡排', '肯德基', 'kfc', '麦当劳', '汉堡王', '油炸', '汉堡', '薯条'], tags: ['fried', 'heavy', 'burger', 'quick', 'snack'] },
+  { keywords: ['赛百味', 'subway', '三明治', '三文治'], tags: ['cold', 'quick', 'snack', 'low_chain'] },
   { keywords: ['烧烤', '烤肉', '烤串'], tags: ['bbq', 'heavy', 'strong_flavor', 'group'] },
   { keywords: ['粥', '粉面', '云吞', '馄饨', '广式', '茶餐厅'], tags: ['light', 'congee', 'comfort', 'not_spicy', 'quick', 'hot'] },
   { keywords: ['轻食', '沙拉', '健康', '低卡', '减脂'], tags: ['light', 'healthy', 'salad', 'low_burden', 'fresh', 'cold', 'not_spicy'] },
@@ -131,9 +133,9 @@ INFERRED_TAG_RULES.push(
   { keywords: ['料理', '南洋料理'], tags: ['meal', 'rice', 'relaxed', 'stable'] },
   { keywords: ['春饼', '东北菜', '东北', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '鲜笋', '外婆小聚'], tags: ['meal', 'rice', 'staple', 'relaxed'] },
   { keywords: ['咖啡', 'cafe', 'coffee', '星巴克', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons', 'm stand', 'seesaw', 'arabica'], tags: ['coffee', 'drink', 'non_meal', 'afternoon_tea'] },
-  { keywords: ['奶茶', '茶饮', '喜茶', '奈雪', '一点点', '1点点', '霸王茶姬', '蜜雪冰城', '柠檬茶', 'linlee', '麒麟大口茶', '大口茶', 'koi', 'koi thé', 'koi the', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { keywords: ['饮品', '果茶', '糖水', '手打柠檬茶', '麒麟大口茶', '大口茶', 'koi', 'thé', '混果汁', '酸奶', '牛奶', '麦记牛奶', 'blueglass', '茶道', '茶园'], tags: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
-  { keywords: ['甜品', '蛋糕', '面包', '烘焙', '点心', '西点', 'gelato', 'pinvita', 'butterful', 'creamorous', '珞珞', 'bakery', '冰淇淋', 'paper stone', '哈根达斯', 'haagen', 'baker', 'spice', 'bagel', '贝果', 'zakuzaku', '双皮奶', 'marmalade', 'bake land', '老鼎丰'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
+  { keywords: ['奶茶', '茶饮', '冷饮店', '冷饮', '喜茶', '奈雪', '一点点', '1点点', '霸王茶姬', '蜜雪冰城', '柠檬茶', 'linlee', '麒麟大口茶', '大口茶', 'coco', '都可', 'koi', 'koi thé', 'koi the', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko'], tags: ['milk_tea', 'drink', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['饮品', '饮品店', '果茶', '糖水', '手打柠檬茶', '麒麟大口茶', '大口茶', 'coco', '都可', 'koi', 'thé', '混果汁', '酸奶', '牛奶', '麦记牛奶', 'blueglass', '茶道', '茶园'], tags: ['drink', 'dessert', 'non_meal', 'afternoon_tea', 'sweet', 'sugary_drink'] },
+  { keywords: ['甜品', '甜品店', '糕饼', '糕饼店', '蛋糕', '蛋糕店', '面包', '面包店', '烘焙', '烘焙店', '点心', '西点', 'gelato', 'pinvita', 'butterful', 'creamorous', '珞珞', 'bakery', '冰淇淋', 'paper stone', '哈根达斯', 'haagen', 'baker', 'spice', 'bagel', '贝果', 'zakuzaku', '双皮奶', 'marmalade', 'bake land', '老鼎丰'], tags: ['dessert', 'non_meal', 'afternoon_tea', 'sweet'] },
   { keywords: ['早餐', '包子', '豆浆', '油条'], tags: ['breakfast', 'quick', 'hot', 'staple', 'snack'] },
   { keywords: ['夜宵', '宵夜'], tags: ['late_night', 'quick', 'hot', 'snack'] },
   { keywords: ['清真', '兰州拉面', '牛肉面'], tags: ['halal', 'noodle', 'hot', 'high_protein'] },
@@ -144,7 +146,7 @@ INFERRED_TAG_RULES.push(
   { keywords: ['花生', '坚果'], tags: ['peanut', 'unclear_ingredients'] }
 );
 
-const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '饮品', '甜品', '蛋糕', '面包', '烘焙', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '混果汁', '酸奶', '牛奶', 'blueglass', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋', '哈根达斯', 'bagel', '贝果', 'zakuzaku', '双皮奶'];
+const NON_MEAL_KEYWORDS = ['咖啡', '奶茶', '茶饮', '冷饮店', '冷饮', '饮品', '饮品店', '甜品', '甜品店', '糕饼', '糕饼店', '蛋糕', '蛋糕店', '面包', '面包店', '烘焙', '烘焙店', '下午茶', '糖水', '柠檬茶', '蜜雪冰城', '麒麟大口茶', '大口茶', 'coco', '都可', 'koi', 'thé', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '混果汁', '酸奶', '牛奶', 'blueglass', 'gelato', 'butterful', 'creamorous', 'bakery', '冰淇淋', '哈根达斯', 'bagel', '贝果', 'zakuzaku', '双皮奶'];
 const MEAL_KEYWORDS = ['盖饭', '套餐', '简餐', '小炒', '炒菜', '火锅', '米饭', '徽菜', '新徽菜', '小菜园', '茶楼', '早茶', '热卤', '卤味', '料理', '春饼', '东北菜', '脆肚', '私房菜', '啫啫煲', '煲仔饭', '蛙来哒', '外婆小聚', '香锅'];
 const BROAD_MEAL_KEYWORDS = [
   '餐厅',
@@ -173,7 +175,7 @@ const PORK_KEYWORDS = ['猪肉', '卤肉', '叉烧', '五花肉'];
 const MEAT_HEAVY_KEYWORDS = ['烤肉', '烧烤', '牛排', '炸鸡', '猪肉', '肉蟹煲'];
 const SWEET_KEYWORDS = ['甜品', '蛋糕', '奶茶', '茶饮', '糖水'];
 const ALLERGY_KEYWORDS = ['海鲜', '虾', '蟹', '花生', '坚果'];
-const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
+const LOW_CHAIN_KEYWORDS = ['肯德基', 'kfc', '麦当劳', 'mcdonald', '赛百味', 'subway', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'linlee', '麒麟大口茶', '大口茶', 'koi', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 't9tea', 'tamkoko', '星巴克', 'starbucks', '瑞幸', 'luckin', 'manner', 'peet', 'costa', 'tims', 'tim hortons'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '太二', '探鱼', '西贝', '海底捞', '巴奴', '木屋烧烤', '绿茶餐厅', '外婆家', '九毛九', '蛙来哒', '农耕记', '陈鹏鹏', '怂火锅', '大龙燚', '点都德', '陶陶居', '小菜园', '小菜园新徽菜'];
 const PREMIUM_CHAIN_KEYWORDS = ['高端餐厅', '高端日料', '米其林', 'omakase', 'fine dining', '法餐', '私房菜', '炳胜', '利苑', '大董', '新荣记', '甬府', '莆田', '松鹤楼', '广州酒家', '白天鹅', '黑珍珠'];
 const INDEPENDENT_STORE_KEYWORDS = ['街边', '小店', '老店', '大排档', '排档', '小馆', '家常', '本地', '路边摊', '苍蝇馆', '苍蝇小馆', '简陋', '破旧', '破店', '档口', '摊档'];
@@ -536,7 +538,7 @@ function recommendRestaurants(options) {
   };
   const experimentId = (options.context && options.context.experimentId) || DEFAULT_EXPERIMENT_ID;
   const candidateRestaurants = deduplicateRestaurants(options.restaurants || []);
-  const afterHistoryFilter = candidateRestaurants.length;
+  const afterHistoryFilter = candidateRestaurants.filter((restaurant) => !excludeRestaurantIds.has(restaurant.id)).length;
   const baseHardFiltered = candidateRestaurants.filter((restaurant) => {
     return applyHardFilters(restaurant, preference, excludeRestaurantIds, false, true, false).passed;
   });
@@ -696,7 +698,11 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const budgetCalibratedConfidenceScore = nonMealBudgetMismatch
     ? Math.min(rawConfidenceScore, getHighBudgetNonMealConfidenceCap(restaurant, preference))
     : rawConfidenceScore;
-  const historyCalibratedConfidenceScore = historyPenaltyApplies ? Math.min(budgetCalibratedConfidenceScore, 72) : budgetCalibratedConfidenceScore;
+  const underBudgetMismatch = isUnderRequestedBudgetRange(restaurant, preference);
+  const priceCalibratedConfidenceScore = underBudgetMismatch
+    ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
+    : budgetCalibratedConfidenceScore;
+  const historyCalibratedConfidenceScore = historyPenaltyApplies ? Math.min(priceCalibratedConfidenceScore, 72) : priceCalibratedConfidenceScore;
   const confidenceScore =
     options.confidenceCap !== undefined ? Math.min(historyCalibratedConfidenceScore, options.confidenceCap) : historyCalibratedConfidenceScore;
 
@@ -768,6 +774,7 @@ function applyHardFilters(
   const restaurantTagIds = getRestaurantTagIds(restaurant);
   if (isExplicitNonMealPreference(preference) && isLikelyMealCandidate(restaurant, restaurantTagIds)) reasons.push('明确非正餐意图与正餐候选冲突');
   if (isExplicitMealPreference(preference) && hasNonMealEvidence(restaurantTagIds, restaurantText)) reasons.push('明确正餐意图与饮品/甜点候选冲突');
+  if (isHighBudgetNonMealNoise(restaurant, preference, restaurantTagIds, restaurantText)) reasons.push('高预算正餐场景下的低价饮品/甜点噪声');
   if (requiresBrandCandidate(preference) && !isAcceptableBrandCandidate(restaurant, preference)) reasons.push('品牌偏好下缺少连锁/品牌特征');
   if (restaurant.openStatus === 'closed' || restaurant.openStatus === 'resting') reasons.push('当前不在营业');
   if (excludeRestaurantIds.has(restaurant.id)) reasons.push('近期已推荐过');
@@ -1250,8 +1257,14 @@ function getNegativeConflict(restaurant, preference) {
 function getRestaurantTagIds(restaurant) {
   const explicitTagIds = restaurant.tagIds || (restaurant.tagRefs || []).map((tag) => tag.id) || restaurant.tags || [];
   const inferredTagIds = inferTagIdsFromRestaurantText(restaurant, explicitTagIds);
+  const tagIds = new Set([...explicitTagIds, ...inferredTagIds]);
+  const text = getRestaurantText(restaurant);
 
-  return [...new Set([...explicitTagIds, ...inferredTagIds])];
+  if (hasStrongNonMealTextEvidence(text)) {
+    cleanMealTagsFromNonMealCandidate(tagIds);
+  }
+
+  return [...tagIds];
 }
 
 function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
@@ -1314,18 +1327,24 @@ function inferTagIdsFromRestaurantText(restaurant, explicitTagIds) {
     ['independent_store', 'street_shop'].forEach((tag) => inferred.add(tag));
   }
 
+  if (hasStrongNonMealTextEvidence(text)) {
+    cleanMealTagsFromNonMealCandidate(inferred);
+  }
+
   return [...inferred];
 }
 
 function getTemperatureConflict(restaurant, preference) {
   const preferred = new Set(getPreferredTagIds(preference));
   const tagIds = getRestaurantTagIds(restaurant);
+  const text = getRestaurantText(restaurant);
   const wantsHot = preferred.has('hot') || preferred.has('comfort') || preferred.has('congee');
   const wantsCold = preferred.has('cold') || preferred.has('salad') || preferred.has('fresh');
   const hasHot = tagIds.some((tag) => HOT_FOOD_TAGS.includes(tag));
   const hasCold = tagIds.some((tag) => COLD_FOOD_TAGS.includes(tag));
+  const hasColdOrRoomTemperatureText = COLD_OR_ROOM_TEMPERATURE_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
 
-  if (wantsHot && hasCold && !hasHot) return { severity: 'soft', label: 'wanted hot food, candidate is cold or light', penalty: 24 };
+  if (wantsHot && !hasHot && (hasCold || hasColdOrRoomTemperatureText)) return { severity: 'soft', label: 'wanted hot food, candidate is cold or room-temperature', penalty: 34 };
   if (wantsCold && hasHot && !hasCold) return { severity: 'soft', label: 'wanted cold or light food, candidate is hot-heavy', penalty: 16 };
 
   return { severity: 'none', label: '', penalty: 0 };
@@ -1358,6 +1377,17 @@ function hasNonMealEvidence(tagIds, text) {
     NON_MEAL_TAGS.some((tag) => tagIds.includes(tag)) ||
     NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword))
   );
+}
+
+function hasStrongNonMealTextEvidence(text) {
+  return NON_MEAL_KEYWORDS.some((keyword) => text.includes(keyword.toLowerCase()));
+}
+
+function cleanMealTagsFromNonMealCandidate(tagIds) {
+  ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum', 'quick'].forEach((tag) => {
+    tagIds.delete(tag);
+  });
+  tagIds.add('non_meal');
 }
 
 function getCandidateImageUrl(restaurant, matchedPreferredTagIds) {
@@ -1559,6 +1589,15 @@ function isWeakUnknownPriceForPremiumFallback(restaurant, preference) {
   );
 }
 
+function isHighBudgetNonMealNoise(restaurant, preference, tagIds = getRestaurantTagIds(restaurant), text = getRestaurantText(restaurant)) {
+  if (!preference || (preference.budgetLevel || 3) < 5 || isFlexibleNonMealBudget(preference)) return false;
+  if (!hasNonMealEvidence(tagIds, text)) return false;
+  if (hasPremiumCandidateEvidence(restaurant, text)) return false;
+  const range = getBudgetRange(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+  return estimatedCost === undefined || (range.min !== undefined && estimatedCost < range.min);
+}
+
 function isFlexibleNonMealBudget(preference) {
   if (!preference || (preference.budgetLevel || 3) < 5) return false;
   const selected = new Set(preference.selectedOptionIds || []);
@@ -1583,10 +1622,28 @@ function isHighBudgetNonMealUnderBudget(restaurant, preference) {
   return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
 }
 
+function isUnderRequestedBudgetRange(restaurant, preference) {
+  if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5 || isFlexibleNonMealBudget(preference)) return false;
+  const range = getBudgetRange(preference);
+  const estimatedCost = getEstimatedCost(restaurant);
+  return range.min !== undefined && estimatedCost !== undefined && estimatedCost < range.min;
+}
+
 function getHighBudgetNonMealConfidenceCap(restaurant, preference) {
   const estimatedCost = getEstimatedCost(restaurant);
   if (((preference && preference.budgetLevel) || 3) >= 6 && (estimatedCost || 0) < 100) return 58;
   return 64;
+}
+
+function getUnderBudgetConfidenceCap(restaurant, preference) {
+  const estimatedCost = getEstimatedCost(restaurant) || 0;
+  if (((preference && preference.budgetLevel) || 3) >= 6) {
+    if (estimatedCost >= 150) return 70;
+    if (estimatedCost >= 100) return 60;
+    return 48;
+  }
+  if (estimatedCost >= 80) return 70;
+  return 58;
 }
 
 function buildDistanceFallbackReason(preference) {

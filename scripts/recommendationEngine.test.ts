@@ -435,6 +435,26 @@ assert(
   Boolean(premiumNearBudgetFallbackResult.candidates[0]?.reason.includes('近预算补位')),
   '100-200 near-budget fallback should explain the price mismatch'
 );
+const premiumNearBudgetDirectScore = scoreRestaurant(
+  {
+    id: 'premium-near-budget-direct',
+    name: '86 yuan dim sum',
+    tags: ['dim sum'],
+    tagIds: ['meal', 'dim_sum', 'mid_chain'],
+    category: 'restaurant',
+    distanceMeters: 300,
+    averageCostYuan: 86,
+    openStatus: 'open',
+    rating: 4.8,
+    status: 'active'
+  },
+  profile({
+    preferredTagIds: ['meal', 'dim_sum', 'mid_chain'],
+    budgetLevel: 5,
+    maxDistanceMeters: 1000
+  })
+);
+assert((premiumNearBudgetDirectScore.confidenceScore ?? 100) <= 70, '100-200 下限附近但低于预算的候选不能显示 90%+ 高置信');
 
 const premiumInRangeBeatsNearBudgetResult = recommend(
   profile({
@@ -761,6 +781,7 @@ const historyNoRepeatResult = recommendRestaurants({
 });
 assert(historyNoRepeatResult.candidates.length === 2, 'history filter should return fewer fresh candidates instead of repeating shown restaurants');
 assert(!historyNoRepeatResult.candidates.some((candidate) => candidate.restaurantId === 'history-old'), 'shown restaurants should not be repeated when fresh candidates exist');
+assert(historyNoRepeatResult.candidatePoolStats?.afterHistoryFilter === 2, 'afterHistoryFilter 应反映历史过滤后的候选数');
 
 const luxuryPriceOnlyResult = recommend(
   profile({
@@ -798,6 +819,43 @@ const luxuryPriceOnlyResult = recommend(
   ]
 );
 assert(luxuryPriceOnlyResult.candidates[0]?.restaurantId === 'premium-by-price', '200+ budget should accept restaurants by averageCostYuan >= 200 even without a known brand keyword');
+
+const luxuryMealNoCheapDessertResult = recommend(
+  profile({
+    selectedOptionIds: ['budget_over_200'],
+    preferredTagIds: ['meal', 'premium_brand'],
+    budgetLevel: 6,
+    maxDistanceMeters: 10000
+  }),
+  [
+    {
+      id: 'cheap-dessert-noise',
+      name: '满记甜品',
+      tags: ['甜品'],
+      tagIds: ['dessert', 'non_meal', 'low_chain'],
+      category: '甜品店',
+      distanceMeters: 120,
+      averageCostYuan: 32,
+      openStatus: 'open',
+      rating: 4.9,
+      status: 'active'
+    },
+    {
+      id: 'premium-real-meal',
+      name: '酒店主厨餐厅',
+      tags: ['酒店餐厅'],
+      tagIds: ['meal', 'premium_brand'],
+      category: '餐厅',
+      distanceMeters: 2200,
+      averageCostYuan: 260,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    }
+  ]
+);
+assert(luxuryMealNoCheapDessertResult.candidates[0]?.restaurantId === 'premium-real-meal', '200+ 普通正餐场景不能让低价甜品/饮品压过真实高预算正餐');
+assert(!luxuryMealNoCheapDessertResult.candidates.some((candidate) => candidate.restaurantId === 'cheap-dessert-noise'), '200+ 普通正餐场景应过滤低价非正餐噪声');
 
 const chainPreferenceNoIndependentResult = recommend(
   profile({
@@ -1298,6 +1356,34 @@ const hotWithEnoughCandidates = recommend(hotPreference, [
 ]);
 assert(!hotWithEnoughCandidates.candidates.some((candidate) => candidate.restaurantId === 'cold-salad'), '热食偏好且候选充足时不应推荐冷食/轻食');
 
+const hotSubwayPollutionResult = recommend(hotPreference, [
+  {
+    id: 'subway-noise',
+    name: '赛百味 Subway',
+    tags: ['三明治'],
+    tagIds: ['quick', 'staple', 'low_chain'],
+    category: '快餐',
+    distanceMeters: 80,
+    averageCostYuan: 36,
+    openStatus: 'open',
+    rating: 4.9,
+    status: 'active'
+  },
+  {
+    id: 'hot-wonton',
+    name: '云吞热汤粉面',
+    tags: ['云吞', '热汤'],
+    tagIds: ['hot', 'congee', 'comfort', 'noodle'],
+    category: '粥粉面',
+    distanceMeters: 300,
+    averageCostYuan: 28,
+    openStatus: 'open',
+    rating: 4.2,
+    status: 'active'
+  }
+]);
+assert(hotSubwayPollutionResult.candidates[0]?.restaurantId === 'hot-wonton', '热食/粥粉面意图下，赛百味这类冷/常温快餐不能成为 Top1');
+
 const hotFallback = recommend(hotPreference, [
   {
     id: 'cold-only',
@@ -1315,6 +1401,30 @@ const hotFallback = recommend(hotPreference, [
 assert(hotFallback.candidatePoolStats?.fallbackUsed === true, '冷食补位应标记 fallbackUsed');
 assert(hotFallback.candidates[0]?.fallbackReason !== undefined, '冷食补位应写入 fallbackReason');
 assert((hotFallback.candidates[0]?.confidenceScore ?? 100) >= 45 && (hotFallback.candidates[0]?.confidenceScore ?? 0) <= 64, 'fallback 匹配百分比应在 45-64');
+
+const staleDrinkTagsScore = scoreRestaurant(
+  {
+    id: 'stale-coco',
+    name: 'CoCo 都可冷饮店',
+    tags: ['快餐', '主食'],
+    tagIds: ['quick', 'staple'],
+    category: '冷饮店',
+    distanceMeters: 120,
+    averageCostYuan: 18,
+    openStatus: 'open',
+    rating: 4.6,
+    status: 'active'
+  },
+  profile({
+    selectedOptionIds: ['prefer_milk_tea'],
+    preferredTagIds: ['milk_tea', 'drink', 'non_meal'],
+    avoidedTagIds: ['meal', 'staple', 'rice', 'coffee', 'dessert'],
+    budgetLevel: 3,
+    maxDistanceMeters: 1000
+  })
+);
+assert(staleDrinkTagsScore.matchedPreferredTagIds.includes('milk_tea'), 'CoCo/冷饮店应从店名品类推断为奶茶饮品');
+assert(!staleDrinkTagsScore.matchedAvoidedTagIds.includes('staple'), '强非正餐证据应清理旧缓存里的 staple 污染标签');
 
 const strongMatchResult = recommend(
   profile({
