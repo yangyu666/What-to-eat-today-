@@ -45,6 +45,8 @@ const TAG_WEIGHTS = {
     set_meal: 10,
     snack: 12,
     quick: 11,
+    fast_service: 11,
+    low_queue: 10,
     solo: 8,
     slow: 5,
     spicy: 8,
@@ -698,14 +700,16 @@ function recommendRestaurants(options) {
             finalScoreCap: fallbackFinalScoreCap
         }));
     }
+    const fallbackCandidateCount = scored.filter((candidate) => Boolean(candidate.fallbackReason)).length;
     const poolStats = {
         totalFetched,
         afterHardFilter: baseHardFiltered.length,
         afterHistoryFilter,
         afterNegativeFilter,
         finalCandidateCount: Math.min(limit, scored.length),
-        fallbackUsed: fallbackReason !== undefined,
-        fallbackCandidateCount: scored.filter((candidate) => Boolean(candidate.fallbackReason)).length,
+        fallbackUsed: fallbackCandidateCount > 0,
+        fallbackAttempted: fallbackReason !== undefined,
+        fallbackCandidateCount,
         topCandidateFallbackUsed: false,
         historyFallbackUsed: false
     };
@@ -1628,15 +1632,33 @@ function hasPremiumMealOverrideEvidence(restaurant, tagIds, text = getRestaurant
 }
 function hasPremiumMealSignal(text) {
     return (PREMIUM_MEAL_SIGNAL_KEYWORDS.some((keyword) => text.includes(keyword)) ||
-        /高端|黑珍珠|米其林|omakase|fine dining|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜|grill|cantonese|hotel|chef|omakase|fine dining/i.test(text));
+        /高端|黑珍珠|米其林|omakase|fine dining|hotel restaurant|private kitchen|chef restaurant|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜|grill|chef|omakase|fine dining/i.test(text));
 }
 function cleanNonMealTagsFromPremiumMealCandidate(tagIds) {
-    ['non_meal', 'dessert', 'milk_tea', 'coffee', 'drink', 'afternoon_tea', 'sweet', 'sugary_drink', 'quick'].forEach((tagId) => {
+    [
+        'non_meal',
+        'dessert',
+        'milk_tea',
+        'coffee',
+        'drink',
+        'afternoon_tea',
+        'sweet',
+        'sugary_drink',
+        'quick',
+        'fast_service',
+        'low_queue',
+        'congee',
+        'hot',
+        'snack',
+        'solo',
+        'set_meal'
+    ].forEach((tagId) => {
         tagIds.delete(tagId);
     });
     tagIds.add('meal');
     tagIds.add('premium_brand');
     tagIds.add('relaxed');
+    tagIds.add('slow');
 }
 function cleanMealTagsFromNonMealCandidate(tagIds) {
     ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum', 'quick'].forEach((tagId) => {

@@ -9,6 +9,8 @@ exports.QUESTION_OPTION_IMAGES = {
     budgetLow: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=360&q=80',
     budgetMid: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=360&q=80',
     budgetHigh: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=360&q=80',
+    budgetPremium: 'https://images.unsplash.com/photo-1551218808-94e220e084d2?auto=format&fit=crop&w=360&q=80',
+    budgetLuxury: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?auto=format&fit=crop&w=360&q=80',
     distanceNear: 'https://images.unsplash.com/photo-1514933651103-005eec06c04b?auto=format&fit=crop&w=360&q=80',
     distanceWalk: 'https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=360&q=80',
     distanceAny: 'https://images.unsplash.com/photo-1533777857889-4be7c70b33f7?auto=format&fit=crop&w=360&q=80',
@@ -298,7 +300,7 @@ exports.questionBank = [
                 themeClass: 'theme-red',
                 visual: '¥',
                 icon: '¥',
-                imageUrl: exports.QUESTION_OPTION_IMAGES.budgetHigh,
+                imageUrl: exports.QUESTION_OPTION_IMAGES.budgetPremium,
                 effect: {
                     constraints: { budgetLevel: 5 },
                     positiveTags: ['relaxed', 'slow', 'group']
@@ -313,7 +315,7 @@ exports.questionBank = [
                 themeClass: 'theme-red',
                 visual: '¥',
                 icon: '¥',
-                imageUrl: exports.QUESTION_OPTION_IMAGES.budgetHigh,
+                imageUrl: exports.QUESTION_OPTION_IMAGES.budgetLuxury,
                 effect: {
                     constraints: { budgetLevel: 6 },
                     positiveTags: ['relaxed', 'slow', 'group']
@@ -536,9 +538,9 @@ exports.questionBank = [
                 icon: '快',
                 imageUrl: exports.QUESTION_OPTION_IMAGES.speedFast,
                 effect: {
-                    positiveTags: ['quick', 'solo', 'snack'],
+                    positiveTags: ['fast_service', 'low_queue', 'solo'],
                     constraints: { maxEstimatedMinutes: 30 },
-                    softPreferences: { speed: 'fast', amapKeywords: ['快餐', '简餐'] }
+                    softPreferences: { speed: 'fast', servicePriority: 'low_wait', avoidQueue: true }
                 }
             },
             {
@@ -696,7 +698,7 @@ exports.questionBank = [
     {
         id: 'time_slot',
         dimension: 'time_slot',
-        title: '现在更像哪种时段？',
+        title: '现在轮到哪一顿啦？',
         subtitle: '生物钟走到哪了？跟着太阳（或月亮）的指示走',
         type: 'single',
         options: [
@@ -930,8 +932,8 @@ exports.questionBank = [
                 imageUrl: exports.QUESTION_OPTION_IMAGES.diningDelivery,
                 effect: {
                     constraints: { diningMode: 'delivery', maxEstimatedMinutes: 60 },
-                    positiveTags: ['quick', 'solo'],
-                    softPreferences: { speed: 'fast', amapKeywords: ['快餐', '简餐'] }
+                    positiveTags: ['fast_service', 'low_queue', 'solo'],
+                    softPreferences: { speed: 'fast', servicePriority: 'low_wait', avoidQueue: true }
                 }
             }
         ]

@@ -111,7 +111,9 @@ const EXPLICIT_CATEGORY_KEYWORDS: Array<{ optionIds: string[]; keywords: string[
   }
 ];
 const TAG_KEYWORDS: Record<string, string[]> = {
-  quick: ['快餐', '简餐'],
+  quick: [],
+  fast_service: [],
+  low_queue: [],
   staple: ['盖饭', '面', '套餐'],
   meal: ['盖饭', '套餐'],
   set_meal: ['套餐', '简餐'],
@@ -135,7 +137,7 @@ const TAG_KEYWORDS: Record<string, string[]> = {
   fresh: ['轻食', '日式'],
   not_spicy: ['粥', '粤菜', '日式', '简餐'],
   snack: ['小吃', '包子', '煎饼'],
-  solo: ['快餐', '简餐'],
+  solo: [],
   relaxed: ['茶餐厅', '西餐'],
   group: ['火锅', '烤肉'],
   bbq: ['烧烤', '烤肉'],

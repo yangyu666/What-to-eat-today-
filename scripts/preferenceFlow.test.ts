@@ -93,6 +93,11 @@ assert(
   fastDeliveryProfile.maxEstimatedMinutes === 30,
   'strict speed preference should tighten delivery estimated time'
 );
+assert(fastDeliveryProfile.preferredTagIds.includes('fast_service'), 'speed_fast should map to fast_service instead of cheap fast food');
+assert(fastDeliveryProfile.preferredTagIds.includes('low_queue'), 'speed_fast should map to low_queue');
+assert(!fastDeliveryProfile.preferredTagIds.includes('snack'), 'speed_fast should not imply snack or low-price fast food');
+const fastDeliveryQuery = buildAmapRestaurantQuery(fastDeliveryProfile);
+assert(!/快餐|简餐/.test(fastDeliveryQuery.keywords ?? ''), 'speed_fast should not actively search fast-food keywords');
 
 const premiumBudgetProfile = mapAnswersToPreferenceProfile([
   {
@@ -143,6 +148,10 @@ const luxuryBudgetProfile = mapAnswersToPreferenceProfile([
 ]);
 
 assert(luxuryBudgetProfile.budgetLevel === 6, '200+ budget should map to luxury budget level');
+assert(!luxuryBudgetProfile.preferredTagIds.includes('quick'), '200+ meal budget should remove default quick preference');
+assert(!luxuryBudgetProfile.preferredTagIds.includes('staple'), '200+ meal budget should remove default staple preference');
+assert(luxuryBudgetProfile.preferredTagIds.includes('premium_brand'), '200+ meal budget should prefer premium meal signals');
+assert(luxuryBudgetProfile.preferredTagIds.includes('hotel_restaurant'), '200+ meal budget should prefer hotel restaurant signals');
 const luxuryAmapQuery = buildAmapRestaurantQuery(luxuryBudgetProfile);
 assert(
   /黑珍珠|米其林|omakase|法餐|高端日料|Fine Dining/.test(luxuryAmapQuery.keywords ?? ''),

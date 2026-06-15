@@ -16,19 +16,20 @@ exports.DEFAULT_PREFERENCE_PROFILE = {
     maxEstimatedMinutes: 45
 };
 function mapAnswersToPreferenceProfile(answers = []) {
+    var _a, _b, _c;
     const draft = {
-        selectedOptionIds: new Set(answers.flatMap((answer) => answer.optionIds ?? [])),
+        selectedOptionIds: new Set(answers.flatMap((answer) => { var _a; return (_a = answer.optionIds) !== null && _a !== void 0 ? _a : []; })),
         preferredTagIds: new Set(exports.DEFAULT_PREFERENCE_PROFILE.preferredTagIds),
         avoidedTagIds: new Set(exports.DEFAULT_PREFERENCE_PROFILE.avoidedTagIds),
         constraints: { ...exports.DEFAULT_PREFERENCE_PROFILE.constraints },
         softPreferences: { ...exports.DEFAULT_PREFERENCE_PROFILE.softPreferences },
-        budgetLevel: exports.DEFAULT_PREFERENCE_PROFILE.budgetLevel ?? 3,
-        maxDistanceMeters: exports.DEFAULT_PREFERENCE_PROFILE.maxDistanceMeters ?? 1500,
-        maxEstimatedMinutes: exports.DEFAULT_PREFERENCE_PROFILE.maxEstimatedMinutes ?? 45
+        budgetLevel: (_a = exports.DEFAULT_PREFERENCE_PROFILE.budgetLevel) !== null && _a !== void 0 ? _a : 3,
+        maxDistanceMeters: (_b = exports.DEFAULT_PREFERENCE_PROFILE.maxDistanceMeters) !== null && _b !== void 0 ? _b : 1500,
+        maxEstimatedMinutes: (_c = exports.DEFAULT_PREFERENCE_PROFILE.maxEstimatedMinutes) !== null && _c !== void 0 ? _c : 45
     };
     answers.forEach((answer) => {
         const option = (0, questionBank_1.findQuestionOption)(answer.questionId, answer.optionIds, answer.value);
-        if (option?.effect) {
+        if (option === null || option === void 0 ? void 0 : option.effect) {
             applyOptionEffect(draft, option.effect);
             return;
         }
@@ -65,6 +66,22 @@ function applyDefensivePreferenceInferences(draft) {
         'time_afternoon_tea'
     ]);
     const hasNonMealSignal = [...nonMealOptionIds].some((optionId) => draft.selectedOptionIds.has(optionId));
+    const isLuxuryBudget = draft.budgetLevel >= 6 || draft.selectedOptionIds.has('budget_over_200');
+    if (isLuxuryBudget && !hasNonMealSignal) {
+        ['quick', 'staple', 'rice', 'noodle', 'set_meal', 'solo'].forEach((tagId) => {
+            draft.preferredTagIds.delete(tagId);
+        });
+        ['meal', 'premium_brand', 'fine_dining', 'hotel_restaurant', 'omakase', 'chef', 'steak', 'relaxed'].forEach((tagId) => {
+            draft.preferredTagIds.add(tagId);
+        });
+        draft.softPreferences = mergeSoftPreferences(draft.softPreferences, {
+            mealWeight: 'filling',
+            budgetStrictness: 'high'
+        });
+        if (draft.selectedOptionIds.has('speed_fast')) {
+            ['fast_service', 'low_queue'].forEach((tagId) => draft.preferredTagIds.add(tagId));
+        }
+    }
     if (!hasNonMealSignal) {
         return;
     }
@@ -90,17 +107,18 @@ function applyDefensivePreferenceInferences(draft) {
     }
 }
 function applyOptionEffect(draft, effect) {
-    effect.positiveTags?.forEach((tagId) => draft.preferredTagIds.add(tagId));
-    effect.negativeTags?.forEach((tagId) => draft.avoidedTagIds.add(tagId));
-    effect.removeNegativeTags?.forEach((tagId) => draft.avoidedTagIds.delete(tagId));
-    if (effect.constraints?.budgetLevel !== undefined) {
+    var _a, _b, _c, _d, _e, _f, _g;
+    (_a = effect.positiveTags) === null || _a === void 0 ? void 0 : _a.forEach((tagId) => draft.preferredTagIds.add(tagId));
+    (_b = effect.negativeTags) === null || _b === void 0 ? void 0 : _b.forEach((tagId) => draft.avoidedTagIds.add(tagId));
+    (_c = effect.removeNegativeTags) === null || _c === void 0 ? void 0 : _c.forEach((tagId) => draft.avoidedTagIds.delete(tagId));
+    if (((_d = effect.constraints) === null || _d === void 0 ? void 0 : _d.budgetLevel) !== undefined) {
         draft.budgetLevel = effect.constraints.budgetLevel;
     }
-    if (effect.constraints?.maxDistanceMeters !== undefined) {
+    if (((_e = effect.constraints) === null || _e === void 0 ? void 0 : _e.maxDistanceMeters) !== undefined) {
         draft.maxDistanceMeters = effect.constraints.maxDistanceMeters;
     }
-    if (effect.constraints?.maxEstimatedMinutes !== undefined) {
-        const defaultMaxEstimatedMinutes = exports.DEFAULT_PREFERENCE_PROFILE.maxEstimatedMinutes ?? 45;
+    if (((_f = effect.constraints) === null || _f === void 0 ? void 0 : _f.maxEstimatedMinutes) !== undefined) {
+        const defaultMaxEstimatedMinutes = (_g = exports.DEFAULT_PREFERENCE_PROFILE.maxEstimatedMinutes) !== null && _g !== void 0 ? _g : 45;
         const nextMaxEstimatedMinutes = effect.constraints.maxEstimatedMinutes;
         if (draft.maxEstimatedMinutes === defaultMaxEstimatedMinutes ||
             nextMaxEstimatedMinutes < draft.maxEstimatedMinutes) {

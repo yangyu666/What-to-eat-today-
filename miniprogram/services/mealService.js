@@ -274,15 +274,25 @@ function buildAmapQueryAttempts(amapQuery, preferenceSnapshot) {
             ...mallKeywords,
             relaxedKeyword || baseKeyword
         ]
-        : [
-            ...luxuryFocusedKeywords,
-            relaxedKeyword || baseKeyword,
-            ...midHighBudgetKeywords,
-            ...premiumKeywords,
-            ...nonMealPremiumKeywords,
-            ...brandChainKeywords,
-            ...mallKeywords
-        ]).filter(Boolean);
+        : midHighBudgetKeywords.length > 0
+            ? [
+                ...midHighBudgetKeywords,
+                ...luxuryFocusedKeywords,
+                relaxedKeyword || baseKeyword,
+                ...premiumKeywords,
+                ...nonMealPremiumKeywords,
+                ...brandChainKeywords,
+                ...mallKeywords
+            ]
+            : [
+                ...luxuryFocusedKeywords,
+                relaxedKeyword || baseKeyword,
+                ...midHighBudgetKeywords,
+                ...premiumKeywords,
+                ...nonMealPremiumKeywords,
+                ...brandChainKeywords,
+                ...mallKeywords
+            ]).filter(Boolean);
     const attempts = [];
     const primaryKeyword = (_e = keywordAttempts[0]) !== null && _e !== void 0 ? _e : baseKeyword;
     const fallbackKeyword = (_f = keywordAttempts.find((keyword) => keyword !== primaryKeyword)) !== null && _f !== void 0 ? _f : primaryKeyword;
@@ -467,15 +477,15 @@ function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
     }
     if (selected.has('brand_chain')) {
         return [
-            '粤菜|江浙菜|本帮菜|日料|西餐|烤肉|火锅|融合料理',
-            '费大厨|小菜园|西贝|海底捞|巴奴|太二|探鱼|半天妖|烤匠|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|九毛九|王品牛排',
-            '商场餐厅|购物中心餐厅|品牌餐厅|连锁餐厅'
+            '粤菜|江浙菜|本帮菜|日料|西餐|茶餐厅|品牌餐厅|商场餐厅|融合料理|牛排|海鲜|酒店餐厅',
+            '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|费大厨|小菜园|西贝|王品牛排|大渔铁板烧|利苑|炳胜',
+            '火锅|烤肉|烧肉|东南亚菜|韩餐|购物中心餐厅|连锁餐厅'
         ];
     }
     return [
-        '粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理',
-        '本帮菜|湘菜|川菜|东南亚菜|韩餐|牛排|烧肉',
-        '品牌餐厅|商场餐厅|购物中心餐厅'
+        '粤菜|江浙菜|本帮菜|日料|西餐|茶餐厅|品牌餐厅|商场餐厅|融合料理|牛排|海鲜|酒店餐厅',
+        '港式|早茶|点心|私房菜|创意菜|东南亚菜|韩餐|烧肉',
+        '火锅|烤肉|购物中心餐厅|连锁餐厅'
     ];
 }
 function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {

@@ -85,6 +85,24 @@ function applyDefensivePreferenceInferences(draft: MutablePreferenceProfile) {
     'time_afternoon_tea'
   ]);
   const hasNonMealSignal = [...nonMealOptionIds].some((optionId) => draft.selectedOptionIds.has(optionId));
+  const isLuxuryBudget = draft.budgetLevel >= 6 || draft.selectedOptionIds.has('budget_over_200');
+
+  if (isLuxuryBudget && !hasNonMealSignal) {
+    ['quick', 'staple', 'rice', 'noodle', 'set_meal', 'solo'].forEach((tagId) => {
+      draft.preferredTagIds.delete(tagId as TagId);
+    });
+    ['meal', 'premium_brand', 'fine_dining', 'hotel_restaurant', 'omakase', 'chef', 'steak', 'relaxed'].forEach((tagId) => {
+      draft.preferredTagIds.add(tagId as TagId);
+    });
+    draft.softPreferences = mergeSoftPreferences(draft.softPreferences, {
+      mealWeight: 'filling',
+      budgetStrictness: 'high'
+    });
+
+    if (draft.selectedOptionIds.has('speed_fast')) {
+      ['fast_service', 'low_queue'].forEach((tagId) => draft.preferredTagIds.add(tagId as TagId));
+    }
+  }
 
   if (!hasNonMealSignal) {
     return;

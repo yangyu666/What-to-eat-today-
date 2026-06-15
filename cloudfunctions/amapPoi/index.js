@@ -1098,13 +1098,20 @@ function mapCategoryToTagIds(text) {
     ids.add('not_spicy');
   }
 
-  if (hasStrongNonMealPoiEvidence(text)) {
+  const strongNonMealPoiEvidence = hasStrongNonMealPoiEvidence(text);
+
+  if (strongNonMealPoiEvidence) {
     ids.add('non_meal');
     ['meal', 'staple', 'rice', 'noodle', 'set_meal', 'hotpot', 'stir_fry', 'dim_sum'].forEach((id) => ids.delete(id));
 
     if (['drink', 'milk_tea', 'coffee', 'dessert'].some((id) => ids.has(id))) {
       ids.delete('quick');
     }
+  }
+
+  if (!strongNonMealPoiEvidence && hasPremiumMealPoiEvidence(ids, text)) {
+    ['quick', 'fast_service', 'low_queue', 'congee', 'hot', 'snack', 'solo', 'set_meal'].forEach((id) => ids.delete(id));
+    ['meal', 'premium_brand', 'relaxed', 'slow'].forEach((id) => ids.add(id));
   }
 
   if (ids.size === 0) {
@@ -1146,6 +1153,15 @@ function addBrandTags(ids, text) {
 function hasStrongNonMealPoiEvidence(text) {
   return /冷饮店|饮品店|饮品|奶茶|茶饮|咖啡厅|咖啡店|咖啡馆|cafe|coffee|甜品店|甜品|糕饼店|糕饼|蛋糕店|蛋糕|面包店|面包|烘焙店|烘焙|冰淇淋|gelato|星巴克|starbucks|瑞幸|luckin|manner|库迪|cotti|喜茶|奈雪|霸王茶姬|coco|都可|古茗|蜜雪冰城|茶百道|沪上阿姨/i.test(
     String(text || '')
+  );
+}
+
+function hasPremiumMealPoiEvidence(ids, text) {
+  const normalizedText = String(text || '').toLowerCase();
+  return (
+    ids.has('premium_brand') ||
+    PREMIUM_CHAIN_KEYWORDS.some((keyword) => normalizedText.includes(keyword.toLowerCase())) ||
+    /高端|黑珍珠|米其林|omakase|fine dining|hotel restaurant|private kitchen|chef restaurant|chef|主厨|私厨|私房|牛排馆|海鲜放题|法餐|高端日料|酒店餐厅|星级酒店|白天鹅|炳胜|利苑|大董|新荣记|甬府|GRILL|grill|烧肉|融合料理|创意菜/i.test(normalizedText)
   );
 }
 

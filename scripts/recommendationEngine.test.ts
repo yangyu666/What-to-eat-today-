@@ -857,6 +857,29 @@ const luxuryMealNoCheapDessertResult = recommend(
 assert(luxuryMealNoCheapDessertResult.candidates[0]?.restaurantId === 'premium-real-meal', '200+ 普通正餐场景不能让低价甜品/饮品压过真实高预算正餐');
 assert(!luxuryMealNoCheapDessertResult.candidates.some((candidate) => candidate.restaurantId === 'cheap-dessert-noise'), '200+ 普通正餐场景应过滤低价非正餐噪声');
 
+const premiumCantoneseTagScore = scoreRestaurant(
+  {
+    id: 'premium-cantonese-hotel',
+    name: '唐阁黑珍珠酒店餐厅',
+    tags: ['广式', '粤菜', '黑珍珠'],
+    category: '餐饮服务;中餐厅;粤菜;广式',
+    distanceMeters: 1800,
+    averageCostYuan: 360,
+    openStatus: 'open',
+    rating: 4.7,
+    status: 'active'
+  },
+  profile({
+    selectedOptionIds: ['budget_over_200'],
+    preferredTagIds: ['premium_brand', 'meal', 'quick', 'congee', 'hot'],
+    budgetLevel: 6
+  })
+);
+assert(premiumCantoneseTagScore.matchedPreferredTagIds.includes('premium_brand'), 'premium Cantonese hotel restaurant should keep premium_brand');
+assert(!premiumCantoneseTagScore.matchedPreferredTagIds.includes('quick'), 'premium Cantonese hotel restaurant should not be inferred as quick');
+assert(!premiumCantoneseTagScore.matchedPreferredTagIds.includes('congee'), 'premium Cantonese hotel restaurant should not be inferred as congee');
+assert(!premiumCantoneseTagScore.matchedPreferredTagIds.includes('hot'), 'premium Cantonese hotel restaurant should not be inferred as hot quick meal');
+
 const chainPreferenceNoIndependentResult = recommend(
   profile({
     selectedOptionIds: ['brand_chain', 'budget_100_200'],
@@ -1102,6 +1125,9 @@ assert(spicyOnlyFallback.candidates.length === 0, '明确不吃辣时，即使�
 assert(spicyOnlyFallback.candidatePoolStats?.afterHardFilter === 2, '不吃辣冲突池的 afterHardFilter 应表示非负向硬过滤后的候选数');
 assert(spicyOnlyFallback.candidatePoolStats?.afterNegativeFilter === 0, '不吃辣冲突池的 afterNegativeFilter 应为 0');
 assert(spicyOnlyFallback.candidatePoolStats?.finalCandidateCount === 0, '不吃辣冲突池最终候选数应为 0');
+assert(spicyOnlyFallback.candidatePoolStats?.fallbackUsed === false, '没有 fallback 候选进入结果时 fallbackUsed 不应为 true');
+assert(spicyOnlyFallback.candidatePoolStats?.fallbackAttempted === true, '无可用候选但尝试过放宽时应记录 fallbackAttempted');
+assert(spicyOnlyFallback.candidatePoolStats?.fallbackCandidateCount === 0, '无可用候选时 fallbackCandidateCount 应为 0');
 
 const spicyKeywordRestaurants: Restaurant[] = [
   {
@@ -3294,6 +3320,10 @@ async function runPoiCacheAndStressTests() {
   assert(
     /粤菜|江浙菜|日料|西餐|烤肉|火锅|融合料理|费大厨|海底捞|点都德|陶陶居/.test(midHighBudgetQuotaAttempts[0]?.keyword ?? ''),
     '100-200 brand path should use concrete mid-high meal keywords before generic mall keywords'
+  );
+  assert(
+    /茶餐厅|品牌餐厅|商场餐厅|海鲜|酒店餐厅/.test(midHighBudgetQuotaAttempts[0]?.keyword ?? ''),
+    '100-200 brand path should broaden recall beyond hotpot and barbecue'
   );
   assert(
     midHighBudgetQuotaAttempts.reduce((sum, attempt) => sum + attempt.maxAmapApiCalls, 0) === 3,
