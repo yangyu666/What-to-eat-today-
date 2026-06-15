@@ -1,0 +1,47 @@
+<view class="food-card">
+  <view class="card-head">
+    <view class="name-block">
+      <text class="eyebrow">今日推荐</text>
+      <text class="food-name">{{name}}</text>
+    </view>
+    <view class="match">
+      <text class="match-value">{{matchPercent}}</text>
+      <text class="match-unit">%</text>
+    </view>
+  </view>
+
+  <view class="meta-row">
+    <view class="meta-item">
+      <text class="meta-label">距离</text>
+      <text class="meta-value">{{distanceText}}</text>
+    </view>
+    <view class="meta-item">
+      <text class="meta-label">预计</text>
+      <text class="meta-value">{{estimatedMinutes}} 分钟</text>
+    </view>
+    <view class="meta-item">
+      <text class="meta-label">人均</text>
+      <text class="meta-value">¥{{averageCost}}</text>
+    </view>
+  </view>
+
+  <view class="tag-row" wx:if="{{tags.length}}">
+    <text class="tag" wx:for="{{tags}}" wx:key="*this">{{item}}</text>
+  </view>
+
+  <view class="reason-list" wx:if="{{reasons.length}}">
+    <view class="reason" wx:for="{{reasons}}" wx:key="*this">
+      <text class="dot"></text>
+      <text class="reason-text">{{item}}</text>
+    </view>
+  </view>
+
+  <view class="fallback" wx:if="{{fallbackReason}}">
+    <text>{{fallbackReason}}</text>
+  </view>
+
+  <view class="actions">
+    <button class="btn btn-secondary" bindtap="changeFood">换一个</button>
+    <button class="btn btn-primary" bindtap="acceptFood">就吃这个</button>
+  </view>
+</view>

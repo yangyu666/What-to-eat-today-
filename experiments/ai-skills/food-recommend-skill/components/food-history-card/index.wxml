@@ -1,0 +1,24 @@
+<view class="history-card">
+  <view class="history-head">
+    <text class="title">最近推荐</text>
+    <text class="count">{{items.length}} 条</text>
+  </view>
+
+  <view class="empty" wx:if="{{!items.length}}">
+    <text>还没有最近推荐</text>
+  </view>
+
+  <view class="history-list" wx:else>
+    <view class="history-item" wx:for="{{items}}" wx:key="historyId">
+      <view class="item-main">
+        <text class="item-name">{{item.name}}</text>
+        <text class="item-date">{{item.dateText}}</text>
+      </view>
+      <view class="item-meta">
+        <text class="badge">{{item.action}}</text>
+        <text class="match" wx:if="{{item.matchPercent}}">{{item.matchPercent}}% 匹配</text>
+      </view>
+      <text class="reason" wx:if="{{item.reasonSummary}}">{{item.reasonSummary}}</text>
+    </view>
+  </view>
+</view>
