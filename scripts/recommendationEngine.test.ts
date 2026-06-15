@@ -1478,6 +1478,24 @@ assert(
   ['avoidance', 'flavor', 'health'].filter((id) => selectedQuestionIds.has(id)).length <= 1,
   'avoidance, flavor, and health should not repeat the same light or healthy intent'
 );
+const spicyFlavorFlowQuestions = selectQuestionSet({ random: () => 0.5 });
+const spicyFlavorFlowIds = new Set(spicyFlavorFlowQuestions.map((question) => question.id));
+assert(
+  !(spicyFlavorFlowIds.has('spice_tolerance') && spicyFlavorFlowIds.has('flavor')),
+  'spice tolerance and flavor should not appear in the same generated question set'
+);
+const spicyFlavorPreviousQuestions = ['meal_intent', 'budget', 'distance', 'brand_preference', 'spice_tolerance', 'flavor']
+  .map((id) => questionBank.find((question) => question.id === id))
+  .filter((question): question is NonNullable<typeof question> => question !== undefined);
+const spicyFlavorFollowUpQuestions = selectQuestionSet({
+  previousQuestions: spicyFlavorPreviousQuestions,
+  random: () => 0.5
+});
+const spicyFlavorFollowUpIds = new Set(spicyFlavorFollowUpQuestions.map((question) => question.id));
+assert(
+  !(spicyFlavorFollowUpIds.has('spice_tolerance') && spicyFlavorFollowUpIds.has('flavor')),
+  'spice tolerance and flavor should not both remain when refreshing a previous question set'
+);
 const mealFollowUpQuestions = selectQuestionSet({
   answers: [
     {

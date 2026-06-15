@@ -21,7 +21,8 @@ const QUESTION_FLOWS = [
 const CONFLICTING_QUESTION_GROUPS = [
   ['avoidance', 'spice_tolerance'],
   ['satiety', 'meal_type', 'meal_intent'],
-  ['avoidance', 'flavor', 'health']
+  ['avoidance', 'flavor', 'health'],
+  ['spice_tolerance', 'flavor']
 ];
 const NON_MEAL_OPTION_IDS = new Set([
   'intent_drink',
@@ -71,20 +72,17 @@ export function selectQuestionSet(options: SelectQuestionsOptions = {}): Questio
     }
   });
 
-  const flowSelected = flow
+  const flowCandidates = flow
     .map((id) => selectableQuestions.find((question) => question.id === id))
     .filter(isQuestion)
     .filter((question) => !selectedIds.has(question.id) && !conflictsWithSelected(question.id, selectedIds));
-  flowSelected.slice(0, count - selected.length).forEach((question) => {
-    selected.push(question);
-    selectedIds.add(question.id);
-  });
+  appendQuestions(selected, selectedIds, flowCandidates, count);
 
   if (selected.length < count) {
     const fallbackPool = selectableQuestions.filter((question) => {
       return !selectedIds.has(question.id) && !conflictsWithSelected(question.id, selectedIds);
     });
-    selected.push(...shuffle(fallbackPool, random).slice(0, count - selected.length));
+    appendQuestions(selected, selectedIds, shuffle(fallbackPool, random), count);
   }
 
   return selected;
@@ -131,6 +129,26 @@ function conflictsWithSelected(questionId: string, selectedIds: Set<string>): bo
 
 function isQuestion(question: QuestionBankItem | undefined): question is QuestionBankItem {
   return question !== undefined;
+}
+
+function appendQuestions(
+  selected: QuestionBankItem[],
+  selectedIds: Set<string>,
+  candidates: QuestionBankItem[],
+  count: number
+) {
+  for (const question of candidates) {
+    if (
+      selected.length >= count ||
+      selectedIds.has(question.id) ||
+      conflictsWithSelected(question.id, selectedIds)
+    ) {
+      continue;
+    }
+
+    selected.push(question);
+    selectedIds.add(question.id);
+  }
 }
 
 function shuffle<T>(items: T[], random: () => number): T[] {
