@@ -8,6 +8,7 @@ const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 4;
 const MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
+const MIN_MID_HIGH_POOL_BEFORE_FALLBACK = 8;
 const MIN_PREMIUM_POOL_BEFORE_FALLBACK = 6;
 const EMPTY_QUESTIONNAIRE_RESULT = {
     version: 'empty',
@@ -383,7 +384,33 @@ function shouldSkipFallbackAttempt(restaurantPool, preferenceSnapshot) {
     if ((preferenceSnapshot.budgetLevel ?? 3) >= 6) {
         return countEffectivePremiumCandidates(restaurants) >= MIN_PREMIUM_POOL_BEFORE_FALLBACK;
     }
+    if ((preferenceSnapshot.budgetLevel ?? 3) === 5) {
+        return countEffectiveMidHighBudgetCandidates(restaurants) >= MIN_MID_HIGH_POOL_BEFORE_FALLBACK;
+    }
     return restaurants.length >= MIN_POOL_BEFORE_FALLBACK;
+}
+function countEffectiveMidHighBudgetCandidates(restaurants) {
+    return restaurants.filter((restaurant) => {
+        const cost = restaurant.averageCostYuan ?? estimateCostFromPriceLevel(restaurant.priceLevel);
+        const tagIds = new Set(restaurant.tagIds ?? []);
+        const text = `${restaurant.name ?? ''} ${restaurant.category ?? ''} ${(restaurant.tags ?? []).join(' ')}`;
+        const hasQualitySignal = tagIds.has('premium_brand') ||
+            tagIds.has('brand_chain') ||
+            tagIds.has('mall_restaurant') ||
+            tagIds.has('hotel_restaurant') ||
+            /品牌餐厅|商场餐厅|购物中心|酒店餐厅|粤菜|江浙菜|本帮菜|日料|西餐|融合料理|私房菜|创意菜|牛排|海鲜|烧肉|点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|费大厨|小菜园|西贝|王品|大渔|利苑|炳胜/.test(text);
+        const isLowBudgetNoise = cost !== undefined && cost < 80;
+        if (isLowBudgetNoise) {
+            return false;
+        }
+        if (cost !== undefined && cost >= 100 && cost <= 220) {
+            return true;
+        }
+        if (cost !== undefined && cost >= 80 && cost < 100) {
+            return hasQualitySignal;
+        }
+        return cost === undefined && hasQualitySignal;
+    }).length;
 }
 function countEffectivePremiumCandidates(restaurants) {
     return restaurants.filter((restaurant) => {
@@ -472,16 +499,17 @@ function getMidHighBudgetKeywordAttempts(preferenceSnapshot) {
 
     if (selected.has('brand_chain')) {
         return [
-            '粤菜|江浙菜|本帮菜|日料|西餐|茶餐厅|品牌餐厅|商场餐厅|融合料理|牛排|海鲜|酒店餐厅',
+            '品牌餐厅|商场餐厅|购物中心餐厅|酒店餐厅|粤菜|江浙菜|日料|西餐|融合料理|海鲜|牛排',
             '点都德|陶陶居|广州酒家|绿茶餐厅|外婆家|费大厨|小菜园|西贝|王品牛排|大渔铁板烧|利苑|炳胜',
-            '火锅|烤肉|烧肉|东南亚菜|韩餐|购物中心餐厅|连锁餐厅'
+            '本帮菜|港式|早茶|点心|私房菜|创意菜|茶餐厅|东南亚菜|韩餐|烧肉',
+            '火锅|烤肉|连锁餐厅'
         ];
     }
 
     return [
-        '粤菜|江浙菜|本帮菜|日料|西餐|茶餐厅|品牌餐厅|商场餐厅|融合料理|牛排|海鲜|酒店餐厅',
-        '港式|早茶|点心|私房菜|创意菜|东南亚菜|韩餐|烧肉',
-        '火锅|烤肉|购物中心餐厅|连锁餐厅'
+        '品牌餐厅|商场餐厅|购物中心餐厅|酒店餐厅|粤菜|江浙菜|日料|西餐|融合料理|海鲜|牛排',
+        '本帮菜|港式|早茶|点心|私房菜|创意菜|茶餐厅|东南亚菜|韩餐|烧肉',
+        '火锅|烤肉|连锁餐厅'
     ];
 }
 function getNonMealPremiumKeywordAttempts(preferenceSnapshot) {

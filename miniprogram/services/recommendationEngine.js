@@ -764,6 +764,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     const preferenceScore = getPreferenceScore(matchedPreferredTagIds);
     const negativePreferencePenalty = getNegativePenalty(negativeConflict) + temperatureConflict.penalty;
     const speedFastLowChainPenalty = getSpeedFastMealLowChainPenalty(restaurant, preference, tagIds);
+    const lightHealthyMismatchPenalty = getLightHealthyMismatchPenalty(restaurant, preference, tagIds);
     const historyPenaltyApplies = ((_a = options.historyPenaltyRestaurantIds) === null || _a === void 0 ? void 0 : _a.includes(restaurant.id)) === true;
     const historyPenalty = historyPenaltyApplies ? 8 : 0;
     const distanceScore = getDistanceScore(restaurant, preference, options.fallbackReason !== undefined);
@@ -776,6 +777,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         preferenceScore -
         negativePreferencePenalty +
         -speedFastLowChainPenalty +
+        -lightHealthyMismatchPenalty +
         -historyPenalty +
         distanceScore +
         priceScore +
@@ -821,9 +823,12 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     const priceCalibratedConfidenceScore = underBudgetMismatch
         ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
         : budgetCalibratedConfidenceScore;
-    const speedFastCalibratedConfidenceScore = speedFastLowChainPenalty > 0
-        ? Math.min(priceCalibratedConfidenceScore, 64)
+    const lightHealthyCalibratedConfidenceScore = lightHealthyMismatchPenalty > 0
+        ? Math.min(priceCalibratedConfidenceScore, 76)
         : priceCalibratedConfidenceScore;
+    const speedFastCalibratedConfidenceScore = speedFastLowChainPenalty > 0
+        ? Math.min(lightHealthyCalibratedConfidenceScore, 64)
+        : lightHealthyCalibratedConfidenceScore;
     const historyCalibratedConfidenceScore = historyPenaltyApplies
         ? Math.min(speedFastCalibratedConfidenceScore, 72)
         : speedFastCalibratedConfidenceScore;
@@ -838,7 +843,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         breakdown: {
             baseScore,
             preferenceScore,
-            negativePreferencePenalty: negativePreferencePenalty + speedFastLowChainPenalty,
+            negativePreferencePenalty: negativePreferencePenalty + speedFastLowChainPenalty + lightHealthyMismatchPenalty,
             distanceScore,
             priceScore,
             timeScore,
@@ -866,6 +871,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
         penaltyReasons: [
             ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
             ...(speedFastLowChainPenalty > 0 ? ['speed_fast meal intent downranks fried/burger/low-chain fast food'] : []),
+            ...(lightHealthyMismatchPenalty > 0 ? ['light/healthy intent downranks rich experience-heavy restaurants without light evidence'] : []),
             ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
         ],
         matchedPreferredTagIds,
@@ -1031,6 +1037,7 @@ function hasSafetyHardConflict(restaurant, preference) {
     return false;
 }
 function rankWithLightRandom(scored, random) {
+    var _a, _b;
     const nonConflict = scored.filter((item) => item.matchedAvoidedTagIds.length === 0);
     const conflict = scored.filter((item) => item.matchedAvoidedTagIds.length > 0);
     const sorted = [
@@ -1041,22 +1048,27 @@ function rankWithLightRandom(scored, random) {
     if (topThree.length <= 1) {
         return sorted;
     }
-    const totalWeight = topThree.reduce((sum, item, index) => {
+    const highestConfidence = (_b = (_a = topThree[0]) === null || _a === void 0 ? void 0 : _a.confidenceScore) !== null && _b !== void 0 ? _b : 0;
+    const randomizableTop = topThree.filter((item) => item.confidenceScore === highestConfidence);
+    if (randomizableTop.length <= 1) {
+        return sorted;
+    }
+    const totalWeight = randomizableTop.reduce((sum, item, index) => {
         return sum + Math.max(1, item.score) * (1 - index * 0.22);
     }, 0);
     let cursor = random() * totalWeight;
-    const selectedIndex = topThree.findIndex((item, index) => {
+    const selectedIndex = randomizableTop.findIndex((item, index) => {
         cursor -= Math.max(1, item.score) * (1 - index * 0.22);
         return cursor <= 0;
     });
     const safeIndex = selectedIndex >= 0 ? selectedIndex : 0;
-    const selected = topThree[safeIndex];
+    const selected = randomizableTop[safeIndex];
     const remaining = sorted.filter((item) => item.restaurant.id !== selected.restaurant.id);
     return [selected, ...remaining];
 }
 function compareScoredRestaurants(left, right) {
-    return (right.score - left.score ||
-        right.confidenceScore - left.confidenceScore ||
+    return (right.confidenceScore - left.confidenceScore ||
+        right.score - left.score ||
         right.breakdown.preferenceScore - left.breakdown.preferenceScore ||
         right.breakdown.distanceScore - left.breakdown.distanceScore);
 }
@@ -1879,17 +1891,100 @@ function getSpeedFastMealLowChainPenalty(restaurant, preference, tagIds = getRes
         /麦当劳|肯德基|汉堡王|kfc|mcdonald|burger king|炸鸡|汉堡|薯条/i.test(text);
     return isLowChainFastFood ? 38 : 0;
 }
+function getLightHealthyMismatchPenalty(restaurant, preference, tagIds = getRestaurantTagIds(restaurant)) {
+    var _a, _b;
+    const selected = new Set((_a = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _a !== void 0 ? _a : []);
+    const preferred = new Set((_b = preference === null || preference === void 0 ? void 0 : preference.preferredTagIds) !== null && _b !== void 0 ? _b : []);
+    const wantsLightHealthy = selected.has('avoid_greasy') ||
+        selected.has('flavor_light') ||
+        selected.has('health_light') ||
+        preferred.has('light') ||
+        preferred.has('healthy') ||
+        preferred.has('low_burden');
+    if (!wantsLightHealthy) {
+        return 0;
+    }
+    const tags = new Set(tagIds);
+    const hasLightEvidence = tags.has('light') ||
+        tags.has('healthy') ||
+        tags.has('low_burden') ||
+        tags.has('not_spicy') ||
+        tags.has('fresh') ||
+        tags.has('salad') ||
+        tags.has('congee') ||
+        tags.has('vegetarian') ||
+        tags.has('low_sugar') ||
+        tags.has('low_carb') ||
+        tags.has('high_protein');
+    if (hasLightEvidence) {
+        return 0;
+    }
+    const text = getRestaurantSignalText(restaurant);
+    const isRichExperience = tags.has('hotel_restaurant') ||
+        tags.has('premium_brand') ||
+        tags.has('hotpot') ||
+        tags.has('bbq') ||
+        tags.has('slow') ||
+        tags.has('relaxed') ||
+        tags.has('heavy') ||
+        tags.has('strong_flavor') ||
+        /酒店餐厅|星级酒店|放题|自助|火锅|烤肉|烧烤|烧肉|宴请|聚餐|海鲜放题|omakase|fine dining|黑珍珠|米其林/i.test(text);
+    if (!isRichExperience) {
+        return 0;
+    }
+    return tags.has('heavy') || tags.has('strong_flavor') || tags.has('hotpot') || tags.has('bbq') ? 18 : 12;
+}
 function getTimeScore(restaurant, preference) {
-    var _a;
+    var _a, _b, _c;
     const minutes = estimateMinutes(restaurant);
     const maxMinutes = (_a = preference === null || preference === void 0 ? void 0 : preference.maxEstimatedMinutes) !== null && _a !== void 0 ? _a : 45;
+    const selected = new Set((_b = preference === null || preference === void 0 ? void 0 : preference.selectedOptionIds) !== null && _b !== void 0 ? _b : []);
+    const tags = new Set(getRestaurantTagIds(restaurant));
+    const text = getRestaurantSignalText(restaurant);
+    const isSpeedFast = selected.has('speed_fast') || ((_c = preference === null || preference === void 0 ? void 0 : preference.softPreferences) === null || _c === void 0 ? void 0 : _c.speed) === 'fast';
+    let score = 0;
     if (minutes <= Math.min(25, maxMinutes)) {
-        return 8;
+        score = 8;
     }
-    if (minutes <= maxMinutes) {
-        return 4;
+    else if (minutes <= maxMinutes) {
+        score = 4;
     }
-    return -8;
+    else {
+        score = -8;
+    }
+    if (isSpeedFast) {
+        if (restaurant.distanceMeters !== undefined && restaurant.distanceMeters <= 500) {
+            score += 4;
+        }
+        else if (restaurant.distanceMeters !== undefined && restaurant.distanceMeters <= 1000) {
+            score += 2;
+        }
+        if (tags.has('fast_service') ||
+            tags.has('low_queue') ||
+            tags.has('set_meal') ||
+            tags.has('congee') ||
+            tags.has('noodle') ||
+            tags.has('rice')) {
+            score += 5;
+        }
+        if (tags.has('hotpot') ||
+            tags.has('bbq') ||
+            tags.has('slow') ||
+            tags.has('relaxed') ||
+            /火锅|烤肉|烧烤|自助|放题|排队|等位|宴请|聚餐/i.test(text)) {
+            score -= 10;
+        }
+        if (selected.has('intent_meal') &&
+            !selected.has('budget_under_30') &&
+            !selected.has('meal_type_snack') &&
+            (tags.has('low_chain') || tags.has('burger') || tags.has('fried'))) {
+            score -= 6;
+        }
+        if (restaurant.openStatus === 'busy') {
+            score -= 4;
+        }
+    }
+    return clamp(score, -12, 14);
 }
 function getRatingScore(restaurant) {
     if (restaurant.rating === undefined) {

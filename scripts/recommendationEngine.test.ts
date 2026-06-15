@@ -2375,6 +2375,82 @@ const fastMealNoLowChainTopResult = recommend(
 );
 assert(fastMealNoLowChainTopResult.candidates[0]?.restaurantId === 'fast-cantonese-meal', 'speed_fast + intent_meal should not let low-chain fried/burger fast food become Top1 unless low budget or snack is selected');
 
+const fastMealLowWaitResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_meal', 'speed_fast'],
+    preferredTagIds: ['meal', 'fast_service', 'low_queue'],
+    budgetLevel: 3,
+    maxDistanceMeters: 2000,
+    maxEstimatedMinutes: 30
+  }),
+  [
+    {
+      id: 'fast-slow-hotpot',
+      name: '近处排队火锅',
+      tags: ['火锅', '聚餐'],
+      tagIds: ['meal', 'hotpot', 'heavy', 'slow', 'relaxed'],
+      category: '餐饮服务;火锅店',
+      distanceMeters: 180,
+      averageCostYuan: 88,
+      openStatus: 'busy',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'fast-low-wait-set-meal',
+      name: '附近快出餐套餐',
+      tags: ['套餐', '正餐'],
+      tagIds: ['meal', 'fast_service', 'low_queue', 'set_meal', 'not_spicy'],
+      category: '餐饮服务;中餐厅',
+      distanceMeters: 620,
+      averageCostYuan: 62,
+      openStatus: 'open',
+      rating: 4.3,
+      status: 'active'
+    }
+  ]
+);
+assert(fastMealLowWaitResult.candidates[0]?.restaurantId === 'fast-low-wait-set-meal', 'speed_fast should favor low-wait meal options over nearby slow/busy hotpot');
+
+const confidenceOrderResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_meal'],
+    preferredTagIds: ['meal', 'light', 'not_spicy'],
+    budgetLevel: 4,
+    maxDistanceMeters: 2000
+  }),
+  [
+    {
+      id: 'confidence-near-price-unknown',
+      name: '近处价格未知小店',
+      tags: ['清淡', '正餐'],
+      tagIds: ['meal', 'light', 'not_spicy'],
+      category: '餐饮服务;中餐厅',
+      distanceMeters: 120,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    },
+    {
+      id: 'confidence-complete-match',
+      name: '完整匹配正餐',
+      tags: ['清淡', '正餐'],
+      tagIds: ['meal', 'light', 'not_spicy'],
+      category: '餐饮服务;中餐厅',
+      distanceMeters: 520,
+      averageCostYuan: 58,
+      openStatus: 'open',
+      rating: 4.4,
+      status: 'active'
+    }
+  ]
+);
+assert(
+  (confidenceOrderResult.candidates[0]?.confidenceScore ?? 0) >=
+    (confidenceOrderResult.candidates[1]?.confidenceScore ?? 0),
+  'displayed confidence should be non-increasing in recommendation order'
+);
+
 const lightHealthyNoExplicitBudgetResult = recommend(
   profile({
     selectedOptionIds: ['avoid_spicy', 'avoid_greasy', 'health_light'],
@@ -2424,6 +2500,63 @@ const lightHealthyNoExplicitBudgetResult = recommend(
 );
 assert(lightHealthyNoExplicitBudgetResult.candidates[0]?.restaurantId === 'healthy-sushi-86', 'when budget is not explicitly selected, light/healthy candidates slightly above default budget should outrank fried fast-food fallback');
 assert(!lightHealthyNoExplicitBudgetResult.candidates.some((candidate) => candidate.restaurantId === 'cheap-mcdonalds' && !candidate.fallbackReason), 'fried low-chain fast food should not enter primary pool for light/healthy preference');
+
+const lightHealthyBackfillPreference = profile({
+  selectedOptionIds: ['avoid_greasy', 'health_light'],
+  preferredTagIds: ['meal', 'light', 'healthy', 'low_burden'],
+  avoidedTagIds: ['fried', 'heavy', 'strong_flavor', 'bbq', 'hotpot'],
+  budgetLevel: 4,
+  maxDistanceMeters: 3000
+});
+const richHotelBuffetBackfill: Restaurant = {
+  id: 'rich-hotel-buffet-backfill',
+  name: '酒店海鲜放题',
+  tags: ['酒店餐厅', '海鲜放题'],
+  tagIds: ['meal', 'premium_brand', 'hotel_restaurant', 'slow', 'relaxed'],
+  category: '餐饮服务;酒店餐厅;自助餐',
+  distanceMeters: 520,
+  averageCostYuan: 198,
+  openStatus: 'open',
+  rating: 4.7,
+  status: 'active'
+};
+const lightHealthyBackfillResult = recommend(lightHealthyBackfillPreference, [
+  {
+    id: 'light-congee-backfill',
+    name: '清淡粥粉面',
+    tags: ['粥', '清淡'],
+    tagIds: ['meal', 'light', 'healthy', 'low_burden', 'congee', 'not_spicy'],
+    category: '餐饮服务;中餐厅;粥粉面',
+    distanceMeters: 480,
+    averageCostYuan: 34,
+    openStatus: 'open',
+    rating: 4.3,
+    status: 'active'
+  },
+  {
+    id: 'light-salad-backfill',
+    name: '轻食沙拉',
+    tags: ['轻食', '沙拉'],
+    tagIds: ['meal', 'light', 'healthy', 'salad', 'fresh'],
+    category: '餐饮服务;轻食',
+    distanceMeters: 760,
+    averageCostYuan: 52,
+    openStatus: 'open',
+    rating: 4.4,
+    status: 'active'
+  },
+  richHotelBuffetBackfill
+]);
+assert(
+  lightHealthyBackfillResult.candidates.slice(0, 2).every((candidate) => candidate.restaurantId !== 'rich-hotel-buffet-backfill'),
+  'light/healthy preferences should keep rich hotel buffet style candidates behind clear light options'
+);
+assert(
+  scoreRestaurant(richHotelBuffetBackfill, lightHealthyBackfillPreference).penaltyReasons.includes(
+    'light/healthy intent downranks rich experience-heavy restaurants without light evidence'
+  ),
+  'light/healthy mismatch penalty should be observable for later tuning'
+);
 
 const noSpicySushiAddressPollution = scoreRestaurant(
   {
@@ -3435,6 +3568,95 @@ async function runPoiCacheAndStressTests() {
   );
 
   __resetNearbyRestaurantCacheForTest();
+  const midHighRecallAttempts: string[] = [];
+  const lowBudgetNoisePool: Restaurant[] = Array.from({ length: 18 }, (_, index) => ({
+    id: `mid-high-noise-${index}`,
+    name: index % 2 === 0 ? `普通粉面 ${index}` : `街边快餐 ${index}`,
+    tags: ['quick', 'staple'],
+    tagIds: ['quick', 'meal', 'staple'],
+    category: index % 2 === 0 ? '餐饮服务;中餐厅;粉面馆' : '餐饮服务;快餐厅',
+    distanceMeters: 300 + index * 20,
+    averageCostYuan: 24 + (index % 4) * 6,
+    openStatus: 'open',
+    rating: 4.1,
+    source: 'amap',
+    status: 'active'
+  }));
+  const qualityMidHighPool: Restaurant[] = Array.from({ length: 8 }, (_, index) => ({
+    id: `mid-high-quality-${index}`,
+    name: ['广州酒家', '陶陶居', '点都德', '绿茶餐厅'][index % 4] + ` 品质正餐 ${index}`,
+    tags: ['brand_chain', 'mall_restaurant', 'meal'],
+    tagIds: ['brand_chain', 'mall_restaurant', 'meal'],
+    category: '餐饮服务;中餐厅;品牌餐厅',
+    distanceMeters: 600 + index * 70,
+    averageCostYuan: 110 + index * 9,
+    openStatus: 'open',
+    rating: 4.5,
+    source: 'amap',
+    status: 'active'
+  }));
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    midHighRecallAttempts.push(options.keyword ?? '');
+    return {
+      restaurants: midHighRecallAttempts.length === 1 ? lowBudgetNoisePool : qualityMidHighPool,
+      meta: {
+        amapApiCallCount: 1,
+        poiFetchReason: `mid-high-quality-${midHighRecallAttempts.length}`,
+        poiFetchMode: options.mode ?? 'polygon',
+        aroundCallCount: options.mode === 'around' ? 1 : 0,
+        polygonCallCount: options.mode === 'polygon' ? 1 : 0,
+        keywordCallCount: options.mode === 'keyword' ? 1 : 0,
+        totalAmapApiCallCount: 1
+      }
+    };
+  });
+
+  const midHighRecommendations = await getLocalRecommendations({
+    version: 'test',
+    source: 'recommendation_filter',
+    submittedAt: '2026-06-02T04:00:00.000Z',
+    answers: [
+      {
+        questionId: 'meal_intent',
+        type: 'single',
+        value: 'meal',
+        optionIds: ['intent_meal'],
+        answeredAt: '2026-06-02T04:00:01.000Z'
+      },
+      {
+        questionId: 'budget',
+        type: 'single',
+        value: '100_200',
+        optionIds: ['budget_100_200'],
+        answeredAt: '2026-06-02T04:00:02.000Z'
+      },
+      {
+        questionId: 'brand_preference',
+        type: 'single',
+        value: 'chain',
+        optionIds: ['brand_chain'],
+        answeredAt: '2026-06-02T04:00:03.000Z'
+      }
+    ]
+  });
+  const midHighTopRestaurant = midHighRecommendations[0]?.restaurant;
+  assert(midHighRecallAttempts.length >= 2, '100-200 path should continue fetching when the first pool is mostly low-budget noise');
+  assert(
+    midHighTopRestaurant?.averageCostYuan !== undefined &&
+      midHighTopRestaurant.averageCostYuan >= 100,
+    '100-200 path should rank a real mid-high budget restaurant above low-budget noise'
+  );
+  assert(
+    !/^mid-high-noise-/.test(midHighTopRestaurant?.id ?? ''),
+    '100-200 path should not treat low-budget powder/noodle/fast-food noise as a sufficient pool'
+  );
+
+  __resetNearbyRestaurantCacheForTest();
   let quotaFailureCallCount = 0;
   let quotaFailurePlannedAmapBudget = 0;
   __setAmapPoiStorageAdapterForTest({
@@ -3470,6 +3692,42 @@ async function runPoiCacheAndStressTests() {
   assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'quota exhaustion should surface only after fallback searches are also unavailable');
   assert(quotaFailureCallCount === 2, 'quota exhaustion should use bounded logical POI attempts while leaving room for key retry inside each attempt');
   assert(quotaFailurePlannedAmapBudget === 4, 'quota exhaustion should spend the bounded recommendation AMap budget, not stop after the first key or loop indefinitely');
+
+  __resetNearbyRestaurantCacheForTest();
+  const lowBudgetQuotaAttempts: number[] = [];
+  __setAmapPoiStorageAdapterForTest({
+    get: () => undefined,
+    set: () => undefined
+  });
+  __setAmapPoiLocationProviderForTest(async () => baseLocation);
+  __setAmapPoiCloudFetcherForTest(async (_location, options) => {
+    lowBudgetQuotaAttempts.push(options.maxAmapApiCalls ?? 0);
+    throw new Error('USER_DAILY_QUERY_OVER_LIMIT');
+  });
+
+  try {
+    await getLocalRecommendations({
+      version: 'test',
+      source: 'recommendation_filter',
+      submittedAt: '2026-06-02T04:00:00.000Z',
+      answers: [
+        {
+          questionId: 'budget',
+          type: 'single',
+          value: 'under_30',
+          optionIds: ['budget_under_30'],
+          answeredAt: '2026-06-02T04:00:01.000Z'
+        }
+      ]
+    });
+  } catch {
+    // Expected: this scenario intentionally makes every live fetch fail.
+  }
+  assert(lowBudgetQuotaAttempts.length > 0, 'low-budget path should still attempt bounded live fetches when cache misses');
+  assert(
+    lowBudgetQuotaAttempts.every((maxAmapApiCalls) => maxAmapApiCalls !== 1),
+    'low-budget path should not issue one-key live attempts that cannot switch AMap keys'
+  );
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({

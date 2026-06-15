@@ -485,7 +485,7 @@ function normalizeImageUrl(url: string | undefined): string {
 
 function getRecommendationErrorText(error: unknown): string {
   if (isAmapQuotaError(error)) {
-    return '今天附近餐厅数据暂时获取不到，请稍后再试。';
+    return '附近餐厅实时数据暂时获取不到，请稍后再试，或放宽距离/预算后重新推荐。';
   }
 
   return '推荐加载失败，请稍后重试';
