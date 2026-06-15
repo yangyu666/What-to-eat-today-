@@ -9,7 +9,7 @@
 - 入口：`cloudfunctions/setupDatabase/index.js`
 - 入参：`{}`
 - 出参：`ApiResponse<{ collections, indexes }>`
-- 职责：创建 MVP 必需集合：`users`、`recommendation_history`。
+- 职责：创建 MVP 必需集合：`users`、`recommendation_history`、`amap_poi_cache`。
 - 使用方式：部署后在微信开发者工具里测试调用一次；返回 `created` 表示新建成功，返回 `exists` 表示集合已存在。
 - 注意：索引和权限仍建议在云开发控制台确认配置。
 
@@ -175,7 +175,7 @@ Purpose: quota optimization cache for AMap POI candidate pools. It is created by
 ## 上线前控制台操作
 
 1. 部署云函数：`setupDatabase`、`amapPoi`、`saveRecommendationHistory`、`listHistory`、`syncUserProfile`。
-2. 在微信开发者工具里测试调用 `setupDatabase`，创建 `users`、`recommendation_history`。
+2. 在微信开发者工具里测试调用 `setupDatabase`，创建 `users`、`recommendation_history`、`amap_poi_cache`。
 3. 保留部署：`recommendRestaurant`。
 4. 给 `amapPoi` 配置环境变量：`AMAP_WEB_SERVICE_KEYS` / `AMAP_KEYS` / `AMAP_WEB_SERVICE_KEY` / `AMAP_KEY` 之一。
 5. 配置集合权限，禁止全量公开读写。
