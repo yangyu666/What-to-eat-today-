@@ -8,6 +8,9 @@ coverage/
 .cache/
 .agents/
 skills-lock.json
+analysis/*.sqlite
+analysis/*_import.sql
+analysis/*_mysql.sql
 
 # Mini Program TypeScript compiler output
 miniprogram/**/*.js
