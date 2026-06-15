@@ -5,6 +5,7 @@ const privacyConsent_1 = require("../../services/privacyConsent");
 const MAX_RECENT_MEALS = 3;
 const DEFAULT_USER_NAME = '朋友';
 const USER_PROFILE_STORAGE_KEY = 'meal_user_profile';
+let latestLocationRequestId = 0;
 const DEFAULT_RECENT_IMAGES = {
     spicy: 'https://images.unsplash.com/photo-1585032226651-759b368d7246?auto=format&fit=crop&w=360&q=80',
     rice: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?auto=format&fit=crop&w=360&q=80',
@@ -31,6 +32,9 @@ Page({
     onShow() {
         this.initUserName();
         this.initHistoryFilter();
+        if ((0, privacyConsent_1.hasLocationConsent)() && !this.data.privacyConsentVisible) {
+            this.initLocation();
+        }
         this.loadRecentMeals();
     },
     initHistoryFilter() {
@@ -49,7 +53,6 @@ Page({
                 privacyConsentVisible: false,
                 privacyRejectMessage: ''
             });
-            this.initLocation();
             return;
         }
         this.setData({
@@ -76,16 +79,24 @@ Page({
             return;
         }
         this.setData({ locationStatus: '定位中' });
+        const requestId = latestLocationRequestId + 1;
+        latestLocationRequestId = requestId;
         wx.getLocation({
             type: 'gcj02',
             success: async (result) => {
                 const locationLabel = await getLocationLabel(result.latitude, result.longitude);
+                if (requestId !== latestLocationRequestId) {
+                    return;
+                }
                 this.setData({
                     locationStatus: locationLabel || '位置未授权',
                     locationAuthDenied: !locationLabel
                 });
             },
             fail: () => {
+                if (requestId !== latestLocationRequestId) {
+                    return;
+                }
                 this.setData({
                     locationStatus: '位置未授权',
                     locationAuthDenied: true
@@ -252,9 +263,17 @@ async function getLocationLabel(latitude, longitude) {
 function formatLocationLabel(province, city, district) {
     const parts = [province, city, district]
         .filter((part) => Boolean(part))
-        .map((part) => part.replace(/省|市|自治区|特别行政区|地区|盟|区|县$/g, ''));
+        .map(normalizeLocationPart)
+        .filter((part) => Boolean(part));
     const uniqueParts = parts.filter((part, index) => part && parts.indexOf(part) === index);
     return uniqueParts.length > 0 ? uniqueParts.slice(0, 2).join(' · ') : undefined;
+}
+function normalizeLocationPart(part) {
+    const text = part.trim();
+    if (!text) {
+        return undefined;
+    }
+    return text.replace(/(省|市|自治区|特别行政区|地区|盟|区|县)$/g, '');
 }
 function toRecentMealItem(item) {
     const name = item.restaurantName || item.mealName;
