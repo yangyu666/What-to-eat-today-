@@ -853,6 +853,7 @@ export function scoreRestaurant(
   const baseScore = 32;
   const preferenceScore = getPreferenceScore(matchedPreferredTagIds);
   const negativePreferencePenalty = getNegativePenalty(negativeConflict) + temperatureConflict.penalty;
+  const speedFastLowChainPenalty = getSpeedFastMealLowChainPenalty(restaurant, preference, tagIds);
   const historyPenaltyApplies =
     options.historyPenaltyRestaurantIds?.includes(restaurant.id) === true;
   const historyPenalty = historyPenaltyApplies ? 8 : 0;
@@ -866,6 +867,7 @@ export function scoreRestaurant(
     baseScore +
       preferenceScore -
       negativePreferencePenalty +
+      - speedFastLowChainPenalty +
       - historyPenalty +
       distanceScore +
       priceScore +
@@ -916,9 +918,12 @@ export function scoreRestaurant(
   const priceCalibratedConfidenceScore = underBudgetMismatch
     ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
     : budgetCalibratedConfidenceScore;
-  const historyCalibratedConfidenceScore = historyPenaltyApplies
-    ? Math.min(priceCalibratedConfidenceScore, 72)
+  const speedFastCalibratedConfidenceScore = speedFastLowChainPenalty > 0
+    ? Math.min(priceCalibratedConfidenceScore, 64)
     : priceCalibratedConfidenceScore;
+  const historyCalibratedConfidenceScore = historyPenaltyApplies
+    ? Math.min(speedFastCalibratedConfidenceScore, 72)
+    : speedFastCalibratedConfidenceScore;
   const confidenceScore =
     options.confidenceCap !== undefined
       ? Math.min(historyCalibratedConfidenceScore, options.confidenceCap)
@@ -932,7 +937,7 @@ export function scoreRestaurant(
     breakdown: {
       baseScore,
       preferenceScore,
-      negativePreferencePenalty,
+      negativePreferencePenalty: negativePreferencePenalty + speedFastLowChainPenalty,
       distanceScore,
       priceScore,
       timeScore,
@@ -976,6 +981,7 @@ export function scoreRestaurant(
         temperatureConflict,
         nonMealBudgetMismatch
       ),
+      ...(speedFastLowChainPenalty > 0 ? ['speed_fast meal intent downranks fried/burger/low-chain fast food'] : []),
       ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
     ],
     matchedPreferredTagIds,
@@ -2208,7 +2214,7 @@ function getDistanceScore(
 }
 
 function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfile): number {
-  if (preference?.budgetLevel === undefined) {
+  if (preference?.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) {
     return 0;
   }
 
@@ -2271,6 +2277,32 @@ function getPriceScore(restaurant: Restaurant, preference?: UserPreferenceProfil
   }
 
   return -34;
+}
+
+function getSpeedFastMealLowChainPenalty(
+  restaurant: Restaurant,
+  preference: UserPreferenceProfile | undefined,
+  tagIds = getRestaurantTagIds(restaurant)
+): number {
+  const selected = new Set(preference?.selectedOptionIds ?? []);
+
+  if (!selected.has('speed_fast') || !selected.has('intent_meal')) {
+    return 0;
+  }
+
+  if (selected.has('budget_under_30') || selected.has('meal_type_snack')) {
+    return 0;
+  }
+
+  const tags = new Set(tagIds);
+  const text = getRestaurantSignalText(restaurant);
+  const isLowChainFastFood =
+    tags.has('low_chain') ||
+    tags.has('burger') ||
+    tags.has('fried') ||
+    /麦当劳|肯德基|汉堡王|kfc|mcdonald|burger king|炸鸡|汉堡|薯条/i.test(text);
+
+  return isLowChainFastFood ? 38 : 0;
 }
 
 function getTimeScore(restaurant: Restaurant, preference?: UserPreferenceProfile): number {
@@ -2450,7 +2482,7 @@ function getConfidenceLabel(score: number): RecommendationConfidenceLabel {
 }
 
 function isOverBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
-  if (preference?.budgetLevel === undefined) {
+  if (preference?.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) {
     return false;
   }
 
@@ -2460,7 +2492,7 @@ function isOverBudget(restaurant: Restaurant, preference?: UserPreferenceProfile
 }
 
 function isClearlyOverBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
-  if (preference?.budgetLevel === undefined) {
+  if (preference?.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) {
     return false;
   }
 
@@ -2474,7 +2506,7 @@ function isClearlyUnderBudget(
   preference?: UserPreferenceProfile,
   allowNearBudgetFallback = false
 ): boolean {
-  if (preference?.budgetLevel === undefined || preference.budgetLevel < 5) {
+  if (preference?.budgetLevel === undefined || !hasExplicitBudgetPreference(preference) || preference.budgetLevel < 5) {
     return false;
   }
 
@@ -2499,6 +2531,7 @@ function isClearlyUnderBudget(
 function isPriceUnknownForStrictBudget(restaurant: Restaurant, preference?: UserPreferenceProfile): boolean {
   return (
     preference?.budgetLevel !== undefined &&
+    hasExplicitBudgetPreference(preference) &&
     preference.budgetLevel >= 5 &&
     !isFlexibleNonMealBudget(preference) &&
     isPriceUnknown(restaurant)
@@ -2723,6 +2756,10 @@ function getBudgetMaxYuan(preference: UserPreferenceProfile): number {
 
 function getBudgetRange(preference: UserPreferenceProfile): { min?: number; max: number } {
   return BUDGET_LEVEL_TO_RANGE[preference.budgetLevel ?? 3] ?? BUDGET_LEVEL_TO_RANGE[3];
+}
+
+function hasExplicitBudgetPreference(preference?: UserPreferenceProfile): boolean {
+  return (preference?.selectedOptionIds ?? []).some((optionId) => optionId.startsWith('budget_'));
 }
 
 function getEstimatedCost(restaurant: Restaurant): number | undefined {

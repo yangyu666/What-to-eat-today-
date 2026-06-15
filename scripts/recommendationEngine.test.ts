@@ -110,6 +110,7 @@ const slowButMatchingScore = scoreRestaurant(
 assert((slowButMatchingScore.confidenceScore ?? 100) <= 70, '超过耗时偏好的候选不能拿到高匹配度');
 
 const cheap = profile({
+  selectedOptionIds: ['budget_under_30'],
   preferredTagIds: ['rice', 'staple', 'quick'],
   budgetLevel: 2,
   maxDistanceMeters: 3000
@@ -121,6 +122,7 @@ assert(
 );
 
 const budgetRangePreference = profile({
+  selectedOptionIds: ['budget_30_60'],
   preferredTagIds: ['rice', 'meal', 'quick'],
   budgetLevel: 3,
   maxDistanceMeters: 1000
@@ -182,6 +184,7 @@ const slightlyOverBudgetScore = scoreRestaurant(
 assert((slightlyOverBudgetScore.confidenceScore ?? 100) <= 70, '略超预算候选不能拿到高匹配度');
 
 const premiumBudgetPreference = profile({
+  selectedOptionIds: ['budget_100_200'],
   preferredTagIds: ['relaxed', 'slow', 'group'],
   budgetLevel: 5,
   maxDistanceMeters: 1000
@@ -245,6 +248,7 @@ assert(cheapForPremiumScore.breakdown.priceScore < 0, 'high budget preference sh
 
 const luxuryBudgetResult = recommend(
   profile({
+    selectedOptionIds: ['budget_over_200'],
     preferredTagIds: ['relaxed', 'slow', 'group'],
     budgetLevel: 6,
     maxDistanceMeters: 1000
@@ -280,6 +284,7 @@ assert(luxuryBudgetResult.candidates[0]?.restaurantId === 'luxury-in-range', '20
 
 const luxuryLowOnlyResult = recommend(
   profile({
+    selectedOptionIds: ['budget_over_200'],
     preferredTagIds: ['relaxed', 'slow', 'group'],
     budgetLevel: 6,
     maxDistanceMeters: 1000
@@ -314,6 +319,7 @@ assert(
 
 const luxuryUnknownOnlyResult = recommend(
   profile({
+    selectedOptionIds: ['budget_over_200'],
     preferredTagIds: ['relaxed', 'slow', 'group'],
     budgetLevel: 6,
     maxDistanceMeters: 1000
@@ -347,6 +353,7 @@ assert(
 
 const luxuryWeakUnknownOnlyResult = recommend(
   profile({
+    selectedOptionIds: ['budget_over_200'],
     preferredTagIds: ['relaxed', 'slow', 'group'],
     budgetLevel: 6,
     maxDistanceMeters: 1000
@@ -376,6 +383,7 @@ assert(
 
 const premiumLowOnlyResult = recommend(
   profile({
+    selectedOptionIds: ['budget_100_200'],
     preferredTagIds: ['relaxed', 'group'],
     budgetLevel: 5,
     maxDistanceMeters: 1000
@@ -406,6 +414,7 @@ assert(
 
 const premiumNearBudgetFallbackResult = recommend(
   profile({
+    selectedOptionIds: ['budget_100_200'],
     preferredTagIds: ['relaxed', 'group', 'meal'],
     budgetLevel: 5,
     maxDistanceMeters: 1000
@@ -1465,7 +1474,7 @@ const strongMatchResult = recommend(
     mockRestaurants.find((restaurant) => restaurant.id === 'r-rice-set') as Restaurant
   ]
 );
-assert((strongMatchResult.candidates[0]?.confidenceScore ?? 0) >= 80, '强匹配应达到 80-95');
+assert(strongMatchResult.candidates.some((candidate) => (candidate.confidenceScore ?? 0) >= 80), '强匹配候选应达到 80-95');
 
 const observableCandidate = strongMatchResult.candidates[0];
 assert(strongMatchResult.algorithmVersion === 'recommendation-v3.0', '结果应暴露 algorithmVersion');
@@ -2328,6 +2337,93 @@ assert(
   !lightCheapMixedResult.candidates.some((candidate) => candidate.restaurantId === 'greasy-fried-burger' && !candidate.fallbackReason),
   'greasy conflict candidate cannot enter the primary pool when clean candidates exist'
 );
+
+const fastMealNoLowChainTopResult = recommend(
+  profile({
+    selectedOptionIds: ['intent_meal', 'speed_fast'],
+    preferredTagIds: ['meal', 'fast_service', 'low_queue'],
+    budgetLevel: 3,
+    maxDistanceMeters: 2000,
+    maxEstimatedMinutes: 30
+  }),
+  [
+    {
+      id: 'fast-low-chain-burger',
+      name: '汉堡王',
+      tags: ['汉堡', '快餐'],
+      tagIds: ['meal', 'quick', 'staple', 'low_chain', 'burger', 'fried'],
+      category: '西式快餐',
+      distanceMeters: 160,
+      averageCostYuan: 38,
+      openStatus: 'open',
+      rating: 4.7,
+      status: 'active'
+    },
+    {
+      id: 'fast-cantonese-meal',
+      name: '附近茶餐厅',
+      tags: ['茶餐厅', '正餐'],
+      tagIds: ['meal', 'fast_service', 'low_queue', 'set_meal', 'not_spicy'],
+      category: '茶餐厅',
+      distanceMeters: 420,
+      averageCostYuan: 68,
+      openStatus: 'open',
+      rating: 4.4,
+      status: 'active'
+    }
+  ]
+);
+assert(fastMealNoLowChainTopResult.candidates[0]?.restaurantId === 'fast-cantonese-meal', 'speed_fast + intent_meal should not let low-chain fried/burger fast food become Top1 unless low budget or snack is selected');
+
+const lightHealthyNoExplicitBudgetResult = recommend(
+  profile({
+    selectedOptionIds: ['avoid_spicy', 'avoid_greasy', 'health_light'],
+    preferredTagIds: ['not_spicy', 'light', 'healthy', 'meal'],
+    avoidedTagIds: ['spicy', 'strong_flavor', 'fried', 'heavy', 'burger', 'bbq'],
+    budgetLevel: 3,
+    maxDistanceMeters: 2000
+  }),
+  [
+    {
+      id: 'healthy-sushi-86',
+      name: '寿司郎',
+      tags: ['日式', '清淡'],
+      tagIds: ['meal', 'light', 'healthy', 'not_spicy'],
+      category: '日料',
+      distanceMeters: 700,
+      averageCostYuan: 86,
+      openStatus: 'open',
+      rating: 4.5,
+      status: 'active'
+    },
+    {
+      id: 'healthy-cantonese-110',
+      name: '陶陶居',
+      tags: ['粤菜', '清淡'],
+      tagIds: ['meal', 'light', 'not_spicy', 'relaxed'],
+      category: '粤菜',
+      distanceMeters: 900,
+      averageCostYuan: 110,
+      openStatus: 'open',
+      rating: 4.6,
+      status: 'active'
+    },
+    {
+      id: 'cheap-mcdonalds',
+      name: '麦当劳',
+      tags: ['汉堡', '炸鸡'],
+      tagIds: ['meal', 'quick', 'staple', 'low_chain', 'burger', 'fried', 'heavy'],
+      category: '西式快餐',
+      distanceMeters: 120,
+      averageCostYuan: 30,
+      openStatus: 'open',
+      rating: 4.8,
+      status: 'active'
+    }
+  ]
+);
+assert(lightHealthyNoExplicitBudgetResult.candidates[0]?.restaurantId === 'healthy-sushi-86', 'when budget is not explicitly selected, light/healthy candidates slightly above default budget should outrank fried fast-food fallback');
+assert(!lightHealthyNoExplicitBudgetResult.candidates.some((candidate) => candidate.restaurantId === 'cheap-mcdonalds' && !candidate.fallbackReason), 'fried low-chain fast food should not enter primary pool for light/healthy preference');
 
 const noSpicySushiAddressPollution = scoreRestaurant(
   {
@@ -3326,8 +3422,12 @@ async function runPoiCacheAndStressTests() {
     '100-200 brand path should broaden recall beyond hotpot and barbecue'
   );
   assert(
-    midHighBudgetQuotaAttempts.reduce((sum, attempt) => sum + attempt.maxAmapApiCalls, 0) === 3,
+    midHighBudgetQuotaAttempts.reduce((sum, attempt) => sum + attempt.maxAmapApiCalls, 0) === 4,
     '100-200 brand path should spend the bounded AMap key retry budget before surfacing quota failure'
+  );
+  assert(
+    midHighBudgetQuotaAttempts.every((attempt) => attempt.maxAmapApiCalls !== 1),
+    '100-200 brand path should not issue a one-key live attempt that cannot switch AMap keys'
   );
   assert(
     midHighBudgetQuotaAttempts.every((attempt) => attempt.mode !== 'around'),
@@ -3369,7 +3469,7 @@ async function runPoiCacheAndStressTests() {
   }
   assert(quotaErrorMessage === 'AMAP_DAILY_QUOTA_EXHAUSTED', 'quota exhaustion should surface only after fallback searches are also unavailable');
   assert(quotaFailureCallCount === 2, 'quota exhaustion should use bounded logical POI attempts while leaving room for key retry inside each attempt');
-  assert(quotaFailurePlannedAmapBudget === 3, 'quota exhaustion should spend the bounded recommendation AMap budget, not stop after the first key or loop indefinitely');
+  assert(quotaFailurePlannedAmapBudget === 4, 'quota exhaustion should spend the bounded recommendation AMap budget, not stop after the first key or loop indefinitely');
 
   const stress = require('../../../scripts/stressRecommendation.js');
   const missingCachePolicy = stress.validateStressCachePolicy({

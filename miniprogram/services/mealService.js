@@ -8,7 +8,7 @@ const amapQueryBuilder_1 = require("./amapQueryBuilder");
 const amapPoiService_1 = require("./amapPoiService");
 const preferenceMapper_1 = require("./preferenceMapper");
 const recommendationEngine_1 = require("./recommendationEngine");
-const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 3;
+const MAX_AMAP_API_CALLS_PER_RECOMMENDATION = 4;
 const MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST = 2;
 const MAX_AROUND_API_CALLS_PER_RECOMMENDATION = 1;
 const MIN_POOL_BEFORE_FALLBACK = 12;
@@ -174,6 +174,9 @@ async function getAmapRecommendations(questionnaire, limit, historyFilterContext
 }
 function getAttemptAmapBudget(attempt, remainingAmapApiCalls) {
     if (attempt.cacheOnly) {
+        return 0;
+    }
+    if (remainingAmapApiCalls < MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST) {
         return 0;
     }
     return Math.max(0, Math.min(MAX_AMAP_KEY_RETRY_CALLS_PER_POI_REQUEST, remainingAmapApiCalls));

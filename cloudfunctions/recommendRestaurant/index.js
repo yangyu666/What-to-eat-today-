@@ -753,6 +753,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const baseScore = 32;
   const preferenceScore = Math.min(34, matchedPreferredTagIds.reduce((sum, tag) => sum + (TAG_WEIGHTS[tag] || 6), 0));
   const negativePreferencePenalty = (negativeConflict.severity === 'hard' ? 88 : negativeConflict.severity === 'soft' ? Math.min(45, 22 + negativeConflict.tags.length * 7) : 0) + temperatureConflict.penalty;
+  const speedFastLowChainPenalty = getSpeedFastMealLowChainPenalty(restaurant, preference, tagIds);
   const historyPenaltyApplies =
     Array.isArray(options.historyPenaltyRestaurantIds) && options.historyPenaltyRestaurantIds.includes(restaurant.id);
   const historyPenalty = historyPenaltyApplies ? 8 : 0;
@@ -762,7 +763,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const ratingScore = getRatingScore(restaurant);
   const openStatusScore = restaurant.openStatus === 'open' ? 6 : restaurant.openStatus === 'busy' ? 1 : 0;
   const dataCompletenessScore = getDataCompletenessScore(restaurant);
-  const rawFinalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty - historyPenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
+  const rawFinalScore = clamp(baseScore + preferenceScore - negativePreferencePenalty - speedFastLowChainPenalty - historyPenalty + distanceScore + priceScore + timeScore + ratingScore + openStatusScore + dataCompletenessScore, 0, 100);
   const distanceAdjustedFinalScore =
     options.fallbackReason !== undefined &&
     preference &&
@@ -802,7 +803,8 @@ function scoreRestaurant(restaurant, preference, options = {}) {
   const priceCalibratedConfidenceScore = underBudgetMismatch
     ? Math.min(budgetCalibratedConfidenceScore, getUnderBudgetConfidenceCap(restaurant, preference))
     : budgetCalibratedConfidenceScore;
-  const historyCalibratedConfidenceScore = historyPenaltyApplies ? Math.min(priceCalibratedConfidenceScore, 72) : priceCalibratedConfidenceScore;
+  const speedFastCalibratedConfidenceScore = speedFastLowChainPenalty > 0 ? Math.min(priceCalibratedConfidenceScore, 64) : priceCalibratedConfidenceScore;
+  const historyCalibratedConfidenceScore = historyPenaltyApplies ? Math.min(speedFastCalibratedConfidenceScore, 72) : speedFastCalibratedConfidenceScore;
   const confidenceScore =
     options.confidenceCap !== undefined ? Math.min(historyCalibratedConfidenceScore, options.confidenceCap) : historyCalibratedConfidenceScore;
 
@@ -814,7 +816,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     breakdown: {
       baseScore,
       preferenceScore,
-      negativePreferencePenalty,
+      negativePreferencePenalty: negativePreferencePenalty + speedFastLowChainPenalty,
       distanceScore,
       priceScore,
       timeScore,
@@ -844,6 +846,7 @@ function scoreRestaurant(restaurant, preference, options = {}) {
     ).reasons,
     penaltyReasons: [
       ...buildPenaltyReasons(restaurant, negativeConflict, preference, options.fallbackReason, temperatureConflict, nonMealBudgetMismatch),
+      ...(speedFastLowChainPenalty > 0 ? ['speed_fast meal intent downranks fried/burger/low-chain fast food'] : []),
       ...(historyPenaltyApplies ? ['近期跳过，已降低权重'] : [])
     ],
     matchedPreferredTagIds,
@@ -1690,7 +1693,7 @@ function getDistanceScore(restaurant, preference, fallbackUsed) {
 }
 
 function getPriceScore(restaurant, preference) {
-  if (!preference || preference.budgetLevel === undefined) return 0;
+  if (!preference || preference.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) return 0;
   const estimatedCost = getEstimatedCost(restaurant);
   const flexibleNonMealBudget = isFlexibleNonMealBudget(preference);
   if (estimatedCost === undefined) {
@@ -1719,6 +1722,23 @@ function getPriceScore(restaurant, preference) {
   if (estimatedCost <= range.max * 1.1) return -10;
   if (estimatedCost <= range.max * 1.2) return -22;
   return -34;
+}
+
+function getSpeedFastMealLowChainPenalty(restaurant, preference, tagIds = getRestaurantTagIds(restaurant)) {
+  const selected = new Set((preference && preference.selectedOptionIds) || []);
+
+  if (!selected.has('speed_fast') || !selected.has('intent_meal')) return 0;
+  if (selected.has('budget_under_30') || selected.has('meal_type_snack')) return 0;
+
+  const tags = new Set(tagIds);
+  const text = getRestaurantSignalText(restaurant);
+  const isLowChainFastFood =
+    tags.has('low_chain') ||
+    tags.has('burger') ||
+    tags.has('fried') ||
+    /麦当劳|肯德基|汉堡王|kfc|mcdonald|burger king|炸鸡|汉堡|薯条/i.test(text);
+
+  return isLowChainFastFood ? 38 : 0;
 }
 
 function getTimeScore(restaurant, preference) {
@@ -1782,19 +1802,19 @@ function calculateConfidenceScore(input) {
 }
 
 function isOverBudget(restaurant, preference) {
-  if (!preference || preference.budgetLevel === undefined) return false;
+  if (!preference || preference.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) return false;
   const estimatedCost = getEstimatedCost(restaurant);
   return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max;
 }
 
 function isClearlyOverBudget(restaurant, preference) {
-  if (!preference || preference.budgetLevel === undefined) return false;
+  if (!preference || preference.budgetLevel === undefined || !hasExplicitBudgetPreference(preference)) return false;
   const estimatedCost = getEstimatedCost(restaurant);
   return estimatedCost !== undefined && estimatedCost > getBudgetRange(preference).max * 1.2;
 }
 
 function isClearlyUnderBudget(restaurant, preference, allowNearBudgetFallback = false) {
-  if (!preference || preference.budgetLevel === undefined || preference.budgetLevel < 5) return false;
+  if (!preference || preference.budgetLevel === undefined || !hasExplicitBudgetPreference(preference) || preference.budgetLevel < 5) return false;
   if (isFlexibleNonMealBudget(preference)) return false;
   const range = getBudgetRange(preference);
   const estimatedCost = getEstimatedCost(restaurant);
@@ -1804,7 +1824,7 @@ function isClearlyUnderBudget(restaurant, preference, allowNearBudgetFallback = 
 }
 
 function isPriceUnknownForStrictBudget(restaurant, preference) {
-  return preference && preference.budgetLevel !== undefined && preference.budgetLevel >= 5 && !isFlexibleNonMealBudget(preference) && isPriceUnknown(restaurant);
+  return preference && preference.budgetLevel !== undefined && hasExplicitBudgetPreference(preference) && preference.budgetLevel >= 5 && !isFlexibleNonMealBudget(preference) && isPriceUnknown(restaurant);
 }
 
 function isWeakUnknownPriceForPremiumFallback(restaurant, preference) {
@@ -1951,6 +1971,10 @@ function getBudgetMaxYuan(preference) {
 
 function getBudgetRange(preference) {
   return BUDGET_LEVEL_TO_RANGE[preference.budgetLevel || 3] || BUDGET_LEVEL_TO_RANGE[3];
+}
+
+function hasExplicitBudgetPreference(preference) {
+  return ((preference && preference.selectedOptionIds) || []).some((optionId) => String(optionId).startsWith('budget_'));
 }
 
 function getEstimatedCost(restaurant) {

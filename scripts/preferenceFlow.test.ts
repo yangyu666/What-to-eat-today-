@@ -110,6 +110,15 @@ const premiumBudgetProfile = mapAnswersToPreferenceProfile([
 ]);
 
 assert(premiumBudgetProfile.budgetLevel === 5, '100-200 budget should map to premium budget level');
+const premiumBudgetQuery = buildAmapRestaurantQuery(premiumBudgetProfile);
+assert(
+  /粤菜|江浙菜|日料|西餐|品牌餐厅|商场餐厅|酒店餐厅/.test(premiumBudgetQuery.keywords ?? ''),
+  '100-200 budget should start from quality meal recall keywords'
+);
+assert(
+  !/米饭|粉面|火锅|烤肉/.test(premiumBudgetQuery.keywords ?? ''),
+  '100-200 budget should not use cheap staple or hotpot/barbecue as the main query'
+);
 
 const premiumBrandBudgetProfile = mapAnswersToPreferenceProfile([
   {

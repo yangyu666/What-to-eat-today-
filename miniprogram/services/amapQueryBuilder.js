@@ -22,6 +22,20 @@ const PREMIUM_FALLBACK_KEYWORDS = [
     '烧肉',
     '创意菜'
 ];
+const MID_HIGH_FALLBACK_KEYWORDS = [
+    '粤菜',
+    '江浙菜',
+    '本帮菜',
+    '日料',
+    '西餐',
+    '茶餐厅',
+    '品牌餐厅',
+    '商场餐厅',
+    '融合料理',
+    '牛排',
+    '海鲜',
+    '酒店餐厅'
+];
 const LOW_CHAIN_KEYWORDS = ['肯德基', '麦当劳', '赛百味', 'Subway', '汉堡王', '华莱士', '塔斯汀', '必胜客', '达美乐', '真功夫', '老乡鸡', '乡村基', '吉野家', '永和大王', '霸王茶姬', '喜茶', '奈雪', '一点点', '1点点', '蜜雪冰城', 'LINLEE', '麒麟大口茶', '大口茶', 'KOI', '阿嬷手作', '去茶山', '古茗', '茉莉奶白', '爷爷不泡茶', '茶理宜世', '茶记大咖', 'T9tea', 'Tamkoko', '星巴克', '瑞幸', 'Manner', 'Peet', 'Costa', 'Tims'];
 const MID_CHAIN_KEYWORDS = ['费大厨', '小菜园', '西贝', '海底捞', '太二', '探鱼', '点都德', '陶陶居', '绿茶餐厅', '外婆家', '九毛九'];
 const LOW_BUDGET_GENERIC_KEYWORDS = ['快餐', '简餐', '盖饭', '套餐', '茶餐厅', '小吃', '包子', '煎饼', '炸鸡', '汉堡', '面'];
@@ -210,7 +224,7 @@ function normalizeRadius(maxDistanceMeters) {
     return Math.max(300, Math.min(10000, Math.round(radius)));
 }
 function buildKeywords(preference) {
-    var _a, _b;
+    var _a, _b, _c;
     const keywords = new Set();
     const softKeywords = (_a = preference.softPreferences) === null || _a === void 0 ? void 0 : _a.amapKeywords;
     if (Array.isArray(softKeywords)) {
@@ -230,7 +244,11 @@ function buildKeywords(preference) {
     const removedKeywords = removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
     let fallbackKeywordsUsed = false;
     if (keywords.size === 0 || removedKeywords.length >= Math.max(2, beforeRemovalCount / 2)) {
-        const fallbackKeywords = ((_b = preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6 ? PREMIUM_FALLBACK_KEYWORDS : SAFE_FALLBACK_KEYWORDS;
+        const fallbackKeywords = ((_b = preference.budgetLevel) !== null && _b !== void 0 ? _b : 3) >= 6
+            ? PREMIUM_FALLBACK_KEYWORDS
+            : ((_c = preference.budgetLevel) !== null && _c !== void 0 ? _c : 3) >= 5
+                ? MID_HIGH_FALLBACK_KEYWORDS
+                : SAFE_FALLBACK_KEYWORDS;
         fallbackKeywords.forEach((keyword) => keywords.add(keyword));
         removeNegativeConflictKeywords(keywords, preference.avoidedTagIds);
         fallbackKeywordsUsed = true;
@@ -265,6 +283,7 @@ function applyBudgetKeywordCalibration(keywords, preference) {
     if (budgetLevel >= 5) {
         LOW_CHAIN_KEYWORDS.forEach((keyword) => keywords.delete(keyword));
         LOW_BUDGET_GENERIC_KEYWORDS.forEach((keyword) => keywords.delete(keyword));
+        ['米饭', '粉面', '粥', '面', '火锅', '烤肉', '烧烤', '小吃'].forEach((keyword) => keywords.delete(keyword));
         PREMIUM_CHAIN_KEYWORDS.forEach((keyword) => keywords.delete(keyword));
         return;
     }
