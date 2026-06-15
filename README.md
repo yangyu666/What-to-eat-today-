@@ -306,6 +306,7 @@ npm install
 - `project.private.config.json`：本地 AppID 等个人配置。
 - `miniprogram/config/cloud.ts`：云开发环境 ID。
 - 云函数环境变量：高德 key 只放云函数环境变量。
+- `wx.getLocation` 权限已申请通过，申请资料沉淀在 `design/wx-getlocation-application.json`；提审前仍需在微信开发者工具确认 `app.json` 的 `requiredPrivateInfos` 和 `scope.userLocation` 描述完整。
 
 ## 常用命令
 
@@ -354,5 +355,4 @@ npm.cmd run seed:amap-rich -- --label test-point --lat 39.909 --lng 116.455 --ra
 ```
 
 注意：seed 会调用真实高德 API，压测默认不会。
-
 
